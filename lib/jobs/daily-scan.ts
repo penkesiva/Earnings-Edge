@@ -374,6 +374,17 @@ async function generateBrief(ticker: string, earningsDate: string) {
 
   if (error) throw error;
 
+  // Log scan snapshot for flip detection (fire-and-forget, never throws)
+  sb.from('brief_scans').insert({
+    ticker,
+    reconciled_action: reconciled.final_action,
+    scream_score: screamResult.score,
+    iv_rank: ivRank,
+    directional_bias: screamResult.directionalBias,
+  }).then(({ error: scanErr }) => {
+    if (scanErr) console.warn(`[daily-scan] ${ticker} brief_scans insert:`, scanErr.message);
+  });
+
   return {
     ...brief,
     components: score.components,

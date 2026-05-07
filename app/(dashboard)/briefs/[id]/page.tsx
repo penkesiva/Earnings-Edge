@@ -3,7 +3,9 @@ import { notFound } from 'next/navigation';
 import { supabaseAdmin } from '@/lib/supabase';
 import { FinalActionBadge, SignalBadge } from '@/components/SignalBadge';
 import { ScreamTestCard } from '@/components/ScreamTestCard';
+import { ScanDiffBanner } from '@/components/ScanDiffBanner';
 import type { FilterResult, NarrativeOverhang } from '@/lib/screamTest';
+import type { BriefScanRow } from '@/lib/scanDiff';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,6 +34,15 @@ export default async function BriefPage({ params }: { params: { id: string } }) 
     .select('*')
     .eq('brief_id', params.id)
     .maybeSingle();
+
+  // Two most recent scans for this ticker (for flip detection)
+  const { data: scans } = await sb
+    .from('brief_scans')
+    .select('id, ticker, scan_timestamp, reconciled_action, scream_score, iv_rank, directional_bias')
+    .eq('ticker', brief.ticker)
+    .order('scan_timestamp', { ascending: false })
+    .limit(2);
+  const scanRows = (scans ?? []) as BriefScanRow[];
 
   const components = [
     'beat_streak_score',
@@ -75,6 +86,9 @@ export default async function BriefPage({ params }: { params: { id: string } }) 
           <span className="text-fg-subtle text-base ml-2">/ 100</span>
         </div>
       </div>
+
+      {/* ── Scan diff banner ───────────────────────────────────────────────── */}
+      <ScanDiffBanner ticker={brief.ticker} scans={scanRows} />
 
       {/* ── Final action ───────────────────────────────────────────────────── */}
       <section className="border border-border bg-bg-elevated p-6">
