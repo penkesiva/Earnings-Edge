@@ -5,6 +5,7 @@ import { addCalendarDays, earningsSessionDate } from '@/lib/earningsDate';
 import { FinalActionBadge } from '@/components/SignalBadge';
 import { DashboardRefresh } from '@/components/DashboardRefresh';
 import { FearGreedIndex, FearGreedIndexSkeleton } from '@/components/FearGreedIndex';
+import { LastScanned } from '@/components/LastScanned';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -66,7 +67,10 @@ export default async function HomePage() {
               {todayBriefs.map(b => (
                 <Link key={b.id} href={`/briefs/${b.id}`} className="block border border-border bg-bg-elevated p-3">
                   <div className="flex items-center justify-between">
-                    <div className="font-bold text-lg">{b.ticker}</div>
+                    <div className="flex items-baseline gap-2">
+                      <span className="font-bold text-lg">{b.ticker}</span>
+                      <LastScanned updatedAt={b.updated_at ?? b.generated_at ?? null} />
+                    </div>
                     <FinalActionBadge action={b.final_action ?? null} />
                   </div>
                   <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
@@ -89,7 +93,7 @@ export default async function HomePage() {
               <div className="col-span-2">SPOT</div>
               <div className="col-span-2">EXP MOVE</div>
               <div className="col-span-1">IV RANK</div>
-              <div className="col-span-2">REASONING</div>
+              <div className="col-span-2">SCANNED</div>
             </div>
             {todayBriefs.map(b => (
               <Link
@@ -111,8 +115,8 @@ export default async function HomePage() {
                   ±${b.expected_move_dollar?.toFixed(2)} ({b.expected_move_pct?.toFixed(1)}%)
                 </div>
                 <div className="col-span-1 text-fg-muted">{b.iv_rank}</div>
-                <div className="col-span-2 text-xs text-fg-subtle truncate">
-                  {b.reasoning || '—'}
+                <div className="col-span-2">
+                  <LastScanned updatedAt={b.updated_at ?? b.generated_at ?? null} />
                 </div>
               </Link>
             ))}
@@ -140,7 +144,10 @@ export default async function HomePage() {
               {tomorrowBriefs.map(b => (
                 <Link key={b.id} href={`/briefs/${b.id}`} className="block border border-border bg-bg-elevated p-3">
                   <div className="flex items-center justify-between">
-                    <div className="font-bold text-lg">{b.ticker}</div>
+                    <div className="flex items-baseline gap-2">
+                      <span className="font-bold text-lg">{b.ticker}</span>
+                      <LastScanned updatedAt={b.updated_at ?? b.generated_at ?? null} />
+                    </div>
                     <FinalActionBadge action={b.final_action ?? null} />
                   </div>
                   <div className="mt-2 text-xs text-fg-muted">
@@ -154,8 +161,9 @@ export default async function HomePage() {
             <div className="grid grid-cols-12 gap-4 px-4 py-2 bg-bg-elevated text-xs text-fg-subtle uppercase tracking-widest border-b border-border">
               <div className="col-span-2">TKR</div>
               <div className="col-span-2">SCORE</div>
-              <div className="col-span-4">ACTION</div>
-              <div className="col-span-4">EXP MOVE</div>
+              <div className="col-span-3">ACTION</div>
+              <div className="col-span-3">EXP MOVE</div>
+              <div className="col-span-2">SCANNED</div>
             </div>
             {tomorrowBriefs.map(b => (
               <Link
@@ -167,11 +175,14 @@ export default async function HomePage() {
                 <div className="col-span-2">
                   <ScoreCell value={b.composite_score} />
                 </div>
-                <div className="col-span-4">
+                <div className="col-span-3">
                   <FinalActionBadge action={b.final_action ?? null} />
                 </div>
-                <div className="col-span-4 text-fg-muted">
+                <div className="col-span-3 text-fg-muted">
                   ±${b.expected_move_dollar?.toFixed(2)} ({b.expected_move_pct?.toFixed(1)}%)
+                </div>
+                <div className="col-span-2">
+                  <LastScanned updatedAt={b.updated_at ?? b.generated_at ?? null} />
                 </div>
               </Link>
             ))}
