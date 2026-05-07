@@ -1,50 +1,28 @@
 'use client';
 
 import { useState } from 'react';
-import { syncCalendarAction, runTomorrowPrepAction, type RefreshResult } from '@/app/actions/dashboard-refresh';
+import { syncCalendarAction, type RefreshResult } from '@/app/actions/dashboard-refresh';
 
-/**
- * SYNC CALENDAR and PREP TOMORROW call Server Actions directly — they are fast
- * enough (<60s) to be safe.
- *
- * RUN DAILY SCAN hits the HTTP cron route (/api/cron/daily-scan) so it inherits
- * that route's maxDuration = 300s, bypassing the Server Action 10s cap on Hobby.
- * The button sends CRON_SECRET from NEXT_PUBLIC_CRON_SECRET (read-only, exposed
- * intentionally — the endpoint still rejects if the value is wrong or missing).
- */
-
-async function callDailyScanRoute(): Promise<RefreshResult> {
-  const secret = process.env.NEXT_PUBLIC_CRON_SECRET ?? '';
-  const base = process.env.NEXT_PUBLIC_BASE_URL ?? '';
-  const res = await fetch(`${base}/api/cron/daily-scan`, {
-    headers: { Authorization: `Bearer ${secret}` },
+async function callRunScan(prep?: 'tomorrow'): Promise<RefreshResult> {
+  const res = await fetch('/api/internal/run-scan', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(prep ? { prep } : {}),
   });
+  const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    return { ok: false, error: body.error ?? `HTTP ${res.status}` };
+    return { ok: false, error: data.error ?? `HTTP ${res.status}` };
   }
-  const data = await res.json();
-  return {
-    ok: true,
-    message: `Daily scan finished${data.count != null ? ` (${data.count} tickers)` : ''}.`,
-  };
-}
-
-async function callTomorrowPrepRoute(): Promise<RefreshResult> {
-  const secret = process.env.NEXT_PUBLIC_CRON_SECRET ?? '';
-  const base = process.env.NEXT_PUBLIC_BASE_URL ?? '';
-  const res = await fetch(`${base}/api/cron/daily-scan?prep=tomorrow`, {
-    headers: { Authorization: `Bearer ${secret}` },
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    return { ok: false, error: body.error ?? `HTTP ${res.status}` };
+  const count: number | undefined = data.count;
+  const idle: string | undefined = data.idleReason;
+  if (idle === 'empty_watchlist') {
+    return { ok: true, message: 'Watchlist is empty — add tickers on WATCHLIST first.' };
   }
-  const data = await res.json();
-  return {
-    ok: true,
-    message: `Tomorrow prep finished${data.count != null ? ` (${data.count} tickers)` : ''}.`,
-  };
+  if (idle) {
+    return { ok: true, message: `No earnings today (${idle}).` };
+  }
+  const label = prep === 'tomorrow' ? 'Tomorrow prep' : 'Daily scan';
+  return { ok: true, message: `${label} finished (${count ?? 0} ticker${count === 1 ? '' : 's'}).` };
 }
 
 export function DashboardRefresh() {
@@ -55,8 +33,7 @@ export function DashboardRefresh() {
     setLast(null);
     setPending(true);
     try {
-      const result = await fn();
-      setLast(result);
+      setLast(await fn());
     } finally {
       setPending(false);
     }
@@ -98,7 +75,7 @@ export function DashboardRefresh() {
           <button
             type="button"
             disabled={pending}
-            onClick={() => run(callDailyScanRoute)}
+            onClick={() => run(() => callRunScan())}
             className="px-3 py-2 text-xs font-bold tracking-widest bg-fg text-bg hover:bg-signal-buy transition-colors disabled:opacity-40 w-full sm:w-auto"
           >
             {pending ? '…' : 'RUN DAILY SCAN'}
@@ -106,7 +83,7 @@ export function DashboardRefresh() {
           <button
             type="button"
             disabled={pending}
-            onClick={() => run(callTomorrowPrepRoute)}
+            onClick={() => run(() => callRunScan('tomorrow'))}
             className="px-3 py-2 text-xs font-bold tracking-widest border border-border bg-bg hover:border-signal-watch hover:text-signal-watch transition-colors disabled:opacity-40 w-full sm:w-auto"
           >
             {pending ? '…' : 'PREP TOMORROW'}
