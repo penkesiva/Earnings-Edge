@@ -10,6 +10,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { runUpdateCalendarJob } from '@/lib/jobs/update-calendar';
 
+export const maxDuration = 60; // FMP calendar fetch + upsert; safe on Pro
+
 export async function GET(req: NextRequest) {
   const auth = req.headers.get('authorization');
   if (auth !== `Bearer ${process.env.CRON_SECRET}`) {

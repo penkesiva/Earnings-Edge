@@ -8,8 +8,9 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { runDailyScanJob } from '@/lib/jobs/daily-scan';
+import { addCalendarDays, earningsSessionDate } from '@/lib/earningsDate';
 
-export const maxDuration = 300; // 5 min
+export const maxDuration = 300; // 5 min — requires Vercel Pro or higher
 
 export async function GET(req: NextRequest) {
   const auth = req.headers.get('authorization');
@@ -17,8 +18,18 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
 
+  // ?prep=tomorrow → build briefs for tomorrow's session date, no notifications
+  const prep = req.nextUrl.searchParams.get('prep');
+  const targetDate =
+    prep === 'tomorrow'
+      ? addCalendarDays(earningsSessionDate(), 1)
+      : undefined;
+
   try {
-    const result = await runDailyScanJob();
+    const result = await runDailyScanJob({
+      targetDate,
+      sendNotifications: prep !== 'tomorrow',
+    });
     if ('idleReason' in result) {
       return NextResponse.json({
         count: 0,
