@@ -1,4 +1,4 @@
-import type { FilterResult } from '@/lib/screamTest';
+import type { FilterResult, NarrativeOverhang } from '@/lib/screamTest';
 
 const FILTER_LABELS: Record<string, string> = {
   chainConviction: 'Chain conviction',
@@ -8,6 +8,42 @@ const FILTER_LABELS: Record<string, string> = {
   sectorTailwind: 'Sector / peers',
 };
 
+/** JSON/DB may reorder keys; keep filter rows in design order. */
+const FILTER_ROW_ORDER = [
+  'chainConviction',
+  'skewAlignment',
+  'beatHistory',
+  'setupConfirmation',
+  'sectorTailwind',
+] as const;
+
+/** Display labels aligned with beat-score badge (ALL CAPS trade vocabulary). */
+function formatScreamGate(rec: string): string {
+  const r = rec.toLowerCase();
+  if (r === 'skip') return 'SKIP';
+  if (r === 'stock-only') return 'STOCK ONLY';
+  if (r === 'calls') return 'CALLS';
+  if (r === 'puts') return 'PUTS';
+  return rec.replace(/-/g, ' ').toUpperCase();
+}
+
+/** When we render full narrative rows below, hide duplicate one-line triggers under Setup. */
+function triggersForRow(
+  key: string,
+  f: { triggers?: string[] },
+  unresolvedOverhangs: NarrativeOverhang[] | null | undefined
+): string[] | undefined {
+  const t = f.triggers;
+  if (!t?.length) return undefined;
+  if (key !== 'setupConfirmation' || !unresolvedOverhangs?.length) return t;
+  return t.filter(
+    line =>
+      line.startsWith('Insider selling') ||
+      line.startsWith('Regulatory /') ||
+      line.startsWith('Stretched valuation')
+  );
+}
+
 type Props = {
   scream_score: number | null;
   scream_direction: string | null;
@@ -15,6 +51,8 @@ type Props = {
   scream_qualifies: boolean | null;
   scream_filters: Record<string, FilterResult> | null;
   scream_notes: string[] | null;
+  /** From `raw_fmp.screamUnresolvedOverhangs` after daily scan v2. */
+  unresolvedOverhangs?: NarrativeOverhang[] | null;
 };
 
 export function ScreamTestCard({
@@ -24,6 +62,7 @@ export function ScreamTestCard({
   scream_qualifies,
   scream_filters,
   scream_notes,
+  unresolvedOverhangs,
 }: Props) {
   if (
     scream_score == null ||
@@ -78,16 +117,64 @@ export function ScreamTestCard({
       </div>
 
       <div className="space-y-2 text-xs font-mono">
-        {(Object.entries(scream_filters) as [string, FilterResult][]).map(([key, f]) => (
-          <div key={key} className="flex gap-2 items-start border-b border-border-subtle pb-2 last:border-0">
-            <span className={f.passed ? 'text-signal-buy shrink-0' : 'text-fg-dim shrink-0'}>
-              {f.passed ? '✓' : '✗'}
-            </span>
-            <span className="text-fg-subtle w-40 shrink-0">{FILTER_LABELS[key] ?? key}</span>
-            <span className="text-fg-muted flex-1 min-w-0">{f.detail}</span>
-          </div>
-        ))}
+        {FILTER_ROW_ORDER.map(key => {
+          const f = scream_filters[key];
+          if (!f) return null;
+          const rowTriggers = triggersForRow(key, f, unresolvedOverhangs);
+          return (
+            <div
+              key={key}
+              className="space-y-1 border-b border-border-subtle pb-2 last:border-0"
+            >
+              <div className="flex gap-2 items-start">
+                <span className={f.passed ? 'text-signal-buy shrink-0' : 'text-fg-dim shrink-0'}>
+                  {f.passed ? '✓' : '✗'}
+                </span>
+                <span className="text-fg-subtle w-40 shrink-0">{FILTER_LABELS[key] ?? key}</span>
+                <span className="text-fg-muted flex-1 min-w-0">{f.detail}</span>
+              </div>
+              {rowTriggers && rowTriggers.length > 0 && (
+                <ul className="pl-6 ml-40 text-fg-dim space-y-0.5">
+                  {rowTriggers.map((t, j) => (
+                    <li key={j} className="text-[10px] leading-snug flex gap-1">
+                      <span className="text-fg-dim shrink-0">·</span>
+                      <span>{t}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          );
+        })}
       </div>
+
+      {unresolvedOverhangs && unresolvedOverhangs.length > 0 && (
+        <div className="mt-4 pt-3 border-t border-border-subtle">
+          <div className="text-[10px] tracking-widest text-fg-subtle mb-1">
+            UNRESOLVED NARRATIVE RISKS
+          </div>
+          <p className="text-[10px] text-fg-dim mb-2 max-w-xl leading-relaxed">
+            From the daily scan: FMP stable stock news (keyword buckets) plus Alpaca daily bars
+            to tag same-window drawdowns. “Unresolved” means no matching resolution headline in
+            the following ~14 days.
+          </p>
+          <ul className="space-y-2 text-[11px] text-fg-muted">
+            {unresolvedOverhangs.map((o, i) => (
+              <li key={i} className="border-l-2 border-signal-sell/40 pl-2">
+                <span className="text-fg-subtle uppercase text-[10px]">
+                  {o.category.replace(/_/g, ' ')}
+                </span>
+                <span className="text-fg-dim mx-1">·</span>
+                <span>{o.detectedDate}</span>
+                {o.drawdownPct != null && (
+                  <span className="text-fg-dim"> (−{o.drawdownPct}%)</span>
+                )}
+                <div className="text-fg-muted mt-0.5 font-normal">{o.description}</div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {scream_notes && scream_notes.length > 0 && (
         <ul className="mt-4 pt-3 border-t border-border-subtle space-y-1">
@@ -99,9 +186,17 @@ export function ScreamTestCard({
         </ul>
       )}
 
-      <div className="mt-4 pt-3 border-t border-border-subtle font-mono text-xs">
-        <span className="text-fg-dim uppercase tracking-widest">Recommendation </span>
-        <span className={`font-bold tracking-wide ${recClass}`}>{rec.replace(/-/g, ' ')}</span>
+      <div className="mt-4 pt-3 border-t border-border-subtle">
+        <div className="text-[10px] text-fg-dim uppercase tracking-widest mb-1">
+          Scream options gate
+        </div>
+        <div className="font-mono text-xs">
+          <span className={`font-bold tracking-wide ${recClass}`}>{formatScreamGate(rec)}</span>
+        </div>
+        <p className="text-[10px] text-fg-dim mt-1 max-w-md leading-relaxed">
+          Separate from the beat-score badge and suggested structure: only whether directional
+          options (long call/put) meet the 4/5 filter bar.
+        </p>
       </div>
     </section>
   );

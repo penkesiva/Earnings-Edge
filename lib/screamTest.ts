@@ -13,6 +13,25 @@
 
 export type Direction = 'bullish' | 'bearish' | 'mixed' | 'none';
 
+/** Narrative / price-action risk bucket for Filter 4. */
+export type OverhangCategory =
+  | 'competitive'
+  | 'sector_repricing'
+  | 'downgrade'
+  | 'guidance_concern'
+  | 'customer_loss'
+  | 'regulatory'
+  | 'macro_specific';
+
+export interface NarrativeOverhang {
+  category: OverhangCategory;
+  description: string;
+  detectedDate: string;
+  drawdownPct: number | null;
+  resolved: boolean;
+  source: string;
+}
+
 export interface ScreamTestInputs {
   ticker: string;
   spot: number;
@@ -32,11 +51,13 @@ export interface ScreamTestInputs {
   totalQuartersTracked: number; // denominator for streak
   zacksEsp: number | null; // e.g. 0.0308 = +3.08%
 
-  // Filter 4 — setup overhangs (manually flagged or from FMP/insider feed)
+  // Filter 4 — setup overhangs (structured + narrative + valuation)
   hasInsiderSellingCluster: boolean; // ≥2 insiders selling in past 60 days
   hasRegulatoryOverhang: boolean; // SEC probe, lawsuit, etc.
   ytdReturnPct: number; // e.g. 72.8 for COHR
   forwardPe: number | null;
+  /** From FMP stable news + Alpaca bars (`detectOverhangs`). */
+  narrativeOverhangs?: NarrativeOverhang[];
 
   // Filter 5 — sector tailwind
   peerEarningsReactionsPct: number[]; // e.g. [15.1, 2.5] from peer names
@@ -47,13 +68,15 @@ export interface FilterResult {
   passed: boolean;
   direction: Direction;
   detail: string;
+  /** Human-readable reasons when passed with bearish tilt (Filter 4, etc.). */
+  triggers?: string[];
 }
 
 export interface ScreamTestResult {
   ticker: string;
   score: number; // 0-5
   directionalBias: Direction; // dominant direction across passing filters
-  qualifies: boolean; // score >= 4 AND consistent direction
+  qualifies: boolean; // score >= 4 AND consistent direction (not mixed/none)
   recommendation: 'calls' | 'puts' | 'skip' | 'stock-only';
   filters: {
     chainConviction: FilterResult;
@@ -63,6 +86,8 @@ export interface ScreamTestResult {
     sectorTailwind: FilterResult;
   };
   notes: string[];
+  /** Unresolved narrative rows feeding Filter 4 bearish path (audit / UI). */
+  unresolvedOverhangs: NarrativeOverhang[];
 }
 
 // --- Filter implementations ---
@@ -154,35 +179,47 @@ function filter3BeatHistory(i: ScreamTestInputs): FilterResult {
 }
 
 function filter4SetupConfirmation(i: ScreamTestInputs): FilterResult {
+  const narrative = i.narrativeOverhangs ?? [];
+  const unresolved = narrative.filter(n => !n.resolved);
+  const narrativeBearish = unresolved.length > 0;
+
   const stretchedValuation =
     (i.forwardPe != null && i.forwardPe > 45) || i.ytdReturnPct > 60;
-  const overhangs = i.hasInsiderSellingCluster || i.hasRegulatoryOverhang;
+  const structuredOverhang =
+    i.hasInsiderSellingCluster || i.hasRegulatoryOverhang;
 
-  // Bullish setup: no overhangs, valuation reasonable
-  if (!overhangs && !stretchedValuation) {
+  const triggers: string[] = [];
+  for (const u of unresolved) {
+    const dd =
+      u.drawdownPct != null ? `, −${u.drawdownPct}% same window` : '';
+    triggers.push(`${u.category.replace(/_/g, ' ')} (${u.detectedDate})${dd}`);
+  }
+  if (i.hasInsiderSellingCluster) triggers.push('Insider selling cluster (60d)');
+  if (i.hasRegulatoryOverhang) triggers.push('Regulatory / legal overhang');
+  if (stretchedValuation) {
+    triggers.push(
+      `Stretched valuation (YTD +${i.ytdReturnPct.toFixed(1)}%, fwd P/E ${i.forwardPe ?? 'n/a'})`
+    );
+  }
+
+  const bearishSignals =
+    narrativeBearish || structuredOverhang || stretchedValuation;
+
+  if (!bearishSignals) {
     return {
       passed: true,
       direction: 'bullish',
-      detail: 'Clean setup: no insider selling, no regulatory issues, valuation reasonable',
+      detail:
+        'Clean setup: no unresolved narrative risks, no insider/regulatory flags, valuation reasonable',
+      triggers: [],
     };
   }
-  // Bearish setup: overhangs OR stretched valuation present
-  if (overhangs || stretchedValuation) {
-    const reasons: string[] = [];
-    if (i.hasInsiderSellingCluster) reasons.push('insider selling');
-    if (i.hasRegulatoryOverhang) reasons.push('regulatory overhang');
-    if (stretchedValuation)
-      reasons.push(`stretched (YTD +${i.ytdReturnPct.toFixed(1)}%, P/E ${i.forwardPe ?? '?'})`);
-    return {
-      passed: true,
-      direction: 'bearish',
-      detail: `Bearish overhangs: ${reasons.join(', ')}`,
-    };
-  }
+
   return {
-    passed: false,
-    direction: 'mixed',
-    detail: 'Setup factors mixed',
+    passed: true,
+    direction: 'bearish',
+    detail: `Bearish setup: ${triggers.length} signal(s) — narrative, structural, and/or valuation`,
+    triggers,
   };
 }
 
@@ -217,6 +254,8 @@ function filter5SectorTailwind(i: ScreamTestInputs): FilterResult {
 // --- Main entry point ---
 
 export function computeScreamTest(inputs: ScreamTestInputs): ScreamTestResult {
+  const unresolvedOverhangs = (inputs.narrativeOverhangs ?? []).filter(n => !n.resolved);
+
   const filters = {
     chainConviction: filter1ChainConviction(inputs),
     skewAlignment: filter2SkewAlignment(inputs),
@@ -236,8 +275,12 @@ export function computeScreamTest(inputs: ScreamTestInputs): ScreamTestResult {
   let directionalBias: Direction = 'mixed';
   if (bullCount > bearCount && bullCount >= 3) directionalBias = 'bullish';
   else if (bearCount > bullCount && bearCount >= 3) directionalBias = 'bearish';
+  else if (bullCount === 0 && bearCount === 0) directionalBias = 'none';
 
-  const qualifies = score >= 4 && directionalBias !== 'mixed';
+  const qualifies =
+    score >= 4 &&
+    directionalBias !== 'mixed' &&
+    directionalBias !== 'none';
 
   let recommendation: ScreamTestResult['recommendation'];
   if (!qualifies) {
@@ -254,6 +297,14 @@ export function computeScreamTest(inputs: ScreamTestInputs): ScreamTestResult {
   if (directionalBias === 'mixed' && score >= 4) {
     notes.push('Filters pass but direction is split — chain is hedged, avoid directional options');
   }
+  if (directionalBias === 'none' && score >= 4) {
+    notes.push('Passing filters lack a 3+ directional cluster — no clear scream bias');
+  }
+  if (unresolvedOverhangs.length > 0) {
+    notes.push(
+      `${unresolvedOverhangs.length} unresolved narrative risk(s) in the lookback window`
+    );
+  }
   if (score === 5) notes.push('Maximum conviction — rare setup, size accordingly');
 
   return {
@@ -264,5 +315,6 @@ export function computeScreamTest(inputs: ScreamTestInputs): ScreamTestResult {
     recommendation,
     filters,
     notes,
+    unresolvedOverhangs,
   };
 }

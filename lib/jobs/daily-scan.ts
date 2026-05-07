@@ -24,6 +24,8 @@ import { computeBeatScore } from '@/lib/beatScore';
 import { suggestStructure } from '@/lib/structure';
 import { computeScreamTest, type ScreamTestInputs } from '@/lib/screamTest';
 import { deriveChainScreamFields, ytdReturnPctFromBars } from '@/lib/screamTestData';
+import { detectOverhangs } from '@/lib/overhangDetector';
+import { reconcileSignals } from '@/lib/reconcile';
 import { sendBriefEmail } from '@/lib/email';
 import { sendPush } from '@/lib/push';
 import { earningsSessionDate } from '@/lib/earningsDate';
@@ -257,6 +259,13 @@ async function generateBrief(ticker: string, earningsDate: string) {
     yearBars.map((b: { t: string; c: number }) => ({ t: String(b.t), c: b.c }))
   );
 
+  let narrativeOverhangs: ScreamTestInputs['narrativeOverhangs'] = [];
+  try {
+    narrativeOverhangs = await detectOverhangs({ ticker, asOfDate: earningsDate });
+  } catch (e) {
+    console.warn(`[daily-scan] ${ticker} narrative overhangs skipped:`, e);
+  }
+
   const screamInputs: ScreamTestInputs = {
     ticker,
     spot: snapshot.price,
@@ -268,6 +277,7 @@ async function generateBrief(ticker: string, earningsDate: string) {
     hasRegulatoryOverhang: false,
     ytdReturnPct,
     forwardPe,
+    narrativeOverhangs,
     peerEarningsReactionsPct: [],
     sectorIndex5dReturnPct: sectorReturn5d,
   };
@@ -290,6 +300,15 @@ async function generateBrief(ticker: string, earningsDate: string) {
     expectedMoveDollar: expectedMove.dollar,
     composite: score.composite,
     signal: score.signal,
+    preferredExpiry: chain.expiry,
+  });
+
+  const reconciled = reconcileSignals({
+    beatScore: score,
+    scream: screamResult,
+    ivRank,
+    spot: snapshot.price,
+    expectedMoveDollar: expectedMove.dollar,
     preferredExpiry: chain.expiry,
   });
 
@@ -324,6 +343,8 @@ async function generateBrief(ticker: string, earningsDate: string) {
         scream_qualifies: screamResult.qualifies,
         scream_filters: screamResult.filters as object,
         scream_notes: screamResult.notes as unknown,
+        final_action: reconciled.final_action,
+        final_action_rationale: reconciled.rationale,
         raw_alpaca: {
           snapshot,
           expectedMove,
@@ -342,6 +363,8 @@ async function generateBrief(ticker: string, earningsDate: string) {
           consecutiveStreak,
           insiderSellingCluster,
           forwardPe,
+          narrativeOverhangs,
+          screamUnresolvedOverhangs: screamResult.unresolvedOverhangs,
         } as object,
       },
       { onConflict: 'ticker,earnings_date' }

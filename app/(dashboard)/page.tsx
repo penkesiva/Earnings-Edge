@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { Suspense } from 'react';
 import { supabaseAdmin } from '@/lib/supabase';
 import { addCalendarDays, earningsSessionDate } from '@/lib/earningsDate';
-import { SignalBadge } from '@/components/SignalBadge';
+import { FinalActionBadge } from '@/components/SignalBadge';
 import { DashboardRefresh } from '@/components/DashboardRefresh';
 import { FearGreedIndex, FearGreedIndexSkeleton } from '@/components/FearGreedIndex';
 
@@ -67,28 +67,15 @@ export default async function HomePage() {
                 <Link key={b.id} href={`/briefs/${b.id}`} className="block border border-border bg-bg-elevated p-3">
                   <div className="flex items-center justify-between">
                     <div className="font-bold text-lg">{b.ticker}</div>
-                    <SignalBadge
-                      signal={b.signal}
-                      structureAction={(b.suggested_structure as { action?: string } | null)?.action}
-                    />
+                    <FinalActionBadge action={b.final_action ?? null} />
                   </div>
                   <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
                     <div className="text-fg-muted">Score: <ScoreCell value={b.composite_score} /></div>
-                    <div className="text-fg-muted">
-                      Scream:{' '}
-                      {b.scream_score != null ? (
-                        <span className={b.scream_qualifies ? 'text-signal-buy font-bold' : 'text-fg-muted'}>
-                          {b.scream_score}/5
-                        </span>
-                      ) : (
-                        <span className="text-fg-dim">—</span>
-                      )}
-                    </div>
                     <div className="text-fg-muted">Spot: ${b.spot_price?.toFixed(2)}</div>
                     <div className="text-fg-muted">IV Rank: {b.iv_rank}</div>
-                  </div>
-                  <div className="mt-2 text-xs text-fg-muted">
-                    Exp Move: ±${b.expected_move_dollar?.toFixed(2)} ({b.expected_move_pct?.toFixed(1)}%)
+                    <div className="text-fg-muted">
+                      Exp Move: ±${b.expected_move_dollar?.toFixed(2)} ({b.expected_move_pct?.toFixed(1)}%)
+                    </div>
                   </div>
                 </Link>
               ))}
@@ -98,8 +85,7 @@ export default async function HomePage() {
             <div className="grid grid-cols-12 gap-4 px-4 py-2 bg-bg-elevated text-xs text-fg-subtle uppercase tracking-widest border-b border-border">
               <div className="col-span-1">TKR</div>
               <div className="col-span-1">SCORE</div>
-              <div className="col-span-1">SCREAM</div>
-              <div className="col-span-2">SIGNAL</div>
+              <div className="col-span-3">ACTION</div>
               <div className="col-span-2">SPOT</div>
               <div className="col-span-2">EXP MOVE</div>
               <div className="col-span-1">IV RANK</div>
@@ -115,22 +101,8 @@ export default async function HomePage() {
                 <div className="col-span-1">
                   <ScoreCell value={b.composite_score} />
                 </div>
-                <div className="col-span-1 text-xs tabular-nums">
-                  {b.scream_score != null ? (
-                    <span
-                      className={b.scream_qualifies ? 'text-signal-buy font-bold' : 'text-fg-muted'}
-                    >
-                      {b.scream_score}/5
-                    </span>
-                  ) : (
-                    <span className="text-fg-dim">—</span>
-                  )}
-                </div>
-                <div className="col-span-2">
-                  <SignalBadge
-                    signal={b.signal}
-                    structureAction={(b.suggested_structure as { action?: string } | null)?.action}
-                  />
+                <div className="col-span-3">
+                  <FinalActionBadge action={b.final_action ?? null} />
                 </div>
                 <div className="col-span-2 text-fg-muted">
                   ${b.spot_price?.toFixed(2)}
@@ -169,26 +141,10 @@ export default async function HomePage() {
                 <Link key={b.id} href={`/briefs/${b.id}`} className="block border border-border bg-bg-elevated p-3">
                   <div className="flex items-center justify-between">
                     <div className="font-bold text-lg">{b.ticker}</div>
-                    <SignalBadge
-                      signal={b.signal}
-                      structureAction={(b.suggested_structure as { action?: string } | null)?.action}
-                    />
-                  </div>
-                  <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
-                    <div className="text-fg-muted">Score: <ScoreCell value={b.composite_score} /></div>
-                    <div className="text-fg-muted">
-                      Scream:{' '}
-                      {b.scream_score != null ? (
-                        <span className={b.scream_qualifies ? 'text-signal-buy font-bold' : 'text-fg-muted'}>
-                          {b.scream_score}/5
-                        </span>
-                      ) : (
-                        <span className="text-fg-dim">—</span>
-                      )}
-                    </div>
+                    <FinalActionBadge action={b.final_action ?? null} />
                   </div>
                   <div className="mt-2 text-xs text-fg-muted">
-                    Exp Move: ±${b.expected_move_dollar?.toFixed(2)} ({b.expected_move_pct?.toFixed(1)}%)
+                    Score: <ScoreCell value={b.composite_score} /> · Exp Move: ±${b.expected_move_dollar?.toFixed(2)} ({b.expected_move_pct?.toFixed(1)}%)
                   </div>
                 </Link>
               ))}
@@ -198,9 +154,8 @@ export default async function HomePage() {
             <div className="grid grid-cols-12 gap-4 px-4 py-2 bg-bg-elevated text-xs text-fg-subtle uppercase tracking-widest border-b border-border">
               <div className="col-span-2">TKR</div>
               <div className="col-span-2">SCORE</div>
-              <div className="col-span-2">SCREAM</div>
-              <div className="col-span-3">SIGNAL</div>
-              <div className="col-span-3">EXP MOVE</div>
+              <div className="col-span-4">ACTION</div>
+              <div className="col-span-4">EXP MOVE</div>
             </div>
             {tomorrowBriefs.map(b => (
               <Link
@@ -212,22 +167,10 @@ export default async function HomePage() {
                 <div className="col-span-2">
                   <ScoreCell value={b.composite_score} />
                 </div>
-                <div className="col-span-2 text-xs tabular-nums">
-                  {b.scream_score != null ? (
-                    <span className={b.scream_qualifies ? 'text-signal-buy font-bold' : 'text-fg-muted'}>
-                      {b.scream_score}/5
-                    </span>
-                  ) : (
-                    <span className="text-fg-dim">—</span>
-                  )}
+                <div className="col-span-4">
+                  <FinalActionBadge action={b.final_action ?? null} />
                 </div>
-                <div className="col-span-3">
-                  <SignalBadge
-                    signal={b.signal}
-                    structureAction={(b.suggested_structure as { action?: string } | null)?.action}
-                  />
-                </div>
-                <div className="col-span-3 text-fg-muted">
+                <div className="col-span-4 text-fg-muted">
                   ±${b.expected_move_dollar?.toFixed(2)} ({b.expected_move_pct?.toFixed(1)}%)
                 </div>
               </Link>

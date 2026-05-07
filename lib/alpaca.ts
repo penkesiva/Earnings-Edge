@@ -186,7 +186,9 @@ export function computeIvRank(currentIv: number, ivHistory: number[]): number {
   const min = Math.min(...ivHistory);
   const max = Math.max(...ivHistory);
   if (max === min) return 50;
-  return Math.round(((currentIv - min) / (max - min)) * 100);
+  const raw = Math.round(((currentIv - min) / (max - min)) * 100);
+  // Current IV can sit above the in-sample max (e.g. vol spike); keep 0–100 for UI/score.
+  return Math.min(100, Math.max(0, raw));
 }
 
 /**
