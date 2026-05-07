@@ -1,13 +1,18 @@
 import Link from 'next/link';
+import { Suspense } from 'react';
 import { supabaseAdmin } from '@/lib/supabase';
+import { addCalendarDays, earningsSessionDate } from '@/lib/earningsDate';
 import { SignalBadge } from '@/components/SignalBadge';
+import { DashboardRefresh } from '@/components/DashboardRefresh';
+import { FearGreedIndex, FearGreedIndexSkeleton } from '@/components/FearGreedIndex';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export default async function HomePage() {
   const sb = supabaseAdmin();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = earningsSessionDate();
+  const tomorrow = addCalendarDays(today, 1);
 
   // Today's briefs
   const { data: todayBriefs } = await sb
@@ -16,8 +21,14 @@ export default async function HomePage() {
     .eq('earnings_date', today)
     .order('composite_score', { ascending: false });
 
+  const { data: tomorrowBriefs } = await sb
+    .from('earnings_briefs')
+    .select('*')
+    .eq('earnings_date', tomorrow)
+    .order('composite_score', { ascending: false });
+
   // Upcoming events (next 7 days)
-  const in7 = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const in7 = addCalendarDays(today, 7);
   const { data: upcoming } = await sb
     .from('earnings_events')
     .select('*')
@@ -27,9 +38,16 @@ export default async function HomePage() {
 
   return (
     <div className="space-y-12">
+      <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
+        <DashboardRefresh />
+        <Suspense fallback={<FearGreedIndexSkeleton />}>
+          <FearGreedIndex />
+        </Suspense>
+      </div>
+
       <section>
-        <div className="flex items-baseline justify-between mb-6">
-          <h1 className="text-3xl font-bold tracking-tight">
+        <div className="flex items-baseline justify-between mb-4 sm:mb-6">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
             <span className="text-fg-subtle">›</span> TODAY
           </h1>
           <div className="text-xs text-fg-subtle">
@@ -39,18 +57,53 @@ export default async function HomePage() {
 
         {!todayBriefs?.length ? (
           <div className="border border-border bg-bg-elevated p-8 text-center text-fg-subtle text-sm">
-            No earnings reporting today. Cron runs 6am PT weekdays.
+            No briefs for today yet — run daily scan when a watchlist name reports, or use Sync
+            calendar above if dates are stale.
           </div>
         ) : (
-          <div className="border border-border">
+          <>
+            <div className="md:hidden space-y-2">
+              {todayBriefs.map(b => (
+                <Link key={b.id} href={`/briefs/${b.id}`} className="block border border-border bg-bg-elevated p-3">
+                  <div className="flex items-center justify-between">
+                    <div className="font-bold text-lg">{b.ticker}</div>
+                    <SignalBadge
+                      signal={b.signal}
+                      structureAction={(b.suggested_structure as { action?: string } | null)?.action}
+                    />
+                  </div>
+                  <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
+                    <div className="text-fg-muted">Score: <ScoreCell value={b.composite_score} /></div>
+                    <div className="text-fg-muted">
+                      Scream:{' '}
+                      {b.scream_score != null ? (
+                        <span className={b.scream_qualifies ? 'text-signal-buy font-bold' : 'text-fg-muted'}>
+                          {b.scream_score}/5
+                        </span>
+                      ) : (
+                        <span className="text-fg-dim">—</span>
+                      )}
+                    </div>
+                    <div className="text-fg-muted">Spot: ${b.spot_price?.toFixed(2)}</div>
+                    <div className="text-fg-muted">IV Rank: {b.iv_rank}</div>
+                  </div>
+                  <div className="mt-2 text-xs text-fg-muted">
+                    Exp Move: ±${b.expected_move_dollar?.toFixed(2)} ({b.expected_move_pct?.toFixed(1)}%)
+                  </div>
+                </Link>
+              ))}
+            </div>
+
+            <div className="hidden md:block border border-border">
             <div className="grid grid-cols-12 gap-4 px-4 py-2 bg-bg-elevated text-xs text-fg-subtle uppercase tracking-widest border-b border-border">
               <div className="col-span-1">TKR</div>
               <div className="col-span-1">SCORE</div>
+              <div className="col-span-1">SCREAM</div>
               <div className="col-span-2">SIGNAL</div>
               <div className="col-span-2">SPOT</div>
               <div className="col-span-2">EXP MOVE</div>
               <div className="col-span-1">IV RANK</div>
-              <div className="col-span-3">REASONING</div>
+              <div className="col-span-2">REASONING</div>
             </div>
             {todayBriefs.map(b => (
               <Link
@@ -62,8 +115,22 @@ export default async function HomePage() {
                 <div className="col-span-1">
                   <ScoreCell value={b.composite_score} />
                 </div>
+                <div className="col-span-1 text-xs tabular-nums">
+                  {b.scream_score != null ? (
+                    <span
+                      className={b.scream_qualifies ? 'text-signal-buy font-bold' : 'text-fg-muted'}
+                    >
+                      {b.scream_score}/5
+                    </span>
+                  ) : (
+                    <span className="text-fg-dim">—</span>
+                  )}
+                </div>
                 <div className="col-span-2">
-                  <SignalBadge signal={b.signal} />
+                  <SignalBadge
+                    signal={b.signal}
+                    structureAction={(b.suggested_structure as { action?: string } | null)?.action}
+                  />
                 </div>
                 <div className="col-span-2 text-fg-muted">
                   ${b.spot_price?.toFixed(2)}
@@ -72,12 +139,101 @@ export default async function HomePage() {
                   ±${b.expected_move_dollar?.toFixed(2)} ({b.expected_move_pct?.toFixed(1)}%)
                 </div>
                 <div className="col-span-1 text-fg-muted">{b.iv_rank}</div>
-                <div className="col-span-3 text-xs text-fg-subtle truncate">
+                <div className="col-span-2 text-xs text-fg-subtle truncate">
                   {b.reasoning || '—'}
                 </div>
               </Link>
             ))}
+            </div>
+          </>
+        )}
+      </section>
+
+      <section>
+        <div className="flex items-baseline justify-between mb-4 sm:mb-6">
+          <h2 className="text-lg sm:text-xl font-bold tracking-tight">
+            <span className="text-fg-subtle">›</span> TOMORROW PREP
+          </h2>
+          <div className="text-xs text-fg-subtle">
+            {tomorrowBriefs?.length ?? 0} BRIEF{tomorrowBriefs?.length === 1 ? '' : 'S'} · {tomorrow}
           </div>
+        </div>
+        {!tomorrowBriefs?.length ? (
+          <div className="border border-border bg-bg-elevated p-5 text-center text-fg-subtle text-sm">
+            No tomorrow briefs yet — click <span className="text-fg-muted">PREP TOMORROW</span> above.
+          </div>
+        ) : (
+          <>
+            <div className="md:hidden space-y-2">
+              {tomorrowBriefs.map(b => (
+                <Link key={b.id} href={`/briefs/${b.id}`} className="block border border-border bg-bg-elevated p-3">
+                  <div className="flex items-center justify-between">
+                    <div className="font-bold text-lg">{b.ticker}</div>
+                    <SignalBadge
+                      signal={b.signal}
+                      structureAction={(b.suggested_structure as { action?: string } | null)?.action}
+                    />
+                  </div>
+                  <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
+                    <div className="text-fg-muted">Score: <ScoreCell value={b.composite_score} /></div>
+                    <div className="text-fg-muted">
+                      Scream:{' '}
+                      {b.scream_score != null ? (
+                        <span className={b.scream_qualifies ? 'text-signal-buy font-bold' : 'text-fg-muted'}>
+                          {b.scream_score}/5
+                        </span>
+                      ) : (
+                        <span className="text-fg-dim">—</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="mt-2 text-xs text-fg-muted">
+                    Exp Move: ±${b.expected_move_dollar?.toFixed(2)} ({b.expected_move_pct?.toFixed(1)}%)
+                  </div>
+                </Link>
+              ))}
+            </div>
+
+            <div className="hidden md:block border border-border">
+            <div className="grid grid-cols-12 gap-4 px-4 py-2 bg-bg-elevated text-xs text-fg-subtle uppercase tracking-widest border-b border-border">
+              <div className="col-span-2">TKR</div>
+              <div className="col-span-2">SCORE</div>
+              <div className="col-span-2">SCREAM</div>
+              <div className="col-span-3">SIGNAL</div>
+              <div className="col-span-3">EXP MOVE</div>
+            </div>
+            {tomorrowBriefs.map(b => (
+              <Link
+                key={b.id}
+                href={`/briefs/${b.id}`}
+                className="terminal-row grid grid-cols-12 gap-4 px-4 py-3 text-sm border-b border-border-subtle"
+              >
+                <div className="col-span-2 font-bold">{b.ticker}</div>
+                <div className="col-span-2">
+                  <ScoreCell value={b.composite_score} />
+                </div>
+                <div className="col-span-2 text-xs tabular-nums">
+                  {b.scream_score != null ? (
+                    <span className={b.scream_qualifies ? 'text-signal-buy font-bold' : 'text-fg-muted'}>
+                      {b.scream_score}/5
+                    </span>
+                  ) : (
+                    <span className="text-fg-dim">—</span>
+                  )}
+                </div>
+                <div className="col-span-3">
+                  <SignalBadge
+                    signal={b.signal}
+                    structureAction={(b.suggested_structure as { action?: string } | null)?.action}
+                  />
+                </div>
+                <div className="col-span-3 text-fg-muted">
+                  ±${b.expected_move_dollar?.toFixed(2)} ({b.expected_move_pct?.toFixed(1)}%)
+                </div>
+              </Link>
+            ))}
+            </div>
+          </>
         )}
       </section>
 
@@ -89,9 +245,12 @@ export default async function HomePage() {
         </div>
 
         {!upcoming?.length ? (
-          <div className="text-fg-subtle text-sm">No upcoming earnings on watchlist.</div>
+          <div className="text-fg-subtle text-sm">
+            No earnings dates in range — try{' '}
+            <span className="text-fg-muted">SYNC CALENDAR</span> above (needs FMP + watchlist).
+          </div>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
             {upcoming.map(e => (
               <div
                 key={e.id}
@@ -99,7 +258,20 @@ export default async function HomePage() {
               >
                 <div className="flex items-baseline justify-between">
                   <span className="font-bold">{e.ticker}</span>
-                  <span className="text-xs text-fg-subtle">{e.timing}</span>
+                  <div className="flex items-center gap-1.5">
+                    <span
+                      className={`text-[10px] px-1.5 py-0.5 border tracking-widest ${
+                        e.source === 'MANUAL'
+                          ? 'text-signal-watch border-signal-watch/50'
+                          : e.source === 'FMP'
+                            ? 'text-fg-subtle border-border-subtle'
+                            : 'text-fg-dim border-border-subtle'
+                      }`}
+                    >
+                      {e.source || 'UNK'}
+                    </span>
+                    <span className="text-xs text-fg-subtle">{e.timing}</span>
+                  </div>
                 </div>
                 <div className="text-xs text-fg-muted mt-1">{e.earnings_date}</div>
                 {e.consensus_eps && (

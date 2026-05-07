@@ -41,10 +41,11 @@ NOTIFY_EMAIL=siva@yourdomain.com
 CRON_SECRET=  # generate any long random string
 ```
 
-### 4. Run Supabase migration
+### 4. Run Supabase migrations
 ```bash
 psql $DATABASE_URL -f supabase/migrations/0001_init.sql
-# or paste the SQL into Supabase SQL editor
+psql $DATABASE_URL -f supabase/migrations/0002_scream_test.sql
+# or paste SQL into Supabase SQL editor (order: 0001 then 0002)
 ```
 
 ### 5. Seed your watchlist
@@ -71,9 +72,10 @@ For each ticker reporting today:
   2. Fetch from Alpaca: spot price, options chain, IV, Greeks
   3. Compute IV rank, expected move, put/call ratio
   4. Run beatScore() → 0-100 composite
-  5. suggestStructure() → SKIP | SMALL_SPREAD | DIRECTIONAL | HIGH_CONVICTION
-  6. Write earnings_briefs row
-  7. Send email + push notification
+  5. Run screamTest() → 0-5 directional chain conviction (persisted alongside brief)
+  6. suggestStructure() → SKIP | SMALL_SPREAD | DIRECTIONAL | HIGH_CONVICTION
+  7. Write earnings_briefs row
+  8. Send email + push notification
   ↓
 Dashboard auto-loads briefs at /
 ```
@@ -95,6 +97,13 @@ Edit `lib/beatScore.ts`:
 
 After ~10-15 logged outcomes, run `/api/calibrate` to see which weights correlate best with actual day-after moves.
 
+## Scream test (directional options filter)
+
+Five filters over chain volume/OI skew, IV skew (~25Δ), beat streak + ESP placeholder, insider/valuation overhangs, and sector/peers.
+
+- Tunable thresholds live in **`lib/screamTest.ts`**.
+- See **`docs/scream-results/README.md`** for conceptual notes and **`POST /api/scream-test`** for ad-hoc runs.
+
 ## File map
 
 ```
@@ -108,12 +117,15 @@ lib/
   alpaca.ts                       # Alpaca client
   fmp.ts                          # FMP client
   beatScore.ts                    # the formula
+  screamTest.ts                   # 5-filter directional conviction
+  screamTestData.ts               # chain → scream inputs helpers
   structure.ts                    # SKIP/SPREAD/DIRECTIONAL logic
   email.ts                        # Resend wrapper
   push.ts                         # Web Push (PWA)
   supabase.ts                     # DB client
 supabase/migrations/
   0001_init.sql                   # schema
+  0002_scream_test.sql            # scream columns on earnings_briefs
 ```
 
 ## Caveats

@@ -56,3 +56,35 @@ export async function deleteTicker(formData: FormData) {
 
   revalidatePath('/watchlist');
 }
+
+export async function setManualEarnings(formData: FormData) {
+  const id = formData.get('id') as string;
+  const rawDate = (formData.get('manual_earnings_date') as string | null)?.trim() || '';
+  const rawTiming = (formData.get('manual_timing') as string | null)?.trim().toUpperCase() || '';
+
+  const manual_earnings_date = rawDate === '' ? null : rawDate;
+  const manual_timing =
+    rawTiming === '' ? null : rawTiming === 'BMO' || rawTiming === 'AMC' || rawTiming === 'UNK'
+      ? rawTiming
+      : null;
+
+  if (manual_earnings_date && !/^\d{4}-\d{2}-\d{2}$/.test(manual_earnings_date)) {
+    throw new Error('Manual earnings date must be YYYY-MM-DD');
+  }
+  if (rawTiming && manual_timing === null) {
+    throw new Error('Manual timing must be BMO, AMC, UNK, or empty');
+  }
+
+  const sb = supabaseAdmin();
+  const { error } = await sb
+    .from('watchlist')
+    .update({ manual_earnings_date, manual_timing })
+    .eq('id', id);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  revalidatePath('/watchlist');
+  revalidatePath('/');
+}

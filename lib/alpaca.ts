@@ -120,6 +120,15 @@ export async function getOptionChain(
     const quote = snap.latestQuote || {};
     const bid = quote.bp ?? 0;
     const ask = quote.ap ?? 0;
+    const day = snap.day || snap.latestTrade || {};
+    const vol =
+      snap.daily_volume ??
+      snap.dailyVolume ??
+      day.volume ??
+      day.v ??
+      snap.prevDailyBar?.v ??
+      0;
+    const oi = snap.open_interest ?? snap.openInterest ?? 0;
 
     const contract: OptionContract = {
       symbol,
@@ -129,11 +138,13 @@ export async function getOptionChain(
       bid,
       ask,
       mid: (bid + ask) / 2,
-      iv: snap.impliedVolatility ?? 0,
+      iv: snap.implied_volatility ?? snap.impliedVolatility ?? 0,
       delta: greeks.delta ?? 0,
       gamma: greeks.gamma ?? 0,
       theta: greeks.theta ?? 0,
       vega: greeks.vega ?? 0,
+      openInterest: typeof oi === 'number' ? oi : 0,
+      volume: typeof vol === 'number' ? vol : 0,
     };
 
     if (firstExpiry === expiryAfter) firstExpiry = parsed.expiry;

@@ -1,12 +1,13 @@
 import Link from 'next/link';
 import { supabaseAdmin } from '@/lib/supabase';
+import { earningsSessionDate } from '@/lib/earningsDate';
 import { SignalBadge } from '@/components/SignalBadge';
 
 export const dynamic = 'force-dynamic';
 
 export default async function HistoryPage() {
   const sb = supabaseAdmin();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = earningsSessionDate();
 
   const { data: rows } = await sb
     .from('v_brief_outcomes')

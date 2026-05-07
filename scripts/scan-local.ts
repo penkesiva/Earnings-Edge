@@ -6,6 +6,7 @@
 import { config } from 'dotenv';
 config({ path: '.env.local' });
 
+import { earningsSessionDate } from '../lib/earningsDate';
 import {
   getStockSnapshot,
   getOptionChain,
@@ -27,7 +28,7 @@ const ticker = process.argv[2]?.toUpperCase() || 'NVDA';
 async function main() {
   console.log(`\n▸ Scanning ${ticker}...\n`);
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = earningsSessionDate();
   const yearAgo = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000)
     .toISOString().slice(0, 10);
   const fiveDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
