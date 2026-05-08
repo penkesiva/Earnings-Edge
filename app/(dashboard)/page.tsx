@@ -6,6 +6,7 @@ import { FinalActionBadge } from '@/components/SignalBadge';
 import { DashboardRefresh } from '@/components/DashboardRefresh';
 import { FearGreedIndex, FearGreedIndexSkeleton } from '@/components/FearGreedIndex';
 import { LastScanned } from '@/components/LastScanned';
+import { PrepDateButton } from '@/components/PrepDateButton';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -28,14 +29,33 @@ export default async function HomePage() {
     .eq('earnings_date', tomorrow)
     .order('composite_score', { ascending: false });
 
-  // Upcoming events (next 7 days)
+  // Upcoming events (next 7 days, excluding today/tomorrow which have their own sections)
   const in7 = addCalendarDays(today, 7);
   const { data: upcoming } = await sb
     .from('earnings_events')
     .select('*')
-    .gt('earnings_date', today)
+    .gt('earnings_date', tomorrow)
     .lte('earnings_date', in7)
     .order('earnings_date', { ascending: true });
+
+  // Existing briefs for the same window (so we can show links + badge)
+  const { data: upcomingBriefs } = await sb
+    .from('earnings_briefs')
+    .select('id, ticker, earnings_date, final_action, composite_score')
+    .gt('earnings_date', tomorrow)
+    .lte('earnings_date', in7)
+    .order('composite_score', { ascending: false });
+
+  // Index briefs by date+ticker for quick lookup
+  const briefByKey = new Map(
+    (upcomingBriefs ?? []).map(b => [`${b.earnings_date}:${b.ticker}`, b])
+  );
+
+  // Group upcoming events by date
+  const upcomingByDate = (upcoming ?? []).reduce<Record<string, typeof upcoming>>((acc, e) => {
+    (acc[e.earnings_date] ??= []).push(e);
+    return acc;
+  }, {});
 
   return (
     <div className="space-y-12">
@@ -192,7 +212,7 @@ export default async function HomePage() {
       </section>
 
       <section>
-        <div className="flex items-baseline justify-between mb-6">
+        <div className="flex items-baseline justify-between mb-4 sm:mb-6">
           <h2 className="text-xl font-bold tracking-tight">
             <span className="text-fg-subtle">›</span> NEXT 7 DAYS
           </h2>
@@ -204,35 +224,57 @@ export default async function HomePage() {
             <span className="text-fg-muted">SYNC CALENDAR</span> above (needs FMP + watchlist).
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
-            {upcoming.map(e => (
-              <div
-                key={e.id}
-                className="border border-border bg-bg-elevated px-3 py-2 text-sm"
-              >
-                <div className="flex items-baseline justify-between">
-                  <span className="font-bold">{e.ticker}</span>
-                  <div className="flex items-center gap-1.5">
-                    <span
-                      className={`text-[10px] px-1.5 py-0.5 border tracking-widest ${
-                        e.source === 'MANUAL'
-                          ? 'text-signal-watch border-signal-watch/50'
-                          : e.source === 'FMP'
-                            ? 'text-fg-subtle border-border-subtle'
-                            : 'text-fg-dim border-border-subtle'
-                      }`}
-                    >
-                      {e.source || 'UNK'}
-                    </span>
-                    <span className="text-xs text-fg-subtle">{e.timing}</span>
-                  </div>
+          <div className="space-y-4">
+            {Object.entries(upcomingByDate).map(([date, events]) => (
+              <div key={date} className="border border-border">
+                {/* Date header row */}
+                <div className="flex items-center justify-between px-4 py-2 bg-bg-elevated border-b border-border text-xs tracking-widest">
+                  <span className="text-fg font-bold">
+                    {new Date(date + 'T12:00:00').toLocaleDateString('en-US', {
+                      weekday: 'short', month: 'short', day: 'numeric',
+                    }).toUpperCase()}
+                  </span>
+                  <PrepDateButton date={date} />
                 </div>
-                <div className="text-xs text-fg-muted mt-1">{e.earnings_date}</div>
-                {e.consensus_eps && (
-                  <div className="text-xs text-fg-subtle mt-1">
-                    Cons EPS: ${e.consensus_eps.toFixed(2)}
-                  </div>
-                )}
+
+                {/* Ticker rows */}
+                <div className="divide-y divide-border-subtle">
+                  {events!.map(e => {
+                    const brief = briefByKey.get(`${date}:${e.ticker}`);
+                    return (
+                      <div key={e.id} className="flex items-center justify-between px-4 py-2 text-sm">
+                        <div className="flex items-center gap-3">
+                          <span className="font-bold w-16">{e.ticker}</span>
+                          <span className="text-[10px] text-fg-subtle">{e.timing}</span>
+                          <span
+                            className={`text-[10px] px-1.5 py-0.5 border tracking-widest ${
+                              e.source === 'MANUAL'
+                                ? 'text-signal-watch border-signal-watch/50'
+                                : 'text-fg-dim border-border-subtle'
+                            }`}
+                          >
+                            {e.source || 'UNK'}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {brief ? (
+                            <>
+                              <FinalActionBadge action={brief.final_action ?? null} />
+                              <Link
+                                href={`/briefs/${brief.id}`}
+                                className="text-[10px] text-fg-subtle hover:text-fg tracking-widest underline underline-offset-2"
+                              >
+                                VIEW
+                              </Link>
+                            </>
+                          ) : (
+                            <span className="text-[10px] text-fg-dim tracking-widest">NO BRIEF</span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             ))}
           </div>

@@ -14,7 +14,11 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   const prep = body?.prep === 'tomorrow';
 
-  const targetDate = prep ? addCalendarDays(earningsSessionDate(), 1) : undefined;
+  // Allow explicit date override (e.g. from "PREP [date]" buttons in Next 7 Days)
+  const explicitDate: string | undefined =
+    typeof body?.targetDate === 'string' ? body.targetDate : undefined;
+
+  const targetDate = explicitDate ?? (prep ? addCalendarDays(earningsSessionDate(), 1) : undefined);
 
   try {
     const result = await runDailyScanJob({
