@@ -215,7 +215,16 @@ export default async function BriefPage({ params }: { params: { id: string } }) 
               <div className={`text-xl font-bold mb-1 ${(finalAction === 'SKIP' || finalAction === 'IRON_CONDOR') ? 'opacity-40 line-through' : ''}`}>
                 {structure.action?.replace(/_/g, ' ')}
               </div>
-              <p className="text-fg-muted text-sm mb-4">{structure.rationale}</p>
+              <p className="text-fg-muted text-sm mb-4">
+                {/* Compute rationale tier from live score rather than stale stored string */}
+                {structure.action !== 'SKIP'
+                  ? brief.composite_score < 60
+                    ? `Marginal score (${brief.composite_score}) — structure shown for reference only, not for trading without scream confirmation.`
+                    : brief.composite_score >= 75
+                      ? `High-conviction score (${brief.composite_score}) with directional bias — controlled-risk spread.`
+                      : structure.rationale
+                  : structure.rationale}
+              </p>
               {structure.legs && (
                 <div className="border border-border-subtle overflow-x-auto mb-4">
                   <div className="grid grid-cols-4 gap-4 px-4 py-2 bg-bg text-xs text-fg-subtle tracking-widest">
