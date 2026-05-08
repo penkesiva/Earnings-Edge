@@ -307,7 +307,7 @@ function TradeDecisionCard({
   const isNeutralVol = isCondor;
 
   const tradeLabel  = isSkip      ? 'NO TRADE'
-                    : isCondor    ? 'SELL VOL'
+                    : isCondor    ? 'SELL VOLATILITY'
                     : isBullish   ? 'TRADE · BULLISH'
                     : isBearish   ? 'TRADE · BEARISH'
                     : 'TRADE';
