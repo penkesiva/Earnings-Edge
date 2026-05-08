@@ -161,10 +161,12 @@ export async function batchImport(
 
   const sb = supabaseAdmin();
 
-  // 1. Upsert watchlist rows
+  // 1. Upsert watchlist rows — include manual date + timing so the UI column shows them
   const watchlistRows = parsed.map(r => ({
     ticker: r.ticker,
     active: true,
+    manual_earnings_date: r.dateIso,
+    manual_timing: r.timing,
   }));
   const { error: wlErr } = await sb
     .from('watchlist')
