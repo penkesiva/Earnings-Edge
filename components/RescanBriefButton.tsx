@@ -62,19 +62,27 @@ export function RescanBriefButton({
         : 'text-fg-subtle border-border hover:border-signal-watch hover:text-signal-watch';
 
   return (
-    <div className="flex items-center gap-3">
-      <button
-        type="button"
-        disabled={state === 'running'}
-        onClick={handleClick}
-        className={`text-xs px-3 py-1.5 border tracking-widest transition-colors disabled:opacity-40 ${colorClass}`}
-      >
-        {state === 'running' ? 'SCANNING…' : state === 'done' ? '✓ RE-SCANNED' : '↻ RE-SCAN'}
-      </button>
+    <div className="flex flex-col items-end gap-1.5">
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          disabled={state === 'running'}
+          onClick={handleClick}
+          className={`text-xs px-3 py-1.5 border tracking-widest transition-colors disabled:opacity-40 ${colorClass}`}
+        >
+          {state === 'running' ? 'SCANNING…' : state === 'done' ? '✓ RE-SCANNED' : state === 'error' ? '✗ RESCAN FAILED' : '↻ RE-SCAN'}
+        </button>
+      </div>
       {message && (
-        <span className={`text-xs ${state === 'error' ? 'text-signal-sell' : 'text-fg-muted'}`}>
+        <div
+          className={`text-xs font-mono px-2 py-1 border max-w-[28rem] text-right ${
+            state === 'error'
+              ? 'text-signal-sell border-signal-sell/40 bg-signal-sell/5'
+              : 'text-fg-muted border-border bg-bg-elevated'
+          }`}
+        >
           {message}
-        </span>
+        </div>
       )}
     </div>
   );
