@@ -86,12 +86,23 @@ export async function runUpdateCalendarJob(): Promise<UpdateCalendarJobResult> {
 
   if (error) throw new Error(error.message);
 
-  const sorted = [...dedupedRows].sort((a, b) =>
-    a.earnings_date.localeCompare(b.earnings_date)
-  );
+  // Prune FMP-sourced rows older than today so stale past dates don't
+  // surface in the dashboard. Manual rows are preserved (user may want history).
+  await sb
+    .from('earnings_events')
+    .delete()
+    .lt('earnings_date', today)
+    .eq('source', 'FMP')
+    .in('ticker', [...tickerSet]);
+
+  // Find the next upcoming date (>= today) across the newly synced rows
+  const upcoming = dedupedRows
+    .filter(r => r.earnings_date >= today)
+    .sort((a, b) => a.earnings_date.localeCompare(b.earnings_date));
+
   const nextEarning =
-    sorted[0] != null
-      ? { ticker: sorted[0].ticker, date: sorted[0].earnings_date }
+    upcoming[0] != null
+      ? { ticker: upcoming[0].ticker, date: upcoming[0].earnings_date }
       : null;
 
   const uniqueTickers = [...new Set(dedupedRows.map(r => r.ticker))];

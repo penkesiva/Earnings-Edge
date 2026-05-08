@@ -33,9 +33,9 @@ function formatCalendarMessage(res: UpdateCalendarJobResult): string {
 
   const next =
     nextEarning != null
-      ? ` Next: ${nextEarning.ticker} on ${nextEarning.date}.`
-      : '';
-  return `Earnings calendar synced (${updated} row${updated === 1 ? '' : 's'} for your watchlist).${next}`;
+      ? ` Next upcoming: ${nextEarning.ticker} on ${nextEarning.date}.`
+      : ' No upcoming dates found in the next 30 days for your watchlist.';
+  return `Calendar synced — ${updated} date${updated === 1 ? '' : 's'} stored across your watchlist.${next}`;
 }
 
 function formatScanMessage(res: DailyScanJobResult): string {
