@@ -1,6 +1,9 @@
+'use client';
+
 /**
  * Shows when a brief was last generated/refreshed.
  * Color shifts green → amber → red based on staleness.
+ * Runs client-side so timestamps reflect the user's local timezone.
  */
 
 type Props = { updatedAt: string | null };
@@ -15,7 +18,7 @@ function label(isoTs: string): { text: string; color: string } {
   if (mins < 2)        text = 'just now';
   else if (mins < 60)  text = `${mins}m ago`;
   else if (hours < 24) text = `${hours}h ago`;
-  else                 text = new Date(isoTs).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  else                 text = new Date(isoTs).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone });
 
   // green < 4h, amber 4–12h, red > 12h (stale by market open next day)
   const color =

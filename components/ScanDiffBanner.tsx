@@ -1,3 +1,5 @@
+'use client';
+
 import { computeScanDiff, formatScanTime, type BriefScanRow } from '@/lib/scanDiff';
 
 export function ScanDiffBanner({ ticker, scans }: { ticker: string; scans: BriefScanRow[] }) {

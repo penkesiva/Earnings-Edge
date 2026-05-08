@@ -132,12 +132,15 @@ export function computeScanDiff(scans: BriefScanRow[]): ScanDiffResult {
   };
 }
 
-/** Format a scan_timestamp as a short time string with timezone, e.g. "3:45 PM ET". */
-export function formatScanTime(isoTs: string): string {
+/**
+ * Format a scan_timestamp as a short time string with timezone abbreviation.
+ * Omit `timeZone` to use the browser/system local timezone (preferred in client components).
+ */
+export function formatScanTime(isoTs: string, timeZone?: string): string {
   return new Date(isoTs).toLocaleTimeString('en-US', {
     hour: 'numeric',
     minute: '2-digit',
     timeZoneName: 'short',
-    timeZone: 'America/New_York',
+    ...(timeZone ? { timeZone } : {}),
   });
 }
