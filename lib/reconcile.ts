@@ -52,24 +52,50 @@ export function reconcileSignals(opts: {
   // ── Gate 1: scream test failed ─────────────────────────────────────────────
   if (!screamPasses) {
     if (ivRank > 70) {
-      // When setup filter (filter 4) shows bearish signals but chain is mixed,
-      // flag the asymmetry: a symmetric condor risks the put wing blowing out.
+      // High IV alone is NOT a thesis to sell vol. Selling premium requires
+      // the realized move to land between the wings. Several factors blow that up:
+      //   1. Unresolved unexplained drawdowns >7% in the lookback window
+      //      (suggests gap/jump risk that wings cannot price).
+      //   2. Setup filter is bearish (insider selling cluster, regulatory
+      //      overhang, stretched valuation) — directional skew not symmetric.
+      //   3. Beat score itself is SKIP — no fundamental thesis at all.
+      const bigUnresolvedDrop = scream.unresolvedOverhangs.some(
+        (o) => !o.resolved && o.drawdownPct != null && o.drawdownPct < -7,
+      );
       const setupIsBearish =
         scream.filters.setupConfirmation.direction === 'bearish';
-      const chainIsMixed =
-        scream.filters.chainConviction.direction === 'mixed' ||
-        scream.filters.chainConviction.direction === 'none';
-      const asymmetryNote =
-        setupIsBearish && chainIsMixed
-          ? ` ⚠ Bearish narrative (setup: ${scream.filters.setupConfirmation.detail.split(' signal')[0]}) but options chain is mixed — condor put wing carries downside skew risk. Consider widening put wing or skipping.`
-          : '';
+      const beatIsSkip = beatScore.signal === 'SKIP';
+
+      // Block selling vol when any meaningful asymmetry exists.
+      if (bigUnresolvedDrop || setupIsBearish || beatIsSkip) {
+        const reasons: string[] = [];
+        if (bigUnresolvedDrop) {
+          const worst = scream.unresolvedOverhangs
+            .filter((o) => !o.resolved && o.drawdownPct != null && o.drawdownPct < -7)
+            .sort((a, b) => (a.drawdownPct ?? 0) - (b.drawdownPct ?? 0))[0];
+          reasons.push(
+            `unresolved ${worst?.drawdownPct?.toFixed(1)}% drawdown could blow through wings`,
+          );
+        }
+        if (setupIsBearish) reasons.push('bearish setup (insider selling / regulatory / stretched valuation) — symmetric wings carry downside skew risk');
+        if (beatIsSkip) reasons.push(`beat score ${beatScore.composite} is SKIP — no fundamental thesis`);
+
+        return {
+          final_action: 'SKIP',
+          rationale:
+            `IV rank ${ivRank} is elevated, but high IV alone is not a thesis. ` +
+            `Skip selling vol because: ${reasons.join('; ')}. ` +
+            `Wait for a setup where realized vol can be reasonably bounded.`,
+        };
+      }
 
       return {
         final_action: 'IRON_CONDOR',
         rationale:
-          `Scream test did not qualify (${scream.score}/5, mixed chain). ` +
-          `IV rank ${ivRank} is elevated — sell vol via iron condor.` +
-          asymmetryNote,
+          `Scream test did not qualify (${scream.score}/5, mixed chain) but the ` +
+          `setup is clean (no unresolved drawdowns, no insider/regulatory flags, ` +
+          `beat score not in skip range). IV rank ${ivRank} is elevated — sell vol ` +
+          `via iron condor with wings outside the expected move.`,
       };
     }
     return {

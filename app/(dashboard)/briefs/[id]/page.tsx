@@ -108,7 +108,7 @@ export default async function BriefPage({ params }: { params: { id: string } }) 
             expectedMovePct={brief.expected_move_pct ?? null}
             ivRank={brief.iv_rank ?? null}
             spot={brief.spot_price ?? null}
-            preferredExpiry={structure?.legs?.[0]?.expiry ?? null}
+            preferredExpiry={structure?.preferredExpiry ?? structure?.legs?.[0]?.expiry ?? null}
           />
         )}
       </section>

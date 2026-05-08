@@ -7,6 +7,9 @@ import type { BeatScoreResult } from './beatScore';
 export type SuggestedStructure = {
   action: 'SKIP' | 'CALL_DEBIT_SPREAD' | 'PUT_DEBIT_SPREAD' | 'LONG_CALL' | 'LONG_PUT' | 'IRON_CONDOR' | 'STRADDLE';
   rationale: string;
+  /** Always populated, even when no legs are returned — used to render
+   * iron condor / put-side structures driven by the reconciled final_action. */
+  preferredExpiry: string;
   legs?: Array<{
     side: 'BUY' | 'SELL';
     type: 'CALL' | 'PUT';
@@ -33,6 +36,7 @@ export function suggestStructure(inputs: StructureInputs): SuggestedStructure {
     return {
       action: 'SKIP',
       rationale: `Score ${composite} below threshold — no edge.`,
+      preferredExpiry,
       notes: ['Wait for next setup. Don\'t force a trade.'],
     };
   }
@@ -44,6 +48,7 @@ export function suggestStructure(inputs: StructureInputs): SuggestedStructure {
       return {
         action: 'CALL_DEBIT_SPREAD',
         rationale: `High conviction (${composite}) but IV rank ${ivRank} is elevated. Spread limits IV crush exposure.`,
+        preferredExpiry,
         legs: [
           {
             side: 'BUY',
@@ -71,6 +76,7 @@ export function suggestStructure(inputs: StructureInputs): SuggestedStructure {
       rationale: composite < 60
         ? `Marginal score (${composite}) with high IV — structure shown for reference only, not for trading without scream confirmation.`
         : `Moderate score (${composite}) with high IV. Spread limits IV crush exposure.`,
+      preferredExpiry,
       legs: [
         {
           side: 'BUY',
@@ -94,6 +100,7 @@ export function suggestStructure(inputs: StructureInputs): SuggestedStructure {
     return {
       action: 'LONG_CALL',
       rationale: `High conviction (${composite}) AND low IV rank ${ivRank} = cheap directional bet.`,
+      preferredExpiry,
       legs: [
         {
           side: 'BUY',
@@ -119,6 +126,7 @@ export function suggestStructure(inputs: StructureInputs): SuggestedStructure {
   return {
     action: 'CALL_DEBIT_SPREAD',
     rationale: defaultRationale,
+    preferredExpiry,
     legs: [
       {
         side: 'BUY',
