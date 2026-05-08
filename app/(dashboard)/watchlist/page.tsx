@@ -1,5 +1,6 @@
 import { supabaseAdmin } from '@/lib/supabase';
 import { AddTickerForm } from './AddTickerForm';
+import { BatchImportForm } from './BatchImportForm';
 import { deleteTicker, setManualEarnings, toggleTicker } from './actions';
 
 export const dynamic = 'force-dynamic';
@@ -23,6 +24,7 @@ export default async function WatchlistPage() {
       </div>
 
       <AddTickerForm />
+      <BatchImportForm />
 
       <div className="md:hidden space-y-2">
         {tickers?.map(t => (
