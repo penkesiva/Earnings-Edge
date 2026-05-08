@@ -15,14 +15,28 @@ async function callRunScan(prep?: 'tomorrow'): Promise<RefreshResult> {
   }
   const count: number | undefined = data.count;
   const idle: string | undefined = data.idleReason;
+  const targetDate: string | undefined = data.targetDate;
+  const nextScheduled: { ticker: string; earnings_date: string } | null =
+    data.nextScheduled ?? null;
+
   if (idle === 'empty_watchlist') {
     return { ok: true, message: 'Watchlist is empty — add tickers on WATCHLIST first.' };
   }
+  if (idle === 'no_earnings_on_session_date') {
+    const when = prep === 'tomorrow' ? `tomorrow (${targetDate})` : `today (${targetDate})`;
+    const next = nextScheduled
+      ? ` Next in DB: ${nextScheduled.ticker} on ${nextScheduled.earnings_date}.`
+      : ' No upcoming dates in DB — run Sync Calendar first.';
+    return {
+      ok: true,
+      message: `No watchlist earnings ${when}.${next}`,
+    };
+  }
   if (idle) {
-    return { ok: true, message: `No earnings today (${idle}).` };
+    return { ok: true, message: `Scan skipped: ${idle}.` };
   }
   const label = prep === 'tomorrow' ? 'Tomorrow prep' : 'Daily scan';
-  return { ok: true, message: `${label} finished (${count ?? 0} ticker${count === 1 ? '' : 's'}).` };
+  return { ok: true, message: `${label} finished — ${count ?? 0} ticker${count === 1 ? '' : 's'} processed.` };
 }
 
 export function DashboardRefresh() {

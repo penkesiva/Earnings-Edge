@@ -23,9 +23,17 @@ export async function POST(req: NextRequest) {
     });
 
     if ('idleReason' in result) {
-      return NextResponse.json({ count: 0, idleReason: result.idleReason });
+      return NextResponse.json({
+        count: 0,
+        idleReason: result.idleReason,
+        targetDate: targetDate ?? earningsSessionDate(),
+        prep,
+        ...(result.idleReason === 'no_earnings_on_session_date'
+          ? { nextScheduled: result.nextScheduled, sessionDate: result.sessionDate }
+          : {}),
+      });
     }
-    return NextResponse.json({ count: result.count });
+    return NextResponse.json({ count: result.count, targetDate: targetDate ?? earningsSessionDate() });
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Internal error';
     return NextResponse.json({ error: msg }, { status: 500 });
