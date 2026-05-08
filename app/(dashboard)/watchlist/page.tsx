@@ -42,11 +42,13 @@ export default async function WatchlistPage() {
                 type="date"
                 name="manual_earnings_date"
                 defaultValue={t.manual_earnings_date ?? ''}
+                key={t.manual_earnings_date ?? 'no-date'}
                 className="flex-1 bg-bg border border-border px-2 py-1 text-xs focus:outline-none focus:border-signal-buy"
               />
               <select
                 name="manual_timing"
                 defaultValue={t.manual_timing ?? ''}
+                key={t.manual_timing ?? 'no-timing'}
                 className="bg-bg border border-border px-1.5 py-1 text-xs focus:outline-none focus:border-signal-buy"
               >
                 <option value="">--</option>
@@ -101,11 +103,13 @@ export default async function WatchlistPage() {
                   type="date"
                   name="manual_earnings_date"
                   defaultValue={t.manual_earnings_date ?? ''}
+                  key={t.manual_earnings_date ?? 'no-date'}
                   className="w-[138px] bg-bg border border-border px-2 py-1 text-xs focus:outline-none focus:border-signal-buy"
                 />
                 <select
                   name="manual_timing"
                   defaultValue={t.manual_timing ?? ''}
+                  key={t.manual_timing ?? 'no-timing'}
                   className="bg-bg border border-border px-1.5 py-1 text-xs focus:outline-none focus:border-signal-buy"
                 >
                   <option value="">--</option>
