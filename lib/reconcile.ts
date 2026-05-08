@@ -52,11 +52,24 @@ export function reconcileSignals(opts: {
   // ── Gate 1: scream test failed ─────────────────────────────────────────────
   if (!screamPasses) {
     if (ivRank > 70) {
+      // When setup filter (filter 4) shows bearish signals but chain is mixed,
+      // flag the asymmetry: a symmetric condor risks the put wing blowing out.
+      const setupIsBearish =
+        scream.filters.setupConfirmation.direction === 'bearish';
+      const chainIsMixed =
+        scream.filters.chainConviction.direction === 'mixed' ||
+        scream.filters.chainConviction.direction === 'none';
+      const asymmetryNote =
+        setupIsBearish && chainIsMixed
+          ? ` ⚠ Bearish narrative (setup: ${scream.filters.setupConfirmation.detail.split(' signal')[0]}) but options chain is mixed — condor put wing carries downside skew risk. Consider widening put wing or skipping.`
+          : '';
+
       return {
         final_action: 'IRON_CONDOR',
         rationale:
-          `Scream test did not qualify (${scream.score}/5, ${scream.directionalBias}), ` +
-          `but IV rank ${ivRank} is elevated — sell vol via iron condor instead of directional.`,
+          `Scream test did not qualify (${scream.score}/5, mixed chain). ` +
+          `IV rank ${ivRank} is elevated — sell vol via iron condor.` +
+          asymmetryNote,
       };
     }
     return {

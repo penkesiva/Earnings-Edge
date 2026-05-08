@@ -127,10 +127,17 @@ function filter1ChainConviction(i: ScreamTestInputs): FilterResult {
   }
 
   const side = ratio >= 1 ? 'calls' : 'puts';
+  // Express "how far from the 3x threshold" without using vague "slightly"
+  const dominant = ratio >= 1 ? ratio : 1 / ratio;
+  const thresholdGap = dominant < 1.5
+    ? 'barely one-sided'
+    : dominant < 2.0
+      ? 'moderately one-sided'
+      : 'below 3× threshold';
   return {
     passed: false,
     direction: 'mixed',
-    detail: `Vol ratio ${ratio.toFixed(2)} (${side} slightly heavier); ${oiLabel} — not one-sided enough`,
+    detail: `Near-ATM vol ratio ${ratio.toFixed(2)}× (${side} ${thresholdGap}); ${oiLabel} — not one-sided enough`,
   };
 }
 
@@ -210,8 +217,9 @@ function filter4SetupConfirmation(i: ScreamTestInputs): FilterResult {
   if (i.hasInsiderSellingCluster) triggers.push('Insider selling cluster (60d)');
   if (i.hasRegulatoryOverhang) triggers.push('Regulatory / legal overhang');
   if (stretchedValuation) {
+    const peStr = i.forwardPe != null ? i.forwardPe.toFixed(1) : 'n/a';
     triggers.push(
-      `Stretched valuation (YTD +${i.ytdReturnPct.toFixed(1)}%, fwd P/E ${i.forwardPe ?? 'n/a'})`
+      `Stretched valuation (YTD +${i.ytdReturnPct.toFixed(1)}%, fwd P/E ${peStr})`
     );
   }
 

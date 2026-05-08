@@ -318,7 +318,7 @@ async function generateBrief(ticker: string, earningsDate: string) {
       {
         ticker,
         earnings_date: earningsDate,
-        beat_streak_score: score.components.beatStreakScore,
+        beat_streak_score: beatStats.totalQuarters > 0 ? score.components.beatStreakScore : null,
         surprise_magnitude_score: score.components.surpriseMagnitudeScore,
         revision_trend_score: score.components.revisionTrendScore,
         whisper_delta_score: score.components.whisperDeltaScore,

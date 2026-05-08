@@ -107,6 +107,8 @@ export default async function BriefPage({ params }: { params: { id: string } }) 
             expectedMoveDollar={brief.expected_move_dollar ?? null}
             expectedMovePct={brief.expected_move_pct ?? null}
             ivRank={brief.iv_rank ?? null}
+            spot={brief.spot_price ?? null}
+            preferredExpiry={structure?.legs?.[0]?.expiry ?? null}
           />
         )}
       </section>
@@ -116,7 +118,7 @@ export default async function BriefPage({ params }: { params: { id: string } }) 
         <Stat label="IV 30d" value={`${(brief.iv_30d * 100).toFixed(1)}%`} />
         <Stat label="IV Rank" value={brief.iv_rank} />
         <Stat label="Expected Move" value={`±$${brief.expected_move_dollar?.toFixed(2)}`} sub={`${brief.expected_move_pct?.toFixed(1)}%`} />
-        <Stat label="P/C Ratio (vol)" value={brief.put_call_ratio?.toFixed(2)} />
+        <Stat label="P/C Ratio (all strikes)" value={brief.put_call_ratio?.toFixed(2)} />
       </div>
 
       {/* ── Outcome (if logged) ────────────────────────────────────────────── */}
@@ -286,9 +288,63 @@ export default async function BriefPage({ params }: { params: { id: string } }) 
   );
 }
 
+function roundStrike(price: number): number {
+  if (price < 25) return Math.round(price * 2) / 2;
+  if (price < 200) return Math.round(price);
+  return Math.round(price / 5) * 5;
+}
+
+function CondorLegsTable({
+  spot, expectedMoveDollar, expiry,
+}: {
+  spot: number;
+  expectedMoveDollar: number;
+  expiry: string | null;
+}) {
+  if (!expiry) return null;
+  // Short wings just outside expected move; long wings 1.5× out (protection).
+  const shortCall = roundStrike(spot + expectedMoveDollar);
+  const longCall  = roundStrike(spot + expectedMoveDollar * 1.5);
+  const shortPut  = roundStrike(spot - expectedMoveDollar);
+  const longPut   = roundStrike(spot - expectedMoveDollar * 1.5);
+
+  const legs = [
+    { side: 'BUY',  type: 'PUT',  strike: longPut,   note: 'protective wing' },
+    { side: 'SELL', type: 'PUT',  strike: shortPut,  note: 'short put' },
+    { side: 'SELL', type: 'CALL', strike: shortCall, note: 'short call' },
+    { side: 'BUY',  type: 'CALL', strike: longCall,  note: 'protective wing' },
+  ] as const;
+
+  return (
+    <div>
+      <div className="text-[10px] tracking-widest text-fg-subtle mb-2">STRUCTURE</div>
+      <div className="border border-border-subtle overflow-x-auto mb-2">
+        <div className="grid grid-cols-4 gap-4 px-4 py-2 bg-bg text-xs text-fg-subtle tracking-widest">
+          <div>SIDE</div><div>TYPE</div><div>STRIKE</div><div>EXPIRY</div>
+        </div>
+        {legs.map((leg, i) => (
+          <div key={i} className="grid grid-cols-4 gap-4 px-4 py-3 text-sm border-t border-border-subtle">
+            <div className={leg.side === 'BUY' ? 'text-signal-buy font-bold' : 'text-signal-sell font-bold'}>
+              {leg.side}
+            </div>
+            <div>{leg.type}</div>
+            <div>${leg.strike}</div>
+            <div className="text-fg-muted">{expiry}</div>
+          </div>
+        ))}
+      </div>
+      <p className="text-xs text-fg-dim">
+        Wings placed at ±${expectedMoveDollar.toFixed(2)} (short) and ±${(expectedMoveDollar * 1.5).toFixed(2)} (long).
+        Profit if stock stays within the short strikes. Verify strikes exceed the straddle expected move before entry.
+      </p>
+    </div>
+  );
+}
+
 function TradeDecisionCard({
   action, rationale, screamDirection, screamScore,
   compositeScore, expectedMoveDollar, expectedMovePct, ivRank,
+  spot, preferredExpiry,
 }: {
   action: string | null;
   rationale: string | null;
@@ -298,13 +354,14 @@ function TradeDecisionCard({
   expectedMoveDollar: number | null;
   expectedMovePct: number | null;
   ivRank: number | null;
+  spot: number | null;
+  preferredExpiry: string | null;
 }) {
   const isSkip      = !action || action === 'SKIP';
   const isCondor    = action === 'IRON_CONDOR';
   const isBullish   = action === 'LONG_CALL' || action === 'CALL_DEBIT_SPREAD';
   const isBearish   = action === 'LONG_PUT'  || action === 'PUT_DEBIT_SPREAD';
   const isOptions   = !isSkip && !isCondor;
-  const isNeutralVol = isCondor;
 
   const tradeLabel  = isSkip      ? 'NO TRADE'
                     : isCondor    ? 'SELL VOLATILITY'
@@ -371,6 +428,15 @@ function TradeDecisionCard({
           <p className="text-xs text-fg-muted leading-relaxed">{rationale}</p>
         </div>
       )}
+
+      {/* Iron condor legs (only when action is IRON_CONDOR and we have necessary data) */}
+      {isCondor && spot != null && expectedMoveDollar != null && (
+        <CondorLegsTable
+          spot={spot}
+          expectedMoveDollar={expectedMoveDollar}
+          expiry={preferredExpiry}
+        />
+      )}
     </div>
   );
 }
@@ -385,7 +451,16 @@ function Stat({ label, value, sub }: { label: string; value: any; sub?: string }
   );
 }
 
-function ComponentBar({ label, value }: { label: string; value: number }) {
+function ComponentBar({ label, value }: { label: string; value: number | null }) {
+  if (value === null || value === undefined) {
+    return (
+      <div className="flex items-center gap-2 sm:gap-4">
+        <div className="w-32 sm:w-48 text-xs text-fg-muted">{label}</div>
+        <div className="flex-1 h-2 bg-bg overflow-hidden" />
+        <div className="w-12 text-right text-xs text-fg-dim">—</div>
+      </div>
+    );
+  }
   const color =
     value >= 65 ? 'bg-signal-buy' :
     value >= 40 ? 'bg-signal-watch' :

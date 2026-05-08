@@ -55,13 +55,15 @@ function clamp(n: number, min: number, max: number) {
 export function computeBeatScore(inputs: BeatScoreInputs): BeatScoreResult {
   const reasoning: string[] = [];
 
-  // 1. Beat streak: 4-of-4 = 100, 0-of-4 = 0
+  // 1. Beat frequency: 4-of-4 = 100, 0-of-4 = 0, no data = 0 (not 50 — neutral default was misleading)
   const beatStreakScore =
     inputs.totalQuarters > 0
       ? (inputs.beatsLast4 / inputs.totalQuarters) * 100
-      : 50;
-  if (beatStreakScore >= 75) reasoning.push(`Beat frequency: ${inputs.beatsLast4}/${inputs.totalQuarters} (last ${inputs.totalQuarters}Q)`);
-  if (beatStreakScore <= 25) reasoning.push(`Weak beat history: ${inputs.beatsLast4}/${inputs.totalQuarters} (last ${inputs.totalQuarters}Q)`);
+      : 0;
+  if (inputs.totalQuarters > 0) {
+    if (beatStreakScore >= 75) reasoning.push(`Beat frequency: ${inputs.beatsLast4}/${inputs.totalQuarters} (last ${inputs.totalQuarters}Q)`);
+    if (beatStreakScore <= 25) reasoning.push(`Weak beat history: ${inputs.beatsLast4}/${inputs.totalQuarters} (last ${inputs.totalQuarters}Q)`);
+  }
 
   // 2. Surprise magnitude: avg 20%+ → 100; negative → low
   const surpriseMagnitudeScore = clamp(50 + inputs.avgSurprisePct * 2.5, 0, 100);
