@@ -107,12 +107,12 @@ export async function getOptionChain(
   const data = await fetchJson(url);
 
   const snapshots = data.snapshots || {};
-  const calls: OptionContract[] = [];
-  const puts: OptionContract[] = [];
-  let firstExpiry = expiryAfter;
+
+  // First pass: collect all contracts and find the nearest available expiry
+  type RawContract = OptionContract & { expiry: string };
+  const allContracts: RawContract[] = [];
 
   for (const [symbol, snap] of Object.entries<any>(snapshots)) {
-    // Symbol format: AAPL250613C00200000 → ticker + YYMMDD + C/P + strike*1000
     const parsed = parseOccSymbol(symbol);
     if (!parsed) continue;
 
@@ -120,17 +120,24 @@ export async function getOptionChain(
     const quote = snap.latestQuote || {};
     const bid = quote.bp ?? 0;
     const ask = quote.ap ?? 0;
-    const day = snap.day || snap.latestTrade || {};
+    const day = snap.day || {};
     const vol =
       snap.daily_volume ??
       snap.dailyVolume ??
       day.volume ??
       day.v ??
+      day.vw ??
       snap.prevDailyBar?.v ??
       0;
-    const oi = snap.open_interest ?? snap.openInterest ?? 0;
+    // OI: try top-level camelCase, snake_case, and inside day object
+    const oi =
+      snap.openInterest ??
+      snap.open_interest ??
+      day.openInterest ??
+      day.open_interest ??
+      0;
 
-    const contract: OptionContract = {
+    allContracts.push({
       symbol,
       strike: parsed.strike,
       expiry: parsed.expiry,
@@ -145,19 +152,18 @@ export async function getOptionChain(
       vega: greeks.vega ?? 0,
       openInterest: typeof oi === 'number' ? oi : 0,
       volume: typeof vol === 'number' ? vol : 0,
-    };
-
-    if (firstExpiry === expiryAfter) firstExpiry = parsed.expiry;
-
-    if (parsed.type === 'call') calls.push(contract);
-    else puts.push(contract);
+    });
   }
 
-  // Sort by strike
-  calls.sort((a, b) => a.strike - b.strike);
-  puts.sort((a, b) => a.strike - b.strike);
+  // Pick the nearest weekly expiry on or after expiryAfter and filter to it
+  const expiries = [...new Set(allContracts.map(c => c.expiry))].sort();
+  const nearestExpiry = expiries.find(e => e >= expiryAfter) ?? expiries[0] ?? expiryAfter;
+  const filtered = allContracts.filter(c => c.expiry === nearestExpiry);
 
-  return { ticker, spot, expiry: firstExpiry, calls, puts };
+  const calls = filtered.filter(c => c.type === 'call').sort((a, b) => a.strike - b.strike);
+  const puts  = filtered.filter(c => c.type === 'put').sort((a, b) => a.strike - b.strike);
+
+  return { ticker, spot, expiry: nearestExpiry, calls, puts };
 }
 
 /**

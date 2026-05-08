@@ -23,26 +23,20 @@ export function deriveChainScreamFields(chain: OptionChain): ChainScreamFields {
 
   let nearMoneyCallVol = 0;
   let nearMoneyPutVol = 0;
-  let largestOiCluster = 0;
-  let largestOiSide: 'call' | 'put' = 'call';
 
   for (const c of chain.calls) {
     if (c.strike >= lo && c.strike <= hi) nearMoneyCallVol += c.volume ?? 0;
-    const oi = c.openInterest ?? 0;
-    if (oi > largestOiCluster) {
-      largestOiCluster = oi;
-      largestOiSide = 'call';
-    }
   }
-
   for (const p of chain.puts) {
     if (p.strike >= lo && p.strike <= hi) nearMoneyPutVol += p.volume ?? 0;
-    const oi = p.openInterest ?? 0;
-    if (oi > largestOiCluster) {
-      largestOiCluster = oi;
-      largestOiSide = 'put';
-    }
   }
+
+  // OI conviction: sum the 1 strike above + 1 strike below spot for calls and puts.
+  // This mirrors how traders watch the nearest ATM wall.
+  const atmCallOi = atmNearOi(chain.calls, spot);
+  const atmPutOi  = atmNearOi(chain.puts,  spot);
+  const largestOiCluster = Math.max(atmCallOi, atmPutOi);
+  const largestOiSide: 'call' | 'put' = atmCallOi >= atmPutOi ? 'call' : 'put';
 
   const callsPosDelta = chain.calls.filter(c => c.delta > 0.05 && c.delta < 0.95);
   const call25 = callsPosDelta.reduce<(typeof chain.calls)[0] | null>((best, c) => {
@@ -70,6 +64,27 @@ export function deriveChainScreamFields(chain: OptionChain): ChainScreamFields {
     iv25dCall,
     iv25dPut,
   };
+}
+
+/**
+ * Sum OI for the 1 strike immediately below spot and 1 strike immediately above spot.
+ * For very wide chains this is more focused than scanning all strikes.
+ */
+function atmNearOi(contracts: { strike: number; openInterest?: number }[], spot: number): number {
+  if (!contracts.length) return 0;
+  // contracts assumed sorted ascending by strike
+  const sorted = [...contracts].sort((a, b) => a.strike - b.strike);
+  // find the first contract at or above spot
+  const aboveIdx = sorted.findIndex(c => c.strike >= spot);
+  const indices = new Set<number>();
+  if (aboveIdx >= 0) indices.add(aboveIdx);
+  if (aboveIdx > 0) indices.add(aboveIdx - 1);
+  if (aboveIdx < 0) {
+    // all strikes below spot — take the top two
+    indices.add(sorted.length - 1);
+    if (sorted.length > 1) indices.add(sorted.length - 2);
+  }
+  return [...indices].reduce((sum, i) => sum + (sorted[i].openInterest ?? 0), 0);
 }
 
 function averageIvNearSpot(contracts: { strike: number; iv: number }[], spot: number): number | null {
