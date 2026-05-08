@@ -206,49 +206,75 @@ export default async function BriefPage({ params }: { params: { id: string } }) 
               <div className="text-xs tracking-widest text-fg-subtle mb-3">
                 BEAT-SCORE SUGGESTED STRUCTURE
               </div>
-              {/* Override banner — shown whenever the reconciled action overrides this structure */}
-              {(finalAction === 'SKIP' || finalAction === 'IRON_CONDOR') && (
-                <div className="mb-3 border border-signal-sell/40 bg-signal-sell/5 px-3 py-2 text-xs text-signal-sell tracking-wide">
-                  ⚡ OVERRIDDEN BY SCREAM / IV GATE — structure shown for audit only. Do not trade.
-                </div>
-              )}
-              <div className={`text-xl font-bold mb-1 ${(finalAction === 'SKIP' || finalAction === 'IRON_CONDOR') ? 'opacity-40 line-through' : ''}`}>
-                {structure.action?.replace(/_/g, ' ')}
-              </div>
-              <p className="text-fg-muted text-sm mb-4">
-                {/* Compute rationale tier from live score rather than stale stored string */}
-                {structure.action !== 'SKIP'
+
+              {(() => {
+                // Determine if this structure is overridden by scream/IV gate
+                const isOverridden = finalAction === 'SKIP' || finalAction === 'IRON_CONDOR';
+                // Detect directional conflict: beat score is bullish (call structure) but
+                // scream direction is bearish, or vice versa.
+                const structureIsBullish =
+                  structure.action === 'CALL_DEBIT_SPREAD' || structure.action === 'LONG_CALL';
+                const screamIsBearish = brief.scream_direction === 'bearish';
+                const screamIsBullish = brief.scream_direction === 'bullish';
+                const hasDirectionalConflict =
+                  (structureIsBullish && screamIsBearish) ||
+                  (!structureIsBullish && screamIsBullish);
+
+                const rationale = structure.action !== 'SKIP'
                   ? brief.composite_score < 60
                     ? `Marginal score (${brief.composite_score}) — structure shown for reference only, not for trading without scream confirmation.`
                     : brief.composite_score >= 75
                       ? `High-conviction score (${brief.composite_score}) with directional bias — controlled-risk spread.`
                       : structure.rationale
-                  : structure.rationale}
-              </p>
-              {structure.legs && (
-                <div className="border border-border-subtle overflow-x-auto mb-4">
-                  <div className="grid grid-cols-4 gap-4 px-4 py-2 bg-bg text-xs text-fg-subtle tracking-widest">
-                    <div>SIDE</div><div>TYPE</div><div>STRIKE</div><div>EXPIRY</div>
-                  </div>
-                  {structure.legs.map((leg: any, i: number) => (
-                    <div key={i} className="grid grid-cols-4 gap-4 px-4 py-3 text-sm border-t border-border-subtle">
-                      <div className={leg.side === 'BUY' ? 'text-signal-buy font-bold' : 'text-signal-sell font-bold'}>
-                        {leg.side}
+                  : structure.rationale;
+
+                return (
+                  <>
+                    {isOverridden && (
+                      <div className="mb-3 border border-signal-sell/40 bg-signal-sell/5 px-3 py-2 text-xs text-signal-sell tracking-wide">
+                        ⚡ OVERRIDDEN BY SCREAM / IV GATE — structure shown for audit only. Do not trade.
                       </div>
-                      <div>{leg.type}</div>
-                      <div>${leg.strike}</div>
-                      <div className="text-fg-muted">{leg.expiry}</div>
+                    )}
+                    {hasDirectionalConflict && (
+                      <div className="mb-3 border border-signal-watch/40 bg-signal-watch/5 px-3 py-2 text-xs text-signal-watch tracking-wide">
+                        ⚠ DIRECTIONAL CONFLICT — beat score is{' '}
+                        {structureIsBullish ? 'bullish' : 'bearish'} but options chain shows{' '}
+                        {screamIsBearish ? 'bearish' : 'bullish'} conviction. Legs suppressed.
+                      </div>
+                    )}
+                    <div className={`text-xl font-bold mb-1 ${isOverridden ? 'opacity-40 line-through' : ''}`}>
+                      {structure.action?.replace(/_/g, ' ')}
                     </div>
-                  ))}
-                </div>
-              )}
-              {structure.notes?.length > 0 && (
-                <ul className="space-y-1">
-                  {structure.notes.map((n: string, i: number) => (
-                    <li key={i} className="text-xs text-fg-subtle">— {n}</li>
-                  ))}
-                </ul>
-              )}
+                    <p className="text-fg-muted text-sm mb-4">{rationale}</p>
+
+                    {/* Suppress legs when overridden OR when there's a directional conflict */}
+                    {structure.legs && !isOverridden && !hasDirectionalConflict && (
+                      <div className="border border-border-subtle overflow-x-auto mb-4">
+                        <div className="grid grid-cols-4 gap-4 px-4 py-2 bg-bg text-xs text-fg-subtle tracking-widest">
+                          <div>SIDE</div><div>TYPE</div><div>STRIKE</div><div>EXPIRY</div>
+                        </div>
+                        {structure.legs.map((leg: any, i: number) => (
+                          <div key={i} className="grid grid-cols-4 gap-4 px-4 py-3 text-sm border-t border-border-subtle">
+                            <div className={leg.side === 'BUY' ? 'text-signal-buy font-bold' : 'text-signal-sell font-bold'}>
+                              {leg.side}
+                            </div>
+                            <div>{leg.type}</div>
+                            <div>${leg.strike}</div>
+                            <div className="text-fg-muted">{leg.expiry}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {structure.notes?.length > 0 && !isOverridden && !hasDirectionalConflict && (
+                      <ul className="space-y-1">
+                        {structure.notes.map((n: string, i: number) => (
+                          <li key={i} className="text-xs text-fg-subtle">— {n}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </>
+                );
+              })()}
             </section>
           )}
 
