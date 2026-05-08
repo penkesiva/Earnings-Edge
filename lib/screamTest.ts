@@ -175,26 +175,34 @@ function filter3BeatHistory(i: ScreamTestInputs): FilterResult {
   const espBearish = zacksEsp != null && zacksEsp < -0.02;
 
   const espStr = zacksEsp != null ? `ESP ${(zacksEsp * 100).toFixed(2)}%` : 'ESP n/a';
+  // beatStreak counts consecutive beats from the most recent quarter backwards;
+  // it resets to 0 on any miss. So beatStreak=0 means the most recent quarter
+  // missed, NOT that every tracked quarter missed.
+  const streakLabel =
+    beatStreak === 0
+      ? `no active beat streak (last ${totalQuartersTracked}Q tracked)`
+      : `${beatStreak} consec. beat${beatStreak === 1 ? '' : 's'} (last ${totalQuartersTracked}Q tracked)`;
+
   // Bullish: 4+ consecutive beats AND positive ESP
   if (beatStreak >= 4 && streakPct >= 1.0 && espBullish) {
     return {
       passed: true,
       direction: 'bullish',
-      detail: `${beatStreak} consec. beats (${totalQuartersTracked}Q window); ${espStr}`,
+      detail: `${streakLabel}; ${espStr}`,
     };
   }
-  // Bearish: 2+ misses in lookback window or negative ESP
+  // Bearish: streak is stale (2+ quarters since the last beat run) or negative ESP
   if (totalQuartersTracked - beatStreak >= 2 || espBearish) {
     return {
       passed: true,
       direction: 'bearish',
-      detail: `${totalQuartersTracked - beatStreak} misses in last ${totalQuartersTracked}Q consec. window; ${espStr}`,
+      detail: `${streakLabel}; ${espStr}`,
     };
   }
   return {
     passed: false,
     direction: 'mixed',
-    detail: `${beatStreak} consec. beat(s) of ${totalQuartersTracked}Q; ${espStr}`,
+    detail: `${streakLabel}; ${espStr}`,
   };
 }
 
