@@ -1,10 +1,12 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 type State = 'idle' | 'running' | 'done' | 'error';
 
 export function PrepDateButton({ date }: { date: string }) {
+  const router = useRouter();
   const [state, setState] = useState<State>('idle');
   const [message, setMessage] = useState('');
 
@@ -34,6 +36,8 @@ export function PrepDateButton({ date }: { date: string }) {
       }
       setState('done');
       setMessage(`${data.count ?? 0} brief${data.count === 1 ? '' : 's'} generated`);
+      // Refresh the Server Component so brief links appear without a manual reload
+      router.refresh();
     } catch {
       setState('error');
       setMessage('Network error');

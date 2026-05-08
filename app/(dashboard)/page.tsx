@@ -38,10 +38,10 @@ export default async function HomePage() {
     .lte('earnings_date', in7)
     .order('earnings_date', { ascending: true });
 
-  // Existing briefs for the same window (so we can show links + badge)
+  // Existing briefs for the same window (so we can show links + badge + staleness)
   const { data: upcomingBriefs } = await sb
     .from('earnings_briefs')
-    .select('id, ticker, earnings_date, final_action, composite_score')
+    .select('id, ticker, earnings_date, final_action, composite_score, updated_at, generated_at')
     .gt('earnings_date', tomorrow)
     .lte('earnings_date', in7)
     .order('composite_score', { ascending: false });
@@ -260,6 +260,7 @@ export default async function HomePage() {
                           {brief ? (
                             <>
                               <FinalActionBadge action={brief.final_action ?? null} />
+                              <LastScanned updatedAt={brief.updated_at ?? brief.generated_at ?? null} />
                               <Link
                                 href={`/briefs/${brief.id}`}
                                 className="text-[10px] text-fg-subtle hover:text-fg tracking-widest underline underline-offset-2"
