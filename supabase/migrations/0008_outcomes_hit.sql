@@ -11,7 +11,8 @@ comment on column earnings_outcomes.hit is
   'True when the directional prediction was correct based on next-day move.';
 
 -- Refresh view to include final_action from the brief and hit from outcome
-create or replace view v_brief_outcomes as
+drop view if exists v_brief_outcomes;
+create view v_brief_outcomes as
 select
   b.id            as brief_id,
   b.ticker,
