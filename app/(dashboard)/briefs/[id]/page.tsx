@@ -92,20 +92,22 @@ export default async function BriefPage({ params }: { params: { id: string } }) 
 
       {/* ── Final action ───────────────────────────────────────────────────── */}
       <section className="border border-border bg-bg-elevated p-6">
-        <div className="text-xs tracking-widest text-fg-subtle mb-3">TRADE ACTION</div>
+        <div className="text-xs tracking-widest text-fg-subtle mb-4">TRADE DECISION</div>
         {legacyFallback ? (
           <div className="text-xs text-fg-dim">
-            Re-run daily scan to generate a reconciled action for this brief.
+            Re-run scan to generate a reconciled action for this brief.
           </div>
         ) : (
-          <>
-            <div className="flex items-center gap-4 mb-3">
-              <FinalActionBadge action={finalAction} />
-              <span className="text-[10px] text-fg-dim max-w-lg leading-relaxed">
-                {finalRationale}
-              </span>
-            </div>
-          </>
+          <TradeDecisionCard
+            action={finalAction}
+            rationale={finalRationale}
+            screamDirection={brief.scream_direction ?? null}
+            screamScore={brief.scream_score ?? null}
+            compositeScore={brief.composite_score ?? null}
+            expectedMoveDollar={brief.expected_move_dollar ?? null}
+            expectedMovePct={brief.expected_move_pct ?? null}
+            ivRank={brief.iv_rank ?? null}
+          />
         )}
       </section>
 
@@ -280,6 +282,95 @@ export default async function BriefPage({ params }: { params: { id: string } }) 
 
         </div>
       </details>
+    </div>
+  );
+}
+
+function TradeDecisionCard({
+  action, rationale, screamDirection, screamScore,
+  compositeScore, expectedMoveDollar, expectedMovePct, ivRank,
+}: {
+  action: string | null;
+  rationale: string | null;
+  screamDirection: string | null;
+  screamScore: number | null;
+  compositeScore: number | null;
+  expectedMoveDollar: number | null;
+  expectedMovePct: number | null;
+  ivRank: number | null;
+}) {
+  const isSkip      = !action || action === 'SKIP';
+  const isCondor    = action === 'IRON_CONDOR';
+  const isBullish   = action === 'LONG_CALL' || action === 'CALL_DEBIT_SPREAD';
+  const isBearish   = action === 'LONG_PUT'  || action === 'PUT_DEBIT_SPREAD';
+  const isOptions   = !isSkip && !isCondor;
+  const isNeutralVol = isCondor;
+
+  const tradeLabel  = isSkip      ? 'NO TRADE'
+                    : isCondor    ? 'SELL VOL'
+                    : isBullish   ? 'TRADE · BULLISH'
+                    : isBearish   ? 'TRADE · BEARISH'
+                    : 'TRADE';
+
+  const tradeColor  = isSkip      ? 'text-fg-subtle'
+                    : isCondor    ? 'text-signal-watch'
+                    : isBullish   ? 'text-signal-buy'
+                    : isBearish   ? 'text-signal-sell'
+                    : 'text-fg';
+
+  const borderColor = isSkip      ? 'border-border'
+                    : isCondor    ? 'border-signal-watch'
+                    : isBullish   ? 'border-signal-buy'
+                    : isBearish   ? 'border-signal-sell'
+                    : 'border-border';
+
+  const instrument  = isSkip      ? '—'
+                    : isCondor    ? 'Options (iron condor)'
+                    : isOptions   ? `Options (${action?.replace(/_/g, ' ').toLowerCase()})`
+                    : 'Stock only';
+
+  const prediction  = isBullish   ? `Expects stock to move UP beyond ±$${expectedMoveDollar?.toFixed(2)} (${expectedMovePct?.toFixed(1)}%)`
+                    : isBearish   ? `Expects stock to move DOWN beyond ±$${expectedMoveDollar?.toFixed(2)} (${expectedMovePct?.toFixed(1)}%)`
+                    : isCondor    ? `Expects stock to stay within ±$${expectedMoveDollar?.toFixed(2)} (${expectedMovePct?.toFixed(1)}%)`
+                    : `No directional edge — stay in cash`;
+
+  return (
+    <div className={`border-l-4 ${borderColor} pl-4 space-y-4`}>
+      {/* Primary answer */}
+      <div>
+        <div className="text-[10px] tracking-widest text-fg-subtle mb-1">DECISION</div>
+        <div className={`text-2xl font-bold tracking-wide ${tradeColor}`}>{tradeLabel}</div>
+      </div>
+
+      {/* Three key questions */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
+        <div>
+          <div className="text-[10px] tracking-widest text-fg-subtle mb-1">INSTRUMENT</div>
+          <div className="font-bold">{instrument}</div>
+        </div>
+        <div>
+          <div className="text-[10px] tracking-widest text-fg-subtle mb-1">PREDICTION</div>
+          <div className="text-fg-muted text-xs leading-relaxed">{prediction}</div>
+        </div>
+        <div>
+          <div className="text-[10px] tracking-widest text-fg-subtle mb-1">SIGNAL STRENGTH</div>
+          <div className="flex items-center gap-3 text-xs">
+            <span>Scream <span className="font-bold">{screamScore ?? '—'}/5</span></span>
+            <span className="text-fg-dim">·</span>
+            <span>Score <span className="font-bold">{compositeScore ?? '—'}</span></span>
+            <span className="text-fg-dim">·</span>
+            <span>IVR <span className="font-bold">{ivRank ?? '—'}</span></span>
+          </div>
+        </div>
+      </div>
+
+      {/* Why */}
+      {rationale && (
+        <div>
+          <div className="text-[10px] tracking-widest text-fg-subtle mb-1">WHY</div>
+          <p className="text-xs text-fg-muted leading-relaxed">{rationale}</p>
+        </div>
+      )}
     </div>
   );
 }
