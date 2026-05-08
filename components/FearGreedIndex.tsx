@@ -69,7 +69,7 @@ function MoodStrip({ score }: { score: number }) {
   return (
     <div className={`mb-4 pl-3 border-l-[3px] ${border} bg-bg py-3 pr-3 border-y border-border`}>
       <div className="text-[10px] text-fg-muted tracking-widest uppercase mb-1">
-        Market mood today
+        Market sentiment (rolling)
       </div>
       <div className="flex flex-wrap items-baseline gap-2">
         <span className={`text-lg font-bold tracking-wide ${labelColor}`}>{t.label}</span>
