@@ -4,6 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { FinalActionBadge, SignalBadge } from '@/components/SignalBadge';
 import { ScreamTestCard } from '@/components/ScreamTestCard';
 import { ScanDiffBanner } from '@/components/ScanDiffBanner';
+import { RescanBriefButton } from '@/components/RescanBriefButton';
 import type { FilterResult, NarrativeOverhang } from '@/lib/screamTest';
 import type { BriefScanRow } from '@/lib/scanDiff';
 
@@ -72,8 +73,11 @@ export default async function BriefPage({ params }: { params: { id: string } }) 
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div className="border-l-4 border-signal-buy pl-4 sm:pl-6">
-        <div className="text-xs text-fg-subtle tracking-widest mb-2">
-          EARNINGS BRIEF · {brief.earnings_date}
+        <div className="flex items-start justify-between gap-4 mb-2">
+          <div className="text-xs text-fg-subtle tracking-widest">
+            EARNINGS BRIEF · {brief.earnings_date}
+          </div>
+          <RescanBriefButton ticker={brief.ticker} earningsDate={brief.earnings_date} />
         </div>
         <div className="flex flex-wrap items-baseline gap-3 sm:gap-6 mb-4">
           <h1 className="text-4xl sm:text-5xl font-bold">{brief.ticker}</h1>
