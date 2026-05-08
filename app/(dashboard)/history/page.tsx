@@ -75,7 +75,9 @@ export default async function HistoryPage() {
               }>{r.composite_score}</span>
             </div>
             <div className="col-span-2">
-              <FinalActionBadge action={r.final_action ?? null} />
+              {r.final_action
+                ? <FinalActionBadge action={r.final_action} />
+                : <span className="text-fg-dim text-xs">—</span>}
             </div>
             <div className="col-span-1 text-xs text-fg-muted">
               ±{r.expected_move_pct?.toFixed(1)}%
