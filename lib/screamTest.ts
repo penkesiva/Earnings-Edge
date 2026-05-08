@@ -93,32 +93,44 @@ export interface ScreamTestResult {
 // --- Filter implementations ---
 
 function filter1ChainConviction(i: ScreamTestInputs): FilterResult {
-  const { nearMoneyCallVol: cv, nearMoneyPutVol: pv, largestOiCluster, largestOiSide } =
-    i;
+  const { nearMoneyCallVol: cv, nearMoneyPutVol: pv, largestOiCluster, largestOiSide } = i;
+
   if (cv === 0 && pv === 0) {
     return { passed: false, direction: 'none', detail: 'No volume data' };
   }
-  const ratio = pv === 0 ? Infinity : cv / pv;
-  const oiBig = largestOiCluster >= 5000;
 
-  if (ratio >= 3 && oiBig && largestOiSide === 'call') {
+  // vol ratio: >1 = calls dominate, <1 = puts dominate
+  const ratio = pv === 0 ? Infinity : cv / pv;
+
+  // OI confirmation: only applied when OI data is actually present.
+  // When all contracts show 0 OI (common in pre-earnings scans run early),
+  // we treat OI as unavailable and gate solely on volume.
+  const oiAvailable = largestOiCluster > 0;
+  // If OI is present, require it to confirm the same directional side (any nonzero amount).
+  const oiConfirmsCall = !oiAvailable || largestOiSide === 'call';
+  const oiConfirmsPut  = !oiAvailable || largestOiSide === 'put';
+  const oiLabel = oiAvailable ? `${largestOiCluster} OI` : 'OI n/a';
+
+  if (ratio >= 3 && oiConfirmsCall) {
     return {
       passed: true,
       direction: 'bullish',
-      detail: `Call vol ${ratio.toFixed(1)}x put vol; ${largestOiCluster} call OI cluster`,
+      detail: `Call vol ${ratio.toFixed(1)}x put vol; ${oiLabel} on calls`,
     };
   }
-  if (ratio <= 1 / 3 && oiBig && largestOiSide === 'put') {
+  if (ratio <= 1 / 3 && oiConfirmsPut) {
     return {
       passed: true,
       direction: 'bearish',
-      detail: `Put vol ${(1 / ratio).toFixed(1)}x call vol; ${largestOiCluster} put OI cluster`,
+      detail: `Put vol ${(1 / ratio).toFixed(1)}x call vol; ${oiLabel} on puts`,
     };
   }
+
+  const side = ratio >= 1 ? 'calls' : 'puts';
   return {
     passed: false,
     direction: 'mixed',
-    detail: `Vol ratio ${ratio.toFixed(2)}, largest OI ${largestOiCluster} on ${largestOiSide}s — not one-sided enough`,
+    detail: `Vol ratio ${ratio.toFixed(2)} (${side} slightly heavier); ${oiLabel} — not one-sided enough`,
   };
 }
 
