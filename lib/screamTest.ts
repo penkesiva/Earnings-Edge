@@ -167,26 +167,27 @@ function filter3BeatHistory(i: ScreamTestInputs): FilterResult {
   const espBullish = zacksEsp != null && zacksEsp > 0;
   const espBearish = zacksEsp != null && zacksEsp < -0.02;
 
-  // Bullish: 4+/4 streak AND positive ESP
+  const espStr = zacksEsp != null ? `ESP ${(zacksEsp * 100).toFixed(2)}%` : 'ESP n/a';
+  // Bullish: 4+ consecutive beats AND positive ESP
   if (beatStreak >= 4 && streakPct >= 1.0 && espBullish) {
     return {
       passed: true,
       direction: 'bullish',
-      detail: `${beatStreak}/${totalQuartersTracked} streak + ESP +${(zacksEsp! * 100).toFixed(2)}%`,
+      detail: `${beatStreak} consec. beats (${totalQuartersTracked}Q window); ${espStr}`,
     };
   }
-  // Bearish: 2+ recent misses or negative ESP
+  // Bearish: 2+ misses in lookback window or negative ESP
   if (totalQuartersTracked - beatStreak >= 2 || espBearish) {
     return {
       passed: true,
       direction: 'bearish',
-      detail: `${totalQuartersTracked - beatStreak} misses in last ${totalQuartersTracked}; ESP ${zacksEsp != null ? `${(zacksEsp * 100).toFixed(2)}%` : 'n/a'}`,
+      detail: `${totalQuartersTracked - beatStreak} misses in last ${totalQuartersTracked}Q consec. window; ${espStr}`,
     };
   }
   return {
     passed: false,
     direction: 'mixed',
-    detail: `Streak ${beatStreak}/${totalQuartersTracked}, ESP ${zacksEsp != null ? `${(zacksEsp * 100).toFixed(2)}%` : 'n/a'}`,
+    detail: `${beatStreak} consec. beat(s) of ${totalQuartersTracked}Q; ${espStr}`,
   };
 }
 

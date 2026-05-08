@@ -68,7 +68,9 @@ export function suggestStructure(inputs: StructureInputs): SuggestedStructure {
 
     return {
       action: 'CALL_DEBIT_SPREAD',
-      rationale: `Moderate score (${composite}) with high IV. Spread is the prudent structure.`,
+      rationale: composite < 60
+        ? `Marginal score (${composite}) with high IV — structure shown for reference only, not for trading without scream confirmation.`
+        : `Moderate score (${composite}) with high IV. Spread limits IV crush exposure.`,
       legs: [
         {
           side: 'BUY',
@@ -108,9 +110,15 @@ export function suggestStructure(inputs: StructureInputs): SuggestedStructure {
   }
 
   // Default: directional with spread
+  const defaultRationale =
+    composite < 60
+      ? `Marginal score (${composite}) — structure shown for reference only, not for trading without scream confirmation.`
+      : composite >= 75
+        ? `High-conviction score (${composite}) with directional bias — controlled-risk spread.`
+        : `Score ${composite} suggests directional bias; use spread for controlled risk.`;
   return {
     action: 'CALL_DEBIT_SPREAD',
-    rationale: `Score ${composite} suggests directional bias with controlled risk.`,
+    rationale: defaultRationale,
     legs: [
       {
         side: 'BUY',

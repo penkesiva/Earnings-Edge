@@ -60,8 +60,8 @@ export function computeBeatScore(inputs: BeatScoreInputs): BeatScoreResult {
     inputs.totalQuarters > 0
       ? (inputs.beatsLast4 / inputs.totalQuarters) * 100
       : 50;
-  if (beatStreakScore >= 75) reasoning.push(`Strong beat streak: ${inputs.beatsLast4}/${inputs.totalQuarters}`);
-  if (beatStreakScore <= 25) reasoning.push(`Weak beat streak: ${inputs.beatsLast4}/${inputs.totalQuarters}`);
+  if (beatStreakScore >= 75) reasoning.push(`Beat frequency: ${inputs.beatsLast4}/${inputs.totalQuarters} (last ${inputs.totalQuarters}Q)`);
+  if (beatStreakScore <= 25) reasoning.push(`Weak beat history: ${inputs.beatsLast4}/${inputs.totalQuarters} (last ${inputs.totalQuarters}Q)`);
 
   // 2. Surprise magnitude: avg 20%+ → 100; negative → low
   const surpriseMagnitudeScore = clamp(50 + inputs.avgSurprisePct * 2.5, 0, 100);

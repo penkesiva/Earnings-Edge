@@ -41,34 +41,58 @@ export function ScanDiffBanner({ ticker, scans }: { ticker: string; scans: Brief
 
   // ── Flips ─────────────────────────────────────────────────────────────────
   const { flips, critical } = diff;
-  const borderColor = critical ? 'border-signal-sell' : 'border-signal-watch';
-  const iconColor   = critical ? 'text-signal-sell'   : 'text-signal-watch';
-  const icon        = critical ? '⚠' : '△';
 
+  if (critical) {
+    // Full-width banner for decision-relevant flips
+    return (
+      <div className="border border-signal-sell bg-signal-sell/5 px-4 py-3 space-y-2">
+        <div className="flex items-center gap-2">
+          <span className="text-signal-sell font-bold text-sm">⚠ FLIPPED</span>
+          <span className="text-signal-sell text-xs font-mono">since {previousTime} scan</span>
+          <span className="text-fg-dim text-[10px] font-mono ml-auto">last scan {latestTime}</span>
+        </div>
+        <ul className="space-y-1 font-mono text-xs">
+          {flips.map((f, i) => (
+            <li key={i} className="flex items-baseline gap-2">
+              <span className={f.threshold ? 'text-signal-sell' : 'text-fg-dim'}>
+                {f.threshold ? '▸' : '·'}
+              </span>
+              <span className="text-fg-subtle w-20 shrink-0">{f.label}</span>
+              <span className="text-fg-dim">{f.from}</span>
+              <span className="text-fg-dim">→</span>
+              <span className={f.threshold ? 'text-signal-sell font-bold' : 'text-fg-subtle'}>
+                {f.to}
+              </span>
+              {f.field === 'scream_score' && !f.threshold && (
+                <span className="text-fg-dim">(still below bar)</span>
+              )}
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  }
+
+  // Non-critical changes — subtle inline display
+  const iconColor = 'text-signal-watch';
   return (
-    <div className={`font-mono text-[11px] border-l-2 ${borderColor} pl-3 space-y-1`}>
+    <div className="font-mono text-[11px] border-l-2 border-signal-watch pl-3 space-y-1">
       <div className="text-fg-dim">
         {ticker} · last scan {latestTime}
       </div>
       <div className={`font-bold ${iconColor} flex items-center gap-1.5`}>
-        <span>{icon}</span>
-        <span>
-          {critical ? 'FLIPPED' : 'Changed'} since {previousTime} scan
-        </span>
+        <span>△</span>
+        <span>Changed since {previousTime} scan</span>
       </div>
       <ul className="space-y-0.5 pl-1">
         {flips.map((f, i) => (
           <li key={i} className="flex items-baseline gap-1.5">
-            <span className={f.threshold ? iconColor : 'text-fg-dim'}>
-              {f.threshold ? '▸' : '·'}
-            </span>
+            <span className="text-fg-dim">·</span>
             <span className="text-fg-subtle w-20 shrink-0">{f.label}</span>
             <span className="text-fg-dim">{f.from}</span>
             <span className="text-fg-dim">→</span>
-            <span className={f.threshold ? 'text-fg font-bold' : 'text-fg-subtle'}>
-              {f.to}
-            </span>
-            {f.field === 'scream_score' && !f.threshold && (
+            <span className="text-fg-subtle">{f.to}</span>
+            {f.field === 'scream_score' && (
               <span className="text-fg-dim">(still below bar)</span>
             )}
           </li>

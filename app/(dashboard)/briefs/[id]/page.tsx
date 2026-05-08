@@ -10,7 +10,7 @@ import type { BriefScanRow } from '@/lib/scanDiff';
 export const dynamic = 'force-dynamic';
 
 const COMPONENT_LABELS: Record<string, string> = {
-  beat_streak_score: 'Beat Streak (last 4Q)',
+  beat_streak_score: 'Beat Frequency (last 4Q)',
   surprise_magnitude_score: 'Surprise Magnitude',
   revision_trend_score: 'Analyst Revisions (30d)',
   whisper_delta_score: 'Whisper vs Consensus',
@@ -87,7 +87,7 @@ export default async function BriefPage({ params }: { params: { id: string } }) 
         </div>
       </div>
 
-      {/* ── Scan diff banner ───────────────────────────────────────────────── */}
+      {/* ── Flip banner (above everything else when critical) ──────────────── */}
       <ScanDiffBanner ticker={brief.ticker} scans={scanRows} />
 
       {/* ── Final action ───────────────────────────────────────────────────── */}
@@ -114,7 +114,7 @@ export default async function BriefPage({ params }: { params: { id: string } }) 
         <Stat label="IV 30d" value={`${(brief.iv_30d * 100).toFixed(1)}%`} />
         <Stat label="IV Rank" value={brief.iv_rank} />
         <Stat label="Expected Move" value={`±$${brief.expected_move_dollar?.toFixed(2)}`} sub={`${brief.expected_move_pct?.toFixed(1)}%`} />
-        <Stat label="P/C Ratio" value={brief.put_call_ratio?.toFixed(2)} />
+        <Stat label="P/C Ratio (vol)" value={brief.put_call_ratio?.toFixed(2)} />
       </div>
 
       {/* ── Outcome (if logged) ────────────────────────────────────────────── */}
@@ -206,7 +206,13 @@ export default async function BriefPage({ params }: { params: { id: string } }) 
               <div className="text-xs tracking-widest text-fg-subtle mb-3">
                 BEAT-SCORE SUGGESTED STRUCTURE
               </div>
-              <div className="text-xl font-bold mb-1">
+              {/* Override banner — shown whenever the reconciled action overrides this structure */}
+              {(finalAction === 'SKIP' || finalAction === 'IRON_CONDOR') && (
+                <div className="mb-3 border border-signal-sell/40 bg-signal-sell/5 px-3 py-2 text-xs text-signal-sell tracking-wide">
+                  ⚡ OVERRIDDEN BY SCREAM / IV GATE — structure shown for audit only. Do not trade.
+                </div>
+              )}
+              <div className={`text-xl font-bold mb-1 ${(finalAction === 'SKIP' || finalAction === 'IRON_CONDOR') ? 'opacity-40 line-through' : ''}`}>
                 {structure.action?.replace(/_/g, ' ')}
               </div>
               <p className="text-fg-muted text-sm mb-4">{structure.rationale}</p>
