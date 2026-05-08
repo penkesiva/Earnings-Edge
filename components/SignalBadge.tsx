@@ -8,12 +8,14 @@ const FINAL_ACTION_STYLES: Record<
   FinalAction,
   { bg: string; text: string; label: string }
 > = {
-  SKIP:             { bg: 'bg-signal-neutral/10', text: 'text-signal-neutral', label: 'SKIP' },
-  IRON_CONDOR:      { bg: 'bg-signal-watch/10',   text: 'text-signal-watch',   label: 'IRON CONDOR' },
-  CALL_DEBIT_SPREAD:{ bg: 'bg-signal-watch/10',   text: 'text-signal-watch',   label: 'CALL SPREAD' },
-  PUT_DEBIT_SPREAD: { bg: 'bg-signal-sell/10',    text: 'text-signal-sell',    label: 'PUT SPREAD' },
-  LONG_CALL:        { bg: 'bg-signal-buy/10',     text: 'text-signal-buy',     label: 'LONG CALL' },
-  LONG_PUT:         { bg: 'bg-signal-sell/10',    text: 'text-signal-sell',    label: 'LONG PUT' },
+  SKIP:               { bg: 'bg-signal-neutral/10', text: 'text-signal-neutral', label: 'SKIP' },
+  IRON_CONDOR:        { bg: 'bg-signal-watch/10',   text: 'text-signal-watch',   label: 'IRON CONDOR' },
+  PUT_CREDIT_SPREAD:  { bg: 'bg-signal-buy/10',     text: 'text-signal-buy',     label: 'PUT CREDIT SPREAD' },
+  CALL_CREDIT_SPREAD: { bg: 'bg-signal-sell/10',    text: 'text-signal-sell',    label: 'CALL CREDIT SPREAD' },
+  CALL_DEBIT_SPREAD:  { bg: 'bg-signal-watch/10',   text: 'text-signal-watch',   label: 'CALL DEBIT SPREAD' },
+  PUT_DEBIT_SPREAD:   { bg: 'bg-signal-sell/10',    text: 'text-signal-sell',    label: 'PUT DEBIT SPREAD' },
+  LONG_CALL:          { bg: 'bg-signal-buy/10',     text: 'text-signal-buy',     label: 'LONG CALL' },
+  LONG_PUT:           { bg: 'bg-signal-sell/10',    text: 'text-signal-sell',    label: 'LONG PUT' },
 };
 
 export function FinalActionBadge({ action }: { action: string | null }) {

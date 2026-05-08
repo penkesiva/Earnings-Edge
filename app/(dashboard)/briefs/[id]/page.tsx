@@ -294,27 +294,20 @@ function roundStrike(price: number): number {
   return Math.round(price / 5) * 5;
 }
 
-function CondorLegsTable({
-  spot, expectedMoveDollar, expiry,
+// Multipliers for short-vol structures. Shorts placed at 1.25× expected move
+// (≈ 1.25 standard deviations OTM) so they're meaningfully outside the
+// straddle expected move, not sitting on it. Longs at 1.75× as protective
+// wings.
+const SHORT_LEG_MULT = 1.25;
+const LONG_LEG_MULT  = 1.75;
+
+function StructureLegsTable({
+  legs, expiry, footnote,
 }: {
-  spot: number;
-  expectedMoveDollar: number;
-  expiry: string | null;
+  legs: ReadonlyArray<{ side: 'BUY' | 'SELL'; type: 'CALL' | 'PUT'; strike: number }>;
+  expiry: string;
+  footnote: string;
 }) {
-  if (!expiry) return null;
-  // Short wings just outside expected move; long wings 1.5× out (protection).
-  const shortCall = roundStrike(spot + expectedMoveDollar);
-  const longCall  = roundStrike(spot + expectedMoveDollar * 1.5);
-  const shortPut  = roundStrike(spot - expectedMoveDollar);
-  const longPut   = roundStrike(spot - expectedMoveDollar * 1.5);
-
-  const legs = [
-    { side: 'BUY',  type: 'PUT',  strike: longPut,   note: 'protective wing' },
-    { side: 'SELL', type: 'PUT',  strike: shortPut,  note: 'short put' },
-    { side: 'SELL', type: 'CALL', strike: shortCall, note: 'short call' },
-    { side: 'BUY',  type: 'CALL', strike: longCall,  note: 'protective wing' },
-  ] as const;
-
   return (
     <div>
       <div className="text-[10px] tracking-widest text-fg-subtle mb-2">STRUCTURE</div>
@@ -333,11 +326,92 @@ function CondorLegsTable({
           </div>
         ))}
       </div>
-      <p className="text-xs text-fg-dim">
-        Wings placed at ±${expectedMoveDollar.toFixed(2)} (short) and ±${(expectedMoveDollar * 1.5).toFixed(2)} (long).
-        Profit if stock stays within the short strikes. Verify strikes exceed the straddle expected move before entry.
-      </p>
+      <p className="text-xs text-fg-dim">{footnote}</p>
     </div>
+  );
+}
+
+function CondorLegsTable({
+  spot, expectedMoveDollar, expiry,
+}: {
+  spot: number;
+  expectedMoveDollar: number;
+  expiry: string | null;
+}) {
+  if (!expiry) return null;
+  const shortCall = roundStrike(spot + expectedMoveDollar * SHORT_LEG_MULT);
+  const longCall  = roundStrike(spot + expectedMoveDollar * LONG_LEG_MULT);
+  const shortPut  = roundStrike(spot - expectedMoveDollar * SHORT_LEG_MULT);
+  const longPut   = roundStrike(spot - expectedMoveDollar * LONG_LEG_MULT);
+
+  return (
+    <StructureLegsTable
+      expiry={expiry}
+      legs={[
+        { side: 'BUY',  type: 'PUT',  strike: longPut },
+        { side: 'SELL', type: 'PUT',  strike: shortPut },
+        { side: 'SELL', type: 'CALL', strike: shortCall },
+        { side: 'BUY',  type: 'CALL', strike: longCall },
+      ]}
+      footnote={
+        `Shorts placed at ±$${(expectedMoveDollar * SHORT_LEG_MULT).toFixed(2)} ` +
+        `(${SHORT_LEG_MULT}× expected move); long wings at ±$${(expectedMoveDollar * LONG_LEG_MULT).toFixed(2)}. ` +
+        `Profit if stock stays within the short strikes. ` +
+        `Verify strikes safely exceed the straddle expected move before entry.`
+      }
+    />
+  );
+}
+
+function PutCreditSpreadLegsTable({
+  spot, expectedMoveDollar, expiry,
+}: {
+  spot: number;
+  expectedMoveDollar: number;
+  expiry: string | null;
+}) {
+  if (!expiry) return null;
+  const shortPut = roundStrike(spot - expectedMoveDollar * SHORT_LEG_MULT);
+  const longPut  = roundStrike(spot - expectedMoveDollar * LONG_LEG_MULT);
+  return (
+    <StructureLegsTable
+      expiry={expiry}
+      legs={[
+        { side: 'BUY',  type: 'PUT', strike: longPut },
+        { side: 'SELL', type: 'PUT', strike: shortPut },
+      ]}
+      footnote={
+        `Short put at $${shortPut} (≈${SHORT_LEG_MULT}× expected move below spot); ` +
+        `protective long put at $${longPut}. Max profit if stock closes above $${shortPut}. ` +
+        `Bullish bias — bets stock will hold support and IV will crush.`
+      }
+    />
+  );
+}
+
+function CallCreditSpreadLegsTable({
+  spot, expectedMoveDollar, expiry,
+}: {
+  spot: number;
+  expectedMoveDollar: number;
+  expiry: string | null;
+}) {
+  if (!expiry) return null;
+  const shortCall = roundStrike(spot + expectedMoveDollar * SHORT_LEG_MULT);
+  const longCall  = roundStrike(spot + expectedMoveDollar * LONG_LEG_MULT);
+  return (
+    <StructureLegsTable
+      expiry={expiry}
+      legs={[
+        { side: 'SELL', type: 'CALL', strike: shortCall },
+        { side: 'BUY',  type: 'CALL', strike: longCall },
+      ]}
+      footnote={
+        `Short call at $${shortCall} (≈${SHORT_LEG_MULT}× expected move above spot); ` +
+        `protective long call at $${longCall}. Max profit if stock closes below $${shortCall}. ` +
+        `Bearish bias — bets stock won't rally and IV will crush.`
+      }
+    />
   );
 }
 
@@ -357,38 +431,57 @@ function TradeDecisionCard({
   spot: number | null;
   preferredExpiry: string | null;
 }) {
-  const isSkip      = !action || action === 'SKIP';
-  const isCondor    = action === 'IRON_CONDOR';
-  const isBullish   = action === 'LONG_CALL' || action === 'CALL_DEBIT_SPREAD';
-  const isBearish   = action === 'LONG_PUT'  || action === 'PUT_DEBIT_SPREAD';
-  const isOptions   = !isSkip && !isCondor;
+  const isSkip       = !action || action === 'SKIP';
+  const isCondor     = action === 'IRON_CONDOR';
+  const isPutCredit  = action === 'PUT_CREDIT_SPREAD';
+  const isCallCredit = action === 'CALL_CREDIT_SPREAD';
+  const isBullish    = action === 'LONG_CALL' || action === 'CALL_DEBIT_SPREAD';
+  const isBearish    = action === 'LONG_PUT'  || action === 'PUT_DEBIT_SPREAD';
+  const isShortVol   = isCondor || isPutCredit || isCallCredit;
+  const isOptions    = !isSkip && !isShortVol;
 
-  const tradeLabel  = isSkip      ? 'NO TRADE'
-                    : isCondor    ? 'SELL VOLATILITY'
-                    : isBullish   ? 'TRADE · BULLISH'
-                    : isBearish   ? 'TRADE · BEARISH'
+  const tradeLabel  = isSkip       ? 'NO TRADE'
+                    : isCondor     ? 'SELL VOLATILITY'
+                    : isPutCredit  ? 'SELL VOL · BULLISH TILT'
+                    : isCallCredit ? 'SELL VOL · BEARISH TILT'
+                    : isBullish    ? 'TRADE · BULLISH'
+                    : isBearish    ? 'TRADE · BEARISH'
                     : 'TRADE';
 
-  const tradeColor  = isSkip      ? 'text-fg-subtle'
-                    : isCondor    ? 'text-signal-watch'
-                    : isBullish   ? 'text-signal-buy'
-                    : isBearish   ? 'text-signal-sell'
+  const tradeColor  = isSkip       ? 'text-fg-subtle'
+                    : isCondor     ? 'text-signal-watch'
+                    : isPutCredit  ? 'text-signal-buy'
+                    : isCallCredit ? 'text-signal-sell'
+                    : isBullish    ? 'text-signal-buy'
+                    : isBearish    ? 'text-signal-sell'
                     : 'text-fg';
 
-  const borderColor = isSkip      ? 'border-border'
-                    : isCondor    ? 'border-signal-watch'
-                    : isBullish   ? 'border-signal-buy'
-                    : isBearish   ? 'border-signal-sell'
+  const borderColor = isSkip       ? 'border-border'
+                    : isCondor     ? 'border-signal-watch'
+                    : isPutCredit  ? 'border-signal-buy'
+                    : isCallCredit ? 'border-signal-sell'
+                    : isBullish    ? 'border-signal-buy'
+                    : isBearish    ? 'border-signal-sell'
                     : 'border-border';
 
-  const instrument  = isSkip      ? '—'
-                    : isCondor    ? 'Options (iron condor)'
-                    : isOptions   ? `Options (${action?.replace(/_/g, ' ').toLowerCase()})`
+  const instrument  = isSkip       ? '—'
+                    : isCondor     ? 'Options (iron condor)'
+                    : isPutCredit  ? 'Options (put credit spread)'
+                    : isCallCredit ? 'Options (call credit spread)'
+                    : isOptions    ? `Options (${action?.replace(/_/g, ' ').toLowerCase()})`
                     : 'Stock only';
 
-  const prediction  = isBullish   ? `Expects stock to move UP beyond ±$${expectedMoveDollar?.toFixed(2)} (${expectedMovePct?.toFixed(1)}%)`
-                    : isBearish   ? `Expects stock to move DOWN beyond ±$${expectedMoveDollar?.toFixed(2)} (${expectedMovePct?.toFixed(1)}%)`
-                    : isCondor    ? `Expects stock to stay within ±$${expectedMoveDollar?.toFixed(2)} (${expectedMovePct?.toFixed(1)}%)`
+  const shortStrike = spot != null && expectedMoveDollar != null
+    ? (isPutCredit  ? spot - expectedMoveDollar * SHORT_LEG_MULT
+      : isCallCredit ? spot + expectedMoveDollar * SHORT_LEG_MULT
+      : null)
+    : null;
+
+  const prediction  = isBullish    ? `Expects stock to move UP beyond ±$${expectedMoveDollar?.toFixed(2)} (${expectedMovePct?.toFixed(1)}%)`
+                    : isBearish    ? `Expects stock to move DOWN beyond ±$${expectedMoveDollar?.toFixed(2)} (${expectedMovePct?.toFixed(1)}%)`
+                    : isCondor     ? `Expects stock to stay within ±$${expectedMoveDollar?.toFixed(2)} (${expectedMovePct?.toFixed(1)}%)`
+                    : isPutCredit  ? `Expects stock to stay above $${roundStrike(shortStrike ?? 0)} (≈${SHORT_LEG_MULT}× expected move below spot)`
+                    : isCallCredit ? `Expects stock to stay below $${roundStrike(shortStrike ?? 0)} (≈${SHORT_LEG_MULT}× expected move above spot)`
                     : `No directional edge — stay in cash`;
 
   return (
@@ -429,9 +522,23 @@ function TradeDecisionCard({
         </div>
       )}
 
-      {/* Iron condor legs (only when action is IRON_CONDOR and we have necessary data) */}
-      {isCondor && spot != null && expectedMoveDollar != null && (
+      {/* Sell-vol structures: render appropriate legs */}
+      {spot != null && expectedMoveDollar != null && isCondor && (
         <CondorLegsTable
+          spot={spot}
+          expectedMoveDollar={expectedMoveDollar}
+          expiry={preferredExpiry}
+        />
+      )}
+      {spot != null && expectedMoveDollar != null && isPutCredit && (
+        <PutCreditSpreadLegsTable
+          spot={spot}
+          expectedMoveDollar={expectedMoveDollar}
+          expiry={preferredExpiry}
+        />
+      )}
+      {spot != null && expectedMoveDollar != null && isCallCredit && (
+        <CallCreditSpreadLegsTable
           spot={spot}
           expectedMoveDollar={expectedMoveDollar}
           expiry={preferredExpiry}

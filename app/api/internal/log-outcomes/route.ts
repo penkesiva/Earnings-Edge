@@ -5,10 +5,12 @@
  * next-day price move, writes to earnings_outcomes, and marks hit/miss.
  *
  * HIT logic (based on final_action):
- *   LONG_CALL / CALL_DEBIT_SPREAD → hit if next-day close > +2%
- *   LONG_PUT  / PUT_DEBIT_SPREAD  → hit if next-day close < -2%
- *   IRON_CONDOR                   → hit if |next-day close| < expected_move_pct
- *   SKIP                          → not counted (null hit)
+ *   LONG_CALL / CALL_DEBIT_SPREAD  → hit if next-day close > +2%
+ *   LONG_PUT  / PUT_DEBIT_SPREAD   → hit if next-day close < -2%
+ *   PUT_CREDIT_SPREAD              → hit if next-day close > -1.25× expected_move (above short put)
+ *   CALL_CREDIT_SPREAD             → hit if next-day close < +1.25× expected_move (below short call)
+ *   IRON_CONDOR                    → hit if |next-day close| < 1.25× expected_move (between shorts)
+ *   SKIP                           → not counted (null hit)
  */
 
 import { NextResponse } from 'next/server';
@@ -83,13 +85,24 @@ export async function POST() {
       let hit: boolean | null = null;
       const expMove = (brief.expected_move_pct as number | null) ?? 5;
 
+      // Short-vol structures: shorts placed at 1.25× expected move; that's
+      // also the breakeven on a hit (price needs to land inside the short
+      // strikes, with some buffer for the credit collected).
+      const SHORT_VOL_BAND = expMove * 1.25;
+
       if (nextDayClosePct !== null) {
         if (finalAction === 'LONG_CALL' || finalAction === 'CALL_DEBIT_SPREAD') {
           hit = nextDayClosePct > 2;
         } else if (finalAction === 'LONG_PUT' || finalAction === 'PUT_DEBIT_SPREAD') {
           hit = nextDayClosePct < -2;
         } else if (finalAction === 'IRON_CONDOR') {
-          hit = Math.abs(nextDayClosePct) < expMove;
+          hit = Math.abs(nextDayClosePct) < SHORT_VOL_BAND;
+        } else if (finalAction === 'PUT_CREDIT_SPREAD') {
+          // Bullish tilt — needs price to stay above the short put strike.
+          hit = nextDayClosePct > -SHORT_VOL_BAND;
+        } else if (finalAction === 'CALL_CREDIT_SPREAD') {
+          // Bearish tilt — needs price to stay below the short call strike.
+          hit = nextDayClosePct < SHORT_VOL_BAND;
         }
         // SKIP → hit stays null (not counted)
       }
