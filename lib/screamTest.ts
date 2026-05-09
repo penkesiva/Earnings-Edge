@@ -190,15 +190,24 @@ function filter3BeatHistory(i: ScreamTestInputs): FilterResult {
       ? `no active beat streak (last ${totalQuartersTracked}Q tracked)`
       : `${beatStreak} consec. beat${beatStreak === 1 ? '' : 's'} (last ${totalQuartersTracked}Q tracked)`;
 
-  // Bullish: 4+ consecutive beats AND positive ESP
-  if (beatStreak >= 4 && streakPct >= 1.0 && espBullish) {
+  // Bullish: 4+ consecutive beats at ≥75% strike rate.
+  // Negative ESP overrides even a strong streak (analyst sees a miss coming).
+  // No ESP = neutral on the forward estimate dimension — history still counts.
+  if (beatStreak >= 4 && streakPct >= 0.75) {
+    if (espBearish) {
+      return {
+        passed: true,
+        direction: 'bearish',
+        detail: `${streakLabel}; ${espStr} — negative ESP overrides streak`,
+      };
+    }
     return {
       passed: true,
       direction: 'bullish',
       detail: `${streakLabel}; ${espStr}`,
     };
   }
-  // Bearish: streak is stale (2+ quarters since the last beat run) or negative ESP
+  // Bearish: streak is stale (2+ missed quarters in window) or negative ESP confirms
   if (totalQuartersTracked - beatStreak >= 2 || espBearish) {
     return {
       passed: true,

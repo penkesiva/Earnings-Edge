@@ -127,7 +127,7 @@ export function reconcileSignals(opts: {
   const strongCallSkew  = callSkewPts >= 10;
 
   const strongBeatHistory   = beatStreakScore >= 75;
-  const sectorTailwindStrong = sectorReturn5d >= 5;
+  const sectorTailwindStrong = sectorReturn5d >= 4;
   const insiderBuying        = netInsiderBuying90d >= 5; // ≥ +$5M
 
   // Count distinct bullish catalysts for medium-skew threshold.
@@ -192,9 +192,9 @@ export function reconcileSignals(opts: {
   if (unresolvedCount >= 3)      tiltScore -= 2;
   else if (unresolvedCount >= 1) tiltScore -= 1;
 
-  // Sector momentum
-  if (sectorReturn5d >= 5)  tiltScore += 1;
-  if (sectorReturn5d <= -5) tiltScore -= 1;
+  // Sector momentum (≥4% / ≤-4% is a meaningful 5-day sector move)
+  if (sectorReturn5d >= 4)  tiltScore += 1;
+  if (sectorReturn5d <= -4) tiltScore -= 1;
 
   const tilt: 'bullish' | 'bearish' | 'mixed' =
     tiltScore >= 3 ? 'bullish' : tiltScore <= -3 ? 'bearish' : 'mixed';
