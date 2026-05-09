@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 
 type State = 'idle' | 'running' | 'done' | 'error';
 
@@ -17,7 +16,6 @@ export function RescanBriefButton({
   ticker: string;
   earningsDate: string;
 }) {
-  const router = useRouter();
   const [state, setState] = useState<State>('idle');
   const [message, setMessage] = useState('');
 
@@ -47,7 +45,9 @@ export function RescanBriefButton({
       }
       setState('done');
       setMessage(`${data.count ?? 0} brief${data.count === 1 ? '' : 's'} updated`);
-      router.refresh();
+      // Hard reload — bypasses all browser and Next.js soft-navigation caches
+      // so the brief page always shows the freshly-written DB data.
+      window.location.reload();
     } catch {
       setState('error');
       setMessage('Network error');

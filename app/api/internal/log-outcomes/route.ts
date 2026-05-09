@@ -47,7 +47,8 @@ export async function POST() {
       // ── Actual EPS result from FMP ───────────────────────────────────────────
       // Gracefully handle FMP errors (rate limits, plan restrictions) so that
       // at minimum the next-day price data still gets saved.
-      const surprises = await getEarningsSurprises(ticker).catch(() => []);
+      // noCache=true: EPS actuals just came out — bypass the 1-hour FMP cache.
+      const surprises = await getEarningsSurprises(ticker, true).catch(() => []);
       const match = surprises
         .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
         .find(s => {

@@ -10,10 +10,19 @@
 const STABLE = 'https://financialmodelingprep.com/stable';
 const KEY = process.env.FMP_API_KEY!;
 
-async function fmp(path: string) {
+/**
+ * Base FMP fetch.
+ * @param noCache - pass true for post-earnings outcome data where we need
+ *   the freshest EPS result. Default uses a 1-hour Next.js data cache to
+ *   avoid hammering FMP during batch scans.
+ */
+async function fmp(path: string, noCache = false) {
   const sep = path.includes('?') ? '&' : '?';
   const url = `${STABLE}/${path.replace(/^\//, '')}${sep}apikey=${KEY}`;
-  const res = await fetch(url, { next: { revalidate: 3600 } });
+  const fetchOpts: RequestInit = noCache
+    ? { cache: 'no-store' }
+    : { next: { revalidate: 3600 } };
+  const res = await fetch(url, fetchOpts);
   if (!res.ok) throw new Error(`FMP ${res.status}: ${await res.text()}`);
   return res.json();
 }
@@ -104,8 +113,11 @@ export async function getTickerEarningsCalendar(ticker: string, limit = 4) {
 }
 
 /** Per-quarter history (stable); used instead of legacy earnings-surprises. */
-async function getEarningsHistoryForSurprises(ticker: string): Promise<EarningsSurprise[]> {
-  const data = await fmp(`earnings?symbol=${encodeURIComponent(ticker)}`);
+async function getEarningsHistoryForSurprises(
+  ticker: string,
+  noCache = false,
+): Promise<EarningsSurprise[]> {
+  const data = await fmp(`earnings?symbol=${encodeURIComponent(ticker)}`, noCache);
   const rows = Array.isArray(data) ? data : [];
   const out: EarningsSurprise[] = [];
   for (const raw of rows as Record<string, unknown>[]) {
@@ -123,8 +135,9 @@ async function getEarningsHistoryForSurprises(ticker: string): Promise<EarningsS
 }
 
 // ----- Surprise history -----
-export async function getEarningsSurprises(ticker: string) {
-  return getEarningsHistoryForSurprises(ticker);
+/** Pass noCache=true when logging outcomes right after an earnings release. */
+export async function getEarningsSurprises(ticker: string, noCache = false) {
+  return getEarningsHistoryForSurprises(ticker, noCache);
 }
 
 /**

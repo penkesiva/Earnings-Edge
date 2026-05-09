@@ -50,8 +50,10 @@ function makeScream(
 ): ScreamTestResult {
   const unresolvedOverhangs = Array.from({ length: unresolvedCount }, (_, i) => ({
     id: `risk-${i}`,
-    category: 'drawdown' as const,
-    summary: 'test risk',
+    category: 'guidance_concern' as const,
+    description: 'test risk',
+    detectedDate: '2026-01-01',
+    source: 'test',
     resolved: false,
     drawdownPct: -10,
   }));
