@@ -209,7 +209,9 @@ export async function detectOverhangs(opts: {
         title: n.title ?? '',
       }));
 
-      const llmResults = await classifyHeadlines(ticker, headlines);
+      // Pass `end` as the cache date — same ticker rescanned on the same day
+      // will return the cached result without a new LLM call.
+      const llmResults = await classifyHeadlines(ticker, headlines, end);
 
       for (const r of llmResults) {
         // Skip very minor mentions (severity 1 = noise).

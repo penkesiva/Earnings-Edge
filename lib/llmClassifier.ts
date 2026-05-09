@@ -8,9 +8,16 @@
  *
  * Both providers use the same structured JSON output schema and the same
  * system prompt so results are equivalent regardless of which key is active.
+ *
+ * Cache: when `scanDate` (YYYY-MM-DD) is supplied, results are persisted to
+ * the `llm_scan_cache` Supabase table. Subsequent calls for the same
+ * (ticker, scanDate) pair skip the LLM entirely and return the stored risks.
+ * This means multiple rescans of the same ticker on the same day cost one
+ * LLM call instead of N.
  */
 
 import type { OverhangCategory } from '@/lib/screamTest';
+import { supabaseAdmin } from '@/lib/supabase';
 
 // ── Shared types ──────────────────────────────────────────────────────────────
 
@@ -193,6 +200,42 @@ async function classifyWithOpenAi(
   }
 }
 
+// ── Supabase cache helpers ─────────────────────────────────────────────────────
+
+async function readCache(
+  ticker: string,
+  scanDate: string,
+): Promise<LlmRiskResult[] | null> {
+  try {
+    const db = supabaseAdmin();
+    const { data, error } = await db
+      .from('llm_scan_cache')
+      .select('risks')
+      .eq('ticker', ticker)
+      .eq('scan_date', scanDate)
+      .maybeSingle();
+    if (error || !data) return null;
+    return data.risks as LlmRiskResult[];
+  } catch {
+    return null;
+  }
+}
+
+async function writeCache(
+  ticker: string,
+  scanDate: string,
+  risks: LlmRiskResult[],
+): Promise<void> {
+  try {
+    const db = supabaseAdmin();
+    await db
+      .from('llm_scan_cache')
+      .upsert({ ticker, scan_date: scanDate, risks }, { onConflict: 'ticker,scan_date' });
+  } catch {
+    // Cache write failure is non-fatal — next call will just re-classify.
+  }
+}
+
 // ── Public API ────────────────────────────────────────────────────────────────
 
 /**
@@ -200,26 +243,44 @@ async function classifyWithOpenAi(
  * LLM provider. Returns [] if no provider key is configured.
  *
  * Provider priority: Gemini > OpenAI
+ *
+ * @param ticker    - Stock ticker (used for LLM context and cache key).
+ * @param headlines - Headlines to classify.
+ * @param scanDate  - YYYY-MM-DD. When provided, results are read from / written
+ *                    to `llm_scan_cache`. Multiple rescans on the same day share
+ *                    one LLM call.
  */
 export async function classifyHeadlines(
   ticker: string,
   headlines: HeadlineInput[],
+  scanDate?: string,
 ): Promise<LlmRiskResult[]> {
   if (headlines.length === 0) return [];
 
-  if (process.env.GEMINI_API_KEY) {
-    const results = await classifyWithGemini(ticker, headlines);
-    if (results.length > 0 || headlines.length > 0) {
-      // Return even if empty — empty means "no risks found" which is valid.
-      return results;
+  // ── Cache read ──────────────────────────────────────────────────────────────
+  if (scanDate) {
+    const cached = await readCache(ticker, scanDate);
+    if (cached !== null) {
+      return cached;
     }
   }
 
-  if (process.env.OPENAI_API_KEY) {
-    return classifyWithOpenAi(ticker, headlines);
+  // ── LLM call ────────────────────────────────────────────────────────────────
+  let results: LlmRiskResult[] = [];
+
+  if (process.env.GEMINI_API_KEY) {
+    results = await classifyWithGemini(ticker, headlines);
+    // Always proceed — empty array means "no risks found", which is valid.
+  } else if (process.env.OPENAI_API_KEY) {
+    results = await classifyWithOpenAi(ticker, headlines);
   }
 
-  return [];
+  // ── Cache write ─────────────────────────────────────────────────────────────
+  if (scanDate) {
+    await writeCache(ticker, scanDate, results);
+  }
+
+  return results;
 }
 
 /** True when at least one LLM provider key is configured. */
