@@ -27,6 +27,42 @@ function formatScreamGate(rec: string): string {
   return rec.replace(/-/g, ' ').toUpperCase();
 }
 
+/**
+ * Three-state icon for a scream filter row.
+ *
+ * ✓ green  — passed AND aligns with overall directional bias
+ * ↕ amber  — passed BUT direction OPPOSES overall bias (e.g. F1 showing
+ *             bullish call flow inside a bearish 4/5 verdict)
+ * ✗ gray   — filter did not pass
+ *
+ * The ↕ case is critical: without it a user sees a green tick next to
+ * "Call vol 22×x put vol" in a bearish brief and assumes it's bearish
+ * evidence — when it's actually a conflicting signal that was outvoted.
+ */
+function filterIcon(
+  f: FilterResult,
+  overallBias: string | null,
+): { icon: string; className: string; title: string } {
+  if (!f.passed) {
+    return { icon: '✗', className: 'text-fg-dim shrink-0', title: 'Filter did not pass' };
+  }
+  const fDir = f.direction;
+  // Directional conflict: filter passed but points the wrong way
+  if (
+    overallBias &&
+    fDir !== 'none' &&
+    fDir !== 'mixed' &&
+    fDir !== overallBias
+  ) {
+    return {
+      icon: '↕',
+      className: 'text-signal-watch shrink-0',
+      title: `Opposing signal (${fDir}) — outvoted by other filters`,
+    };
+  }
+  return { icon: '✓', className: 'text-signal-buy shrink-0', title: 'Filter passed' };
+}
+
 /** When we render full narrative rows below, hide duplicate one-line triggers under Setup. */
 function triggersForRow(
   key: string,
@@ -121,17 +157,26 @@ export function ScreamTestCard({
           const f = scream_filters[key];
           if (!f) return null;
           const rowTriggers = triggersForRow(key, f, unresolvedOverhangs);
+          const { icon, className: iconClass, title: iconTitle } = filterIcon(f, scream_direction);
+          const isOpposing = icon === '↕';
           return (
             <div
               key={key}
               className="space-y-1 border-b border-border-subtle pb-2 last:border-0"
             >
               <div className="flex gap-2 items-start">
-                <span className={f.passed ? 'text-signal-buy shrink-0' : 'text-fg-dim shrink-0'}>
-                  {f.passed ? '✓' : '✗'}
+                <span className={iconClass} title={iconTitle}>
+                  {icon}
                 </span>
                 <span className="text-fg-subtle w-40 shrink-0">{FILTER_LABELS[key] ?? key}</span>
-                <span className="text-fg-muted flex-1 min-w-0">{f.detail}</span>
+                <span className="flex-1 min-w-0">
+                  <span className="text-fg-muted">{f.detail}</span>
+                  {isOpposing && (
+                    <span className="ml-2 text-[10px] text-signal-watch/80 tracking-wide">
+                      [{f.direction} — opposing]
+                    </span>
+                  )}
+                </span>
               </div>
               {rowTriggers && rowTriggers.length > 0 && (
                 <ul className="pl-6 ml-40 text-fg-dim space-y-0.5">
