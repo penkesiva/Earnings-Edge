@@ -314,10 +314,14 @@ export function computeScreamTest(inputs: ScreamTestInputs): ScreamTestResult {
   const bullCount = dirs.filter(d => d === 'bullish').length;
   const bearCount = dirs.filter(d => d === 'bearish').length;
 
+  // Simple majority: any winning side determines bias.
+  // A 2:1 split at score=3 is "warns bearish/bullish" not "mixed" — the old
+  // ≥3 floor hid directional pressure at low score counts.
   let directionalBias: Direction = 'mixed';
-  if (bullCount > bearCount && bullCount >= 3) directionalBias = 'bullish';
-  else if (bearCount > bullCount && bearCount >= 3) directionalBias = 'bearish';
+  if (bullCount > bearCount) directionalBias = 'bullish';
+  else if (bearCount > bullCount) directionalBias = 'bearish';
   else if (bullCount === 0 && bearCount === 0) directionalBias = 'none';
+  // tie with at least one passing filter on each side → 'mixed' (default)
 
   const qualifies =
     score >= 4 &&

@@ -150,8 +150,9 @@ console.log('\nReconcile regression suite\n');
   console.log(`       rationale: ${result.rationale.slice(0, 120)}…`);
 }
 
-// ── Case 3a: Bearish but manageable — expect CALL_CREDIT_SPREAD ───────────
+// ── Case 3a: Bearish warns, manageable — expect CALL_CREDIT_SPREAD ────────
 // IV 85, put skew 6, scream 3/5 bearish, no heavy insider selling, no unresolved risks
+// Call skew = -6 (<15) so blockCallCreditSpread = false
 {
   const result = reconcileSignals({
     ...BASE_OPTS,
@@ -247,6 +248,26 @@ console.log('\nReconcile regression suite\n');
   });
   assert('Case 7 — Medium put skew + high IV + many bearish filters (mediumPutSkewDownsideRisk)',
     result.final_action, 'SKIP_ASYMMETRIC_DOWNSIDE_RISK');
+  console.log(`       rationale: ${result.rationale.slice(0, 120)}…`);
+}
+
+// ── Case 9: NBIS-style — extreme call skew, 2:1 bearish scream, high IV ──
+// putSkewPts = -21 (callSkewPts = 21 ≥ 15), scream 3/5 bearish (2:1),
+// 3 unresolved risks, $16M insider selling
+// After directionalBias fix: screamWarns=true, direction=bearish
+// blockCallCreditSpread = true (callSkew 21 ≥ 15)
+// Expected: SKIP_CONFLICT
+{
+  const result = reconcileSignals({
+    ...BASE_OPTS,
+    beatScore: makeBeat(38, 'SKIP', 10),
+    scream:    makeScream(3, 'bearish', -21, 'none', 'bearish', 'none', 3),
+    ivRank:    100,
+    netInsiderBuying90d: -16,
+    sectorReturn5d:      0,
+  });
+  assert('Case 9 — NBIS-style (extreme call skew + bearish warns = SKIP_CONFLICT)',
+    result.final_action, 'SKIP_CONFLICT');
   console.log(`       rationale: ${result.rationale.slice(0, 120)}…`);
 }
 

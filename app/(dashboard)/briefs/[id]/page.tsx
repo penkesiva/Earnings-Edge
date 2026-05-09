@@ -216,8 +216,14 @@ export default async function BriefPage({ params }: { params: { id: string } }) 
               </div>
 
               {(() => {
-                // Determine if this structure is overridden by scream/IV gate
-                const isOverridden = finalAction === 'SKIP' || finalAction === 'IRON_CONDOR';
+                // Overridden = the reconcile engine picked a different path than the
+                // beat-score structure. Show the structure greyed-out for audit only.
+                const noTradeActions = new Set([
+                  'SKIP', 'SKIP_NO_EDGE', 'SKIP_CONFLICT',
+                  'SKIP_ASYMMETRIC_DOWNSIDE_RISK', 'SKIP_ASYMMETRIC_UPSIDE_RISK',
+                  'BEARISH_WATCH', 'BULLISH_WATCH', 'IRON_CONDOR',
+                ]);
+                const isOverridden = !finalAction || noTradeActions.has(finalAction);
                 // Detect directional conflict: beat score is bullish (call structure) but
                 // scream direction is bearish, or vice versa.
                 const structureIsBullish =
@@ -435,24 +441,44 @@ function TradeDecisionCard({
   spot: number | null;
   preferredExpiry: string | null;
 }) {
-  const isSkip       = !action || action === 'SKIP';
+  // Classify the action into display buckets.
+  const SKIP_ACTIONS = new Set([
+    'SKIP', 'SKIP_NO_EDGE', 'SKIP_CONFLICT',
+    'SKIP_ASYMMETRIC_DOWNSIDE_RISK', 'SKIP_ASYMMETRIC_UPSIDE_RISK',
+  ]);
+  const isSkip       = !action || SKIP_ACTIONS.has(action);
+  const isConflict   = action === 'SKIP_CONFLICT';
+  const isDownRisk   = action === 'SKIP_ASYMMETRIC_DOWNSIDE_RISK';
+  const isUpRisk     = action === 'SKIP_ASYMMETRIC_UPSIDE_RISK';
+  const isWatchBear  = action === 'BEARISH_WATCH';
+  const isWatchBull  = action === 'BULLISH_WATCH';
+  const isWatch      = isWatchBear || isWatchBull;
   const isCondor     = action === 'IRON_CONDOR';
   const isPutCredit  = action === 'PUT_CREDIT_SPREAD';
   const isCallCredit = action === 'CALL_CREDIT_SPREAD';
   const isBullish    = action === 'LONG_CALL' || action === 'CALL_DEBIT_SPREAD';
   const isBearish    = action === 'LONG_PUT'  || action === 'PUT_DEBIT_SPREAD';
   const isShortVol   = isCondor || isPutCredit || isCallCredit;
-  const isOptions    = !isSkip && !isShortVol;
 
-  const tradeLabel  = isSkip       ? 'NO TRADE'
-                    : isCondor     ? 'SELL VOLATILITY'
-                    : isPutCredit  ? 'SELL VOL · BULLISH TILT'
-                    : isCallCredit ? 'SELL VOL · BEARISH TILT'
-                    : isBullish    ? 'TRADE · BULLISH'
-                    : isBearish    ? 'TRADE · BEARISH'
+  const tradeLabel  = isSkip      && isConflict  ? 'SKIP — CONFLICTING SIGNALS'
+                    : isSkip      && isDownRisk   ? 'SKIP — DOWNSIDE RISK'
+                    : isSkip      && isUpRisk     ? 'SKIP — UPSIDE RISK'
+                    : isSkip                      ? 'NO TRADE'
+                    : isWatchBear                 ? 'WATCH — BEARISH'
+                    : isWatchBull                 ? 'WATCH — BULLISH'
+                    : isCondor                    ? 'SELL VOLATILITY'
+                    : isPutCredit                 ? 'SELL VOL · BULLISH TILT'
+                    : isCallCredit                ? 'SELL VOL · BEARISH TILT'
+                    : isBullish                   ? 'TRADE · BULLISH'
+                    : isBearish                   ? 'TRADE · BEARISH'
                     : 'TRADE';
 
-  const tradeColor  = isSkip       ? 'text-fg-subtle'
+  const tradeColor  = isDownRisk   ? 'text-signal-sell'
+                    : isUpRisk     ? 'text-signal-buy'
+                    : isConflict   ? 'text-signal-watch'
+                    : isSkip       ? 'text-fg-subtle'
+                    : isWatchBear  ? 'text-signal-sell'
+                    : isWatchBull  ? 'text-signal-buy'
                     : isCondor     ? 'text-signal-watch'
                     : isPutCredit  ? 'text-signal-buy'
                     : isCallCredit ? 'text-signal-sell'
@@ -460,7 +486,12 @@ function TradeDecisionCard({
                     : isBearish    ? 'text-signal-sell'
                     : 'text-fg';
 
-  const borderColor = isSkip       ? 'border-border'
+  const borderColor = isDownRisk   ? 'border-signal-sell'
+                    : isUpRisk     ? 'border-signal-buy'
+                    : isConflict   ? 'border-signal-watch'
+                    : isSkip       ? 'border-border'
+                    : isWatchBear  ? 'border-signal-sell'
+                    : isWatchBull  ? 'border-signal-buy'
                     : isCondor     ? 'border-signal-watch'
                     : isPutCredit  ? 'border-signal-buy'
                     : isCallCredit ? 'border-signal-sell'
@@ -468,12 +499,14 @@ function TradeDecisionCard({
                     : isBearish    ? 'border-signal-sell'
                     : 'border-border';
 
-  const instrument  = isSkip       ? '—'
-                    : isCondor     ? 'Options (iron condor)'
-                    : isPutCredit  ? 'Options (put credit spread)'
-                    : isCallCredit ? 'Options (call credit spread)'
-                    : isOptions    ? `Options (${action?.replace(/_/g, ' ').toLowerCase()})`
-                    : 'Stock only';
+  const instrument  = isSkip      ? '—'
+                    : isWatch     ? 'Monitor — no trade yet'
+                    : isCondor    ? 'Options (iron condor)'
+                    : isPutCredit ? 'Options (put credit spread)'
+                    : isCallCredit? 'Options (call credit spread)'
+                    : isBullish || isBearish
+                                  ? `Options (${action?.replace(/_/g, ' ').toLowerCase()})`
+                    : '—';
 
   const shortStrike = spot != null && expectedMoveDollar != null
     ? (isPutCredit  ? spot - expectedMoveDollar * SHORT_LEG_MULT
@@ -486,7 +519,9 @@ function TradeDecisionCard({
                     : isCondor     ? `Expects stock to stay within ±$${expectedMoveDollar?.toFixed(2)} (${expectedMovePct?.toFixed(1)}%)`
                     : isPutCredit  ? `Expects stock to stay above $${roundStrike(shortStrike ?? 0)} (≈${SHORT_LEG_MULT}× expected move below spot)`
                     : isCallCredit ? `Expects stock to stay below $${roundStrike(shortStrike ?? 0)} (≈${SHORT_LEG_MULT}× expected move above spot)`
-                    : `No directional edge — stay in cash`;
+                    : isWatchBear  ? `Scream warns bearish but conviction or IV not yet at trade threshold — monitor for upgrade`
+                    : isWatchBull  ? `Scream warns bullish but conviction or IV not yet at trade threshold — monitor for upgrade`
+                    : `No tradeable edge — stay in cash`;
 
   return (
     <div className={`border-l-4 ${borderColor} pl-4 space-y-4`}>

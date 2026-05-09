@@ -150,6 +150,16 @@ export function reconcileSignals(opts: {
   const asymmetricUpsideRisk =
     extremeCallSkewUpsideRisk || mediumCallSkewUpsideRisk;
 
+  // ── Structure-level blockers ──────────────────────────────────────────────
+  // Even when a credit spread would otherwise be the right path, a sufficiently
+  // extreme skew in the SAME direction as the short leg makes that wing unsafe.
+  //
+  // Extreme call skew (≥15pts) = market is pricing an upside squeeze.
+  // Selling calls in that environment risks blowthrough regardless of tilt.
+  // (Symmetric to how extreme put skew blocks iron condor / put credit spreads.)
+  const blockCallCreditSpread = callSkewPts >= 15 || asymmetricUpsideRisk;
+  const blockPutCreditSpread  = asymmetricDownsideRisk;
+
   // ── Numeric tilt score (range ≈ −12 to +12) ──────────────────────────────
   // ≥ +3 = bullish, ≤ −3 = bearish, else mixed.
   let tiltScore = 0;
@@ -268,6 +278,19 @@ export function reconcileSignals(opts: {
         };
       }
       if (ivRank > 70) {
+        if (blockCallCreditSpread) {
+          // Extreme call skew (callSkewPts ≥15) or asymmetric upside risk:
+          // selling upside calls risks a gap through the wing (market pricing squeeze).
+          return {
+            final_action: 'SKIP_CONFLICT',
+            rationale:
+              `Scream warns bearish (${scream.score}/5, tilt ${tiltScore}) and IV rank ` +
+              `${ivRank} is elevated, but ${callSkewPts >= 15
+                ? `extreme call skew (${callSkewPts.toFixed(1)}pts — market is pricing upside) blocks selling upside calls`
+                : 'asymmetric upside risk blocks call credit spread'
+              }. Bearish structural pressure vs bullish options pricing — skip.`,
+          };
+        }
         return {
           final_action: 'CALL_CREDIT_SPREAD',
           rationale:
@@ -301,6 +324,15 @@ export function reconcileSignals(opts: {
       };
     }
     if (ivRank > 70) {
+      if (blockPutCreditSpread) {
+        return {
+          final_action: 'SKIP_CONFLICT',
+          rationale:
+            `Scream warns bullish (${scream.score}/5, tilt ${tiltScore}) and IV rank ` +
+            `${ivRank} is elevated, but asymmetric downside risk blocks selling put exposure ` +
+            `(put skew ${putSkewPts.toFixed(1)}pts). Bullish bias vs bearish options pricing — skip.`,
+        };
+      }
       return {
         final_action: 'PUT_CREDIT_SPREAD',
         rationale:
@@ -338,6 +370,17 @@ export function reconcileSignals(opts: {
           `without a clear miss-frequency signal. No thesis for a directional trade.`,
       };
     }
+    if (blockCallCreditSpread) {
+      return {
+        final_action: 'SKIP_CONFLICT',
+        rationale:
+          `Tilt score ${tiltScore} (bearish) and IV rank ${ivRank} elevated, but ` +
+          `${callSkewPts >= 15
+            ? `extreme call skew (${callSkewPts.toFixed(1)}pts) blocks selling upside calls`
+            : 'asymmetric upside risk blocks call credit spread'
+          }. Bearish tilt + expensive calls = conflicting signals, no safe structure.`,
+      };
+    }
     return {
       final_action: 'CALL_CREDIT_SPREAD',
       rationale:
@@ -368,6 +411,15 @@ export function reconcileSignals(opts: {
         rationale:
           `Tilt score ${tiltScore} (bullish) but safety blockers prevent selling put ` +
           `exposure: ${reasons.join('; ')}.`,
+      };
+    }
+    if (blockPutCreditSpread) {
+      return {
+        final_action: 'SKIP_CONFLICT',
+        rationale:
+          `Tilt score ${tiltScore} (bullish) and IV rank ${ivRank} elevated, but ` +
+          `asymmetric downside risk (put skew ${putSkewPts.toFixed(1)}pts) blocks selling ` +
+          `put exposure. Bullish tilt + expensive puts = conflicting signals, no safe structure.`,
       };
     }
     return {
