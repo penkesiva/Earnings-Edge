@@ -8,7 +8,16 @@ const FINAL_ACTION_STYLES: Record<
   FinalAction,
   { bg: string; text: string; label: string }
 > = {
-  SKIP:               { bg: 'bg-signal-neutral/10', text: 'text-signal-neutral', label: 'SKIP' },
+  // SKIP variants — same neutral colour, label explains why
+  SKIP:                          { bg: 'bg-signal-neutral/10', text: 'text-signal-neutral', label: 'SKIP' },
+  SKIP_NO_EDGE:                  { bg: 'bg-signal-neutral/10', text: 'text-signal-neutral', label: 'SKIP — NO EDGE' },
+  SKIP_CONFLICT:                 { bg: 'bg-signal-neutral/10', text: 'text-signal-neutral', label: 'SKIP — CONFLICT' },
+  SKIP_ASYMMETRIC_DOWNSIDE_RISK: { bg: 'bg-signal-sell/10',    text: 'text-signal-sell',    label: 'SKIP — DOWNSIDE RISK' },
+  SKIP_ASYMMETRIC_UPSIDE_RISK:   { bg: 'bg-signal-buy/10',     text: 'text-signal-buy',     label: 'SKIP — UPSIDE RISK' },
+  // WATCH — scream warns but bar not met
+  BEARISH_WATCH: { bg: 'bg-signal-sell/10',  text: 'text-signal-sell',  label: 'BEARISH WATCH' },
+  BULLISH_WATCH: { bg: 'bg-signal-buy/10',   text: 'text-signal-buy',   label: 'BULLISH WATCH' },
+  // Trade structures
   IRON_CONDOR:        { bg: 'bg-signal-watch/10',   text: 'text-signal-watch',   label: 'IRON CONDOR' },
   PUT_CREDIT_SPREAD:  { bg: 'bg-signal-buy/10',     text: 'text-signal-buy',     label: 'PUT CREDIT SPREAD' },
   CALL_CREDIT_SPREAD: { bg: 'bg-signal-sell/10',    text: 'text-signal-sell',    label: 'CALL CREDIT SPREAD' },
