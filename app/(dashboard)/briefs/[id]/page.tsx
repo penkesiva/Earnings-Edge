@@ -208,7 +208,7 @@ export default async function BriefPage({ params }: { params: { id: string } }) 
             </section>
           )}
 
-          {/* Suggested structure (legacy / audit) */}
+          {/* Suggested structure (audit only — shown only when beat-score disagrees with reconciled) */}
           {structure && (
             <section>
               <div className="text-xs tracking-widest text-fg-subtle mb-3">
@@ -216,14 +216,24 @@ export default async function BriefPage({ params }: { params: { id: string } }) 
               </div>
 
               {(() => {
-                // Overridden = the reconcile engine picked a different path than the
-                // beat-score structure. Show the structure greyed-out for audit only.
+                // Overridden = reconcile engine picked a different (or no-trade) path.
+                // When the reconcile action matches the beat-score action exactly,
+                // suppress the audit section — it would just repeat what's already shown above.
                 const noTradeActions = new Set([
                   'SKIP', 'SKIP_NO_EDGE', 'SKIP_CONFLICT',
                   'SKIP_ASYMMETRIC_DOWNSIDE_RISK', 'SKIP_ASYMMETRIC_UPSIDE_RISK',
                   'BEARISH_WATCH', 'BULLISH_WATCH', 'IRON_CONDOR',
                 ]);
                 const isOverridden = !finalAction || noTradeActions.has(finalAction);
+
+                // If reconcile and beat-score agree, skip the duplicate section.
+                if (!isOverridden && finalAction === structure.action) {
+                  return (
+                    <p className="text-xs text-fg-dim">
+                      ✓ Beat score agrees with the reconciled action — no additional audit needed.
+                    </p>
+                  );
+                }
                 // Detect directional conflict: beat score is bullish (call structure) but
                 // scream direction is bearish, or vice versa.
                 const structureIsBullish =
@@ -425,6 +435,59 @@ function CallCreditSpreadLegsTable({
   );
 }
 
+// Long debit spreads: buy ATM, sell at expected move (cap the cost, set the target).
+function CallDebitSpreadLegsTable({
+  spot, expectedMoveDollar, expiry,
+}: {
+  spot: number;
+  expectedMoveDollar: number;
+  expiry: string | null;
+}) {
+  if (!expiry) return null;
+  const longCall  = roundStrike(spot);
+  const shortCall = roundStrike(spot + expectedMoveDollar);
+  return (
+    <StructureLegsTable
+      expiry={expiry}
+      legs={[
+        { side: 'BUY',  type: 'CALL', strike: longCall },
+        { side: 'SELL', type: 'CALL', strike: shortCall },
+      ]}
+      footnote={
+        `Buy ATM call at $${longCall}; sell OTM call at $${shortCall} ` +
+        `(≈1× expected move above spot). Max gain capped at the spread width. ` +
+        `Debit spread reduces cost vs naked long call — suitable when IV is elevated.`
+      }
+    />
+  );
+}
+
+function PutDebitSpreadLegsTable({
+  spot, expectedMoveDollar, expiry,
+}: {
+  spot: number;
+  expectedMoveDollar: number;
+  expiry: string | null;
+}) {
+  if (!expiry) return null;
+  const longPut  = roundStrike(spot);
+  const shortPut = roundStrike(spot - expectedMoveDollar);
+  return (
+    <StructureLegsTable
+      expiry={expiry}
+      legs={[
+        { side: 'BUY',  type: 'PUT', strike: longPut },
+        { side: 'SELL', type: 'PUT', strike: shortPut },
+      ]}
+      footnote={
+        `Buy ATM put at $${longPut}; sell OTM put at $${shortPut} ` +
+        `(≈1× expected move below spot). Max gain capped at the spread width. ` +
+        `Debit spread reduces cost vs naked long put — suitable when IV is elevated.`
+      }
+    />
+  );
+}
+
 function TradeDecisionCard({
   action, rationale, screamDirection, screamScore,
   compositeScore, expectedMoveDollar, expectedMovePct, ivRank,
@@ -561,26 +624,34 @@ function TradeDecisionCard({
         </div>
       )}
 
-      {/* Sell-vol structures: render appropriate legs */}
+      {/* Render strike table for every actionable structure */}
       {spot != null && expectedMoveDollar != null && isCondor && (
-        <CondorLegsTable
-          spot={spot}
-          expectedMoveDollar={expectedMoveDollar}
-          expiry={preferredExpiry}
-        />
+        <CondorLegsTable spot={spot} expectedMoveDollar={expectedMoveDollar} expiry={preferredExpiry} />
       )}
       {spot != null && expectedMoveDollar != null && isPutCredit && (
-        <PutCreditSpreadLegsTable
-          spot={spot}
-          expectedMoveDollar={expectedMoveDollar}
-          expiry={preferredExpiry}
-        />
+        <PutCreditSpreadLegsTable spot={spot} expectedMoveDollar={expectedMoveDollar} expiry={preferredExpiry} />
       )}
       {spot != null && expectedMoveDollar != null && isCallCredit && (
-        <CallCreditSpreadLegsTable
-          spot={spot}
-          expectedMoveDollar={expectedMoveDollar}
+        <CallCreditSpreadLegsTable spot={spot} expectedMoveDollar={expectedMoveDollar} expiry={preferredExpiry} />
+      )}
+      {spot != null && expectedMoveDollar != null && action === 'CALL_DEBIT_SPREAD' && (
+        <CallDebitSpreadLegsTable spot={spot} expectedMoveDollar={expectedMoveDollar} expiry={preferredExpiry} />
+      )}
+      {spot != null && expectedMoveDollar != null && action === 'PUT_DEBIT_SPREAD' && (
+        <PutDebitSpreadLegsTable spot={spot} expectedMoveDollar={expectedMoveDollar} expiry={preferredExpiry} />
+      )}
+      {spot != null && expectedMoveDollar != null && action === 'LONG_CALL' && preferredExpiry && (
+        <StructureLegsTable
+          legs={[{ side: 'BUY', type: 'CALL', strike: roundStrike(spot) }]}
           expiry={preferredExpiry}
+          footnote={`Buy ATM call. Max gain: unlimited above $${roundStrike(spot)}. Max loss: premium paid.`}
+        />
+      )}
+      {spot != null && expectedMoveDollar != null && action === 'LONG_PUT' && preferredExpiry && (
+        <StructureLegsTable
+          legs={[{ side: 'BUY', type: 'PUT', strike: roundStrike(spot) }]}
+          expiry={preferredExpiry}
+          footnote={`Buy ATM put. Max gain: stock going to zero. Max loss: premium paid.`}
         />
       )}
     </div>
