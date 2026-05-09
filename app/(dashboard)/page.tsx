@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { Suspense } from 'react';
 import { supabaseAdmin } from '@/lib/supabase';
 import { addCalendarDays, earningsSessionDate } from '@/lib/earningsDate';
-import { FinalActionBadge } from '@/components/SignalBadge';
+import { FinalActionBadge, ConvictionArrows } from '@/components/SignalBadge';
 import { DashboardRefresh } from '@/components/DashboardRefresh';
 import { FearGreedIndex, FearGreedIndexSkeleton } from '@/components/FearGreedIndex';
 import { LastScanned } from '@/components/LastScanned';
@@ -91,7 +91,10 @@ export default async function HomePage() {
                       <span className="font-bold text-lg">{b.ticker}</span>
                       <LastScanned updatedAt={b.updated_at ?? b.generated_at ?? null} />
                     </div>
-                    <FinalActionBadge action={b.final_action ?? null} />
+                    <div className="flex items-center gap-2">
+                      <ConvictionArrows action={b.final_action ?? null} />
+                      <FinalActionBadge action={b.final_action ?? null} />
+                    </div>
                   </div>
                   <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
                     <div className="text-fg-muted">Score: <ScoreCell value={b.composite_score} /></div>
@@ -125,7 +128,8 @@ export default async function HomePage() {
                 <div className="col-span-1">
                   <ScoreCell value={b.composite_score} />
                 </div>
-                <div className="col-span-3">
+                <div className="col-span-3 flex items-center gap-2">
+                  <ConvictionArrows action={b.final_action ?? null} />
                   <FinalActionBadge action={b.final_action ?? null} />
                 </div>
                 <div className="col-span-2 text-fg-muted">
@@ -168,7 +172,10 @@ export default async function HomePage() {
                       <span className="font-bold text-lg">{b.ticker}</span>
                       <LastScanned updatedAt={b.updated_at ?? b.generated_at ?? null} />
                     </div>
-                    <FinalActionBadge action={b.final_action ?? null} />
+                    <div className="flex items-center gap-2">
+                      <ConvictionArrows action={b.final_action ?? null} />
+                      <FinalActionBadge action={b.final_action ?? null} />
+                    </div>
                   </div>
                   <div className="mt-2 text-xs text-fg-muted">
                     Score: <ScoreCell value={b.composite_score} /> · Exp Move: ±${b.expected_move_dollar?.toFixed(2)} ({b.expected_move_pct?.toFixed(1)}%)
@@ -195,7 +202,8 @@ export default async function HomePage() {
                 <div className="col-span-2">
                   <ScoreCell value={b.composite_score} />
                 </div>
-                <div className="col-span-3">
+                <div className="col-span-3 flex items-center gap-2">
+                  <ConvictionArrows action={b.final_action ?? null} />
                   <FinalActionBadge action={b.final_action ?? null} />
                 </div>
                 <div className="col-span-3 text-fg-muted">
@@ -259,6 +267,7 @@ export default async function HomePage() {
                         <div className="flex items-center gap-2">
                           {brief ? (
                             <>
+                              <ConvictionArrows action={brief.final_action ?? null} />
                               <FinalActionBadge action={brief.final_action ?? null} />
                               <LastScanned updatedAt={brief.updated_at ?? brief.generated_at ?? null} />
                               <Link

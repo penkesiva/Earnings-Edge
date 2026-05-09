@@ -1,5 +1,72 @@
 import type { FinalAction } from '@/lib/reconcile';
 
+// ── Conviction arrows ────────────────────────────────────────────────────────
+
+type ConvictionCfg = {
+  dir: 'up' | 'down' | 'neutral' | 'none';
+  strength: 0 | 1 | 2 | 3;
+  dim?: boolean;
+};
+
+const CONVICTION_MAP: Record<FinalAction, ConvictionCfg> = {
+  // Bullish structures — conviction rises with commitment
+  LONG_CALL:                     { dir: 'up',      strength: 3 },
+  CALL_DEBIT_SPREAD:             { dir: 'up',      strength: 2 },
+  PUT_CREDIT_SPREAD:             { dir: 'up',      strength: 1 },
+  BULLISH_WATCH:                 { dir: 'up',      strength: 1, dim: true },
+  SKIP_ASYMMETRIC_UPSIDE_RISK:   { dir: 'up',      strength: 1, dim: true },
+  // Neutral
+  IRON_CONDOR:                   { dir: 'neutral', strength: 0 },
+  // Bearish structures
+  CALL_CREDIT_SPREAD:            { dir: 'down',    strength: 1 },
+  BEARISH_WATCH:                 { dir: 'down',    strength: 1, dim: true },
+  PUT_DEBIT_SPREAD:              { dir: 'down',    strength: 2 },
+  LONG_PUT:                      { dir: 'down',    strength: 3 },
+  SKIP_ASYMMETRIC_DOWNSIDE_RISK: { dir: 'down',    strength: 1, dim: true },
+  // No directional signal
+  SKIP:                          { dir: 'none',    strength: 0 },
+  SKIP_NO_EDGE:                  { dir: 'none',    strength: 0 },
+  SKIP_CONFLICT:                 { dir: 'none',    strength: 0 },
+};
+
+/**
+ * Shows ▲/▼ arrows (1–3) reflecting directional bias and conviction strength.
+ * ▲▲▲ = highest bullish conviction (LONG_CALL)
+ * ▼▼▼ = highest bearish conviction (LONG_PUT)
+ * Dim arrows = watching/cautious bias.
+ */
+export function ConvictionArrows({ action }: { action: string | null }) {
+  if (!action) return null;
+  const cfg = CONVICTION_MAP[action as FinalAction];
+  if (!cfg) return null;
+
+  if (cfg.dir === 'neutral') {
+    return <span className="text-fg-dim text-xs font-mono leading-none" title="Neutral">—</span>;
+  }
+  if (cfg.dir === 'none' || cfg.strength === 0) return null;
+
+  const isUp = cfg.dir === 'up';
+  const baseColor = isUp ? 'text-signal-buy' : 'text-signal-sell';
+  const dimColor  = isUp ? 'text-signal-buy/50' : 'text-signal-sell/50';
+  const arrow = isUp ? '▲' : '▼';
+  const label = `${cfg.dir === 'up' ? 'Bullish' : 'Bearish'} conviction ${cfg.strength}/3${cfg.dim ? ' (watching)' : ''}`;
+
+  return (
+    <span className="inline-flex items-center gap-px leading-none" title={label} aria-label={label}>
+      {Array.from({ length: cfg.strength }, (_, i) => (
+        <span
+          key={i}
+          // Each successive arrow fades slightly: full → 70% → 45%
+          className={`text-[11px] font-bold ${cfg.dim ? dimColor : baseColor}`}
+          style={{ opacity: cfg.dim ? 0.55 : 1 - i * 0.22 }}
+        >
+          {arrow}
+        </span>
+      ))}
+    </span>
+  );
+}
+
 /**
  * FinalActionBadge — shows the reconciled single trade action.
  * Use this everywhere instead of the legacy beat-score SignalBadge.
