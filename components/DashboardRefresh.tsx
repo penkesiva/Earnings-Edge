@@ -77,30 +77,33 @@ export function DashboardRefresh() {
             </details>
           </div>
         </div>
-        <div className="grid grid-cols-1 sm:flex sm:flex-wrap gap-2 shrink-0 w-full sm:w-auto">
+        <div className="grid grid-cols-3 sm:flex sm:flex-wrap gap-2 shrink-0 w-full sm:w-auto">
           <button
             type="button"
             disabled={pending}
             onClick={() => run(syncCalendarAction)}
-            className="px-3 py-2 text-xs font-bold tracking-widest border border-border bg-bg hover:border-signal-buy hover:text-signal-buy transition-colors disabled:opacity-40 w-full sm:w-auto"
+            className="px-2 sm:px-3 py-2 text-[11px] sm:text-xs font-bold tracking-widest border border-border bg-bg hover:border-signal-buy hover:text-signal-buy transition-colors disabled:opacity-40"
           >
-            {pending ? '…' : 'SYNC CALENDAR'}
+            <span className="sm:hidden">{pending ? '…' : 'SYNC'}</span>
+            <span className="hidden sm:inline">{pending ? '…' : 'SYNC CALENDAR'}</span>
           </button>
           <button
             type="button"
             disabled={pending}
             onClick={() => run(() => callRunScan())}
-            className="px-3 py-2 text-xs font-bold tracking-widest bg-fg text-bg hover:bg-signal-buy transition-colors disabled:opacity-40 w-full sm:w-auto"
+            className="px-2 sm:px-3 py-2 text-[11px] sm:text-xs font-bold tracking-widest bg-fg text-bg hover:bg-signal-buy transition-colors disabled:opacity-40"
           >
-            {pending ? '…' : 'RUN DAILY SCAN'}
+            <span className="sm:hidden">{pending ? '…' : 'SCAN'}</span>
+            <span className="hidden sm:inline">{pending ? '…' : 'RUN DAILY SCAN'}</span>
           </button>
           <button
             type="button"
             disabled={pending}
             onClick={() => run(() => callRunScan('tomorrow'))}
-            className="px-3 py-2 text-xs font-bold tracking-widest border border-border bg-bg hover:border-signal-watch hover:text-signal-watch transition-colors disabled:opacity-40 w-full sm:w-auto"
+            className="px-2 sm:px-3 py-2 text-[11px] sm:text-xs font-bold tracking-widest border border-border bg-bg hover:border-signal-watch hover:text-signal-watch transition-colors disabled:opacity-40"
           >
-            {pending ? '…' : 'PREP TOMORROW'}
+            <span className="sm:hidden">{pending ? '…' : 'PREP'}</span>
+            <span className="hidden sm:inline">{pending ? '…' : 'PREP TOMORROW'}</span>
           </button>
         </div>
       </div>

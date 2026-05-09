@@ -85,24 +85,27 @@ export default async function HomePage() {
           <>
             <div className="md:hidden space-y-2">
               {todayBriefs.map(b => (
-                <Link key={b.id} href={`/briefs/${b.id}`} className="block border border-border bg-bg-elevated p-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-baseline gap-2">
-                      <span className="font-bold text-lg">{b.ticker}</span>
-                      <LastScanned updatedAt={b.updated_at ?? b.generated_at ?? null} />
+                <Link key={b.id} href={`/briefs/${b.id}`} className="block border border-border bg-bg-elevated p-3 active:opacity-75">
+                  {/* Row 1: Ticker + conviction + score + timestamp */}
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-xl tracking-tight">{b.ticker}</span>
+                      <ConvictionArrows action={b.final_action ?? null} />
                     </div>
                     <div className="flex items-center gap-2">
-                      <ConvictionArrows action={b.final_action ?? null} />
-                      <FinalActionBadge action={b.final_action ?? null} />
+                      <ScoreCell value={b.composite_score} />
+                      <LastScanned updatedAt={b.updated_at ?? b.generated_at ?? null} />
                     </div>
                   </div>
-                  <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
-                    <div className="text-fg-muted">Score: <ScoreCell value={b.composite_score} /></div>
-                    <div className="text-fg-muted">Spot: ${b.spot_price?.toFixed(2)}</div>
-                    <div className="text-fg-muted">IV Rank: {b.iv_rank}</div>
-                    <div className="text-fg-muted">
-                      Exp Move: ±${b.expected_move_dollar?.toFixed(2)} ({b.expected_move_pct?.toFixed(1)}%)
-                    </div>
+                  {/* Row 2: Action badge (full width so long labels never overflow) */}
+                  <div className="mb-2">
+                    <FinalActionBadge action={b.final_action ?? null} />
+                  </div>
+                  {/* Row 3: Key stats */}
+                  <div className="flex gap-4 text-[11px] text-fg-dim">
+                    <span>SPOT <span className="text-fg-muted font-mono">${b.spot_price?.toFixed(2)}</span></span>
+                    <span>MOVE <span className="text-fg-muted font-mono">±${b.expected_move_dollar?.toFixed(2)}</span></span>
+                    <span>IVR <span className="text-fg-muted font-mono">{b.iv_rank}</span></span>
                   </div>
                 </Link>
               ))}
@@ -166,19 +169,26 @@ export default async function HomePage() {
           <>
             <div className="md:hidden space-y-2">
               {tomorrowBriefs.map(b => (
-                <Link key={b.id} href={`/briefs/${b.id}`} className="block border border-border bg-bg-elevated p-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-baseline gap-2">
-                      <span className="font-bold text-lg">{b.ticker}</span>
-                      <LastScanned updatedAt={b.updated_at ?? b.generated_at ?? null} />
+                <Link key={b.id} href={`/briefs/${b.id}`} className="block border border-border bg-bg-elevated p-3 active:opacity-75">
+                  {/* Row 1: Ticker + conviction + score + timestamp */}
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-xl tracking-tight">{b.ticker}</span>
+                      <ConvictionArrows action={b.final_action ?? null} />
                     </div>
                     <div className="flex items-center gap-2">
-                      <ConvictionArrows action={b.final_action ?? null} />
-                      <FinalActionBadge action={b.final_action ?? null} />
+                      <ScoreCell value={b.composite_score} />
+                      <LastScanned updatedAt={b.updated_at ?? b.generated_at ?? null} />
                     </div>
                   </div>
-                  <div className="mt-2 text-xs text-fg-muted">
-                    Score: <ScoreCell value={b.composite_score} /> · Exp Move: ±${b.expected_move_dollar?.toFixed(2)} ({b.expected_move_pct?.toFixed(1)}%)
+                  {/* Row 2: Action badge */}
+                  <div className="mb-2">
+                    <FinalActionBadge action={b.final_action ?? null} />
+                  </div>
+                  {/* Row 3: Key stats */}
+                  <div className="flex gap-4 text-[11px] text-fg-dim">
+                    <span>SPOT <span className="text-fg-muted font-mono">${b.spot_price?.toFixed(2)}</span></span>
+                    <span>MOVE <span className="text-fg-muted font-mono">±${b.expected_move_dollar?.toFixed(2)}</span></span>
                   </div>
                 </Link>
               ))}
@@ -250,37 +260,41 @@ export default async function HomePage() {
                   {events!.map(e => {
                     const brief = briefByKey.get(`${date}:${e.ticker}`);
                     return (
-                      <div key={e.id} className="flex items-center justify-between px-4 py-2 text-sm">
-                        <div className="flex items-center gap-3">
-                          <span className="font-bold w-16">{e.ticker}</span>
-                          <span className="text-[10px] text-fg-subtle">{e.timing}</span>
-                          <span
-                            className={`text-[10px] px-1.5 py-0.5 border tracking-widest ${
-                              e.source === 'MANUAL'
-                                ? 'text-signal-watch border-signal-watch/50'
-                                : 'text-fg-dim border-border-subtle'
-                            }`}
-                          >
-                            {e.source || 'UNK'}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
+                      <div key={e.id} className="px-4 py-2.5 text-sm">
+                        {/* Row 1: Ticker · timing · source badge  +  VIEW link */}
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="font-bold shrink-0">{e.ticker}</span>
+                            <span className="text-[10px] text-fg-subtle shrink-0">{e.timing}</span>
+                            <span
+                              className={`text-[10px] px-1.5 py-0.5 border tracking-widest shrink-0 ${
+                                e.source === 'MANUAL'
+                                  ? 'text-signal-watch border-signal-watch/50'
+                                  : 'text-fg-dim border-border-subtle'
+                              }`}
+                            >
+                              {e.source || 'UNK'}
+                            </span>
+                          </div>
                           {brief ? (
-                            <>
-                              <ConvictionArrows action={brief.final_action ?? null} />
-                              <FinalActionBadge action={brief.final_action ?? null} />
-                              <LastScanned updatedAt={brief.updated_at ?? brief.generated_at ?? null} />
-                              <Link
-                                href={`/briefs/${brief.id}`}
-                                className="text-[10px] text-fg-subtle hover:text-fg tracking-widest underline underline-offset-2"
-                              >
-                                VIEW
-                              </Link>
-                            </>
+                            <Link
+                              href={`/briefs/${brief.id}`}
+                              className="text-[10px] text-fg-subtle hover:text-fg tracking-widest underline underline-offset-2 shrink-0"
+                            >
+                              VIEW →
+                            </Link>
                           ) : (
-                            <span className="text-[10px] text-fg-dim tracking-widest">NO BRIEF</span>
+                            <span className="text-[10px] text-fg-dim tracking-widest shrink-0">NO BRIEF</span>
                           )}
                         </div>
+                        {/* Row 2: Action badge + scanned timestamp (only when brief exists) */}
+                        {brief && (
+                          <div className="flex items-center gap-2 mt-1.5">
+                            <ConvictionArrows action={brief.final_action ?? null} />
+                            <FinalActionBadge action={brief.final_action ?? null} />
+                            <LastScanned updatedAt={brief.updated_at ?? brief.generated_at ?? null} />
+                          </div>
+                        )}
                       </div>
                     );
                   })}

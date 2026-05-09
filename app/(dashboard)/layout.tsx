@@ -16,26 +16,28 @@ export default function DashboardLayout({
 
   return (
     <div className="relative z-10 max-w-[1400px] mx-auto px-4 sm:px-6 py-4">
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-border pb-4 mb-6 sm:mb-8">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-8">
-          <Link href="/" className="flex items-center gap-3">
+      <header className="flex items-center justify-between gap-3 border-b border-border pb-3 mb-5 sm:mb-8">
+        {/* Left: logo + nav */}
+        <div className="flex items-center gap-4 sm:gap-8 min-w-0">
+          <Link href="/" className="flex items-center gap-2 shrink-0">
             <span className="w-2 h-2 bg-signal-buy pulse-dot rounded-full" />
             <span className="text-sm font-bold tracking-widest">EARNINGS EDGE</span>
           </Link>
           <nav className="flex gap-4 sm:gap-6 text-xs text-fg-muted overflow-x-auto">
-            <Link href="/" className="hover:text-fg transition-colors">TODAY</Link>
-            <Link href="/watchlist" className="hover:text-fg transition-colors">WATCHLIST</Link>
-            <Link href="/history" className="hover:text-fg transition-colors">HISTORY</Link>
+            <Link href="/" className="hover:text-fg transition-colors py-1">TODAY</Link>
+            <Link href="/watchlist" className="hover:text-fg transition-colors py-1">WATCHLIST</Link>
+            <Link href="/history" className="hover:text-fg transition-colors py-1">HISTORY</Link>
           </nav>
         </div>
-        <div className="text-xs text-fg-subtle sm:text-right">
+        {/* Right: time — hidden on very small screens, shown sm+ */}
+        <div className="hidden sm:block text-xs text-fg-subtle text-right shrink-0">
           {now} PT
         </div>
       </header>
 
       <main>{children}</main>
 
-      <footer className="mt-16 pt-4 border-t border-border-subtle text-xs text-fg-dim">
+      <footer className="mt-12 sm:mt-16 pt-4 border-t border-border-subtle text-xs text-fg-dim">
         Decision support, not advice. Sizing is yours.
       </footer>
     </div>
