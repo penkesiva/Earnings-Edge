@@ -45,7 +45,9 @@ export async function POST() {
       const finalAction = (brief.final_action ?? 'SKIP') as string;
 
       // ── Actual EPS result from FMP ───────────────────────────────────────────
-      const surprises = await getEarningsSurprises(ticker);
+      // Gracefully handle FMP errors (rate limits, plan restrictions) so that
+      // at minimum the next-day price data still gets saved.
+      const surprises = await getEarningsSurprises(ticker).catch(() => []);
       const match = surprises
         .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
         .find(s => {
@@ -67,7 +69,7 @@ export async function POST() {
       // Fetch 3 trading days after earnings to find the first post-earnings close
       const fetchStart = earningsDate;
       const fetchEnd   = addCalendarDays(earningsDate, 4);
-      const bars = await getHistoricalBars(ticker, fetchStart, fetchEnd, '1Day');
+      const bars = await getHistoricalBars(ticker, fetchStart, fetchEnd, '1Day').catch(() => [] as { o: number; c: number }[]);
 
       // bars[0] is the earnings date close (or pre-earnings last close),
       // bars[1] is the next trading day close
@@ -98,13 +100,11 @@ export async function POST() {
         } else if (finalAction === 'IRON_CONDOR') {
           hit = Math.abs(nextDayClosePct) < SHORT_VOL_BAND;
         } else if (finalAction === 'PUT_CREDIT_SPREAD') {
-          // Bullish tilt — needs price to stay above the short put strike.
           hit = nextDayClosePct > -SHORT_VOL_BAND;
         } else if (finalAction === 'CALL_CREDIT_SPREAD') {
-          // Bearish tilt — needs price to stay below the short call strike.
           hit = nextDayClosePct < SHORT_VOL_BAND;
         }
-        // SKIP → hit stays null (not counted)
+        // SKIP / SKIP_* / BEARISH_WATCH / BULLISH_WATCH → hit stays null (not counted)
       }
 
       // ── Upsert outcome row ───────────────────────────────────────────────────

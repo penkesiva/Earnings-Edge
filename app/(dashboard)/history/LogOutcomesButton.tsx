@@ -24,10 +24,17 @@ export function LogOutcomesButton({ pendingCount }: { pendingCount: number }) {
         setMessage(data.message ?? 'No pending outcomes to log.');
         return;
       }
-      const ok    = data.results?.filter((r: any) => r.status === 'ok').length ?? 0;
-      const errs  = data.results?.filter((r: any) => r.status === 'error').length ?? 0;
+      const ok      = data.results?.filter((r: any) => r.status === 'ok').length ?? 0;
+      const errRows = (data.results ?? []).filter((r: any) => r.status === 'error') as { ticker: string; detail?: string }[];
+      const errCount = errRows.length;
       setState('done');
-      setMessage(`${ok} outcome${ok === 1 ? '' : 's'} logged${errs ? `, ${errs} error(s)` : ''}.`);
+      const errSummary = errRows.length > 0
+        ? errRows.map((r) => `${r.ticker}: ${r.detail ?? 'unknown error'}`).join(' | ')
+        : '';
+      setMessage(
+        `${ok} outcome${ok === 1 ? '' : 's'} logged` +
+        (errCount ? `, ${errCount} error(s): ${errSummary}` : '.')
+      );
       router.refresh();
     } catch {
       setState('error');
