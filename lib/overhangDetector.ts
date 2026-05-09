@@ -22,6 +22,7 @@
 import { getHistoricalBars } from '@/lib/alpaca';
 import type { NarrativeOverhang, OverhangCategory } from '@/lib/screamTest';
 import { addCalendarDays, earningsSessionDate } from '@/lib/earningsDate';
+import { classifyHeadlines, hasLlmProvider } from '@/lib/llmClassifier';
 
 const STABLE = 'https://financialmodelingprep.com/stable';
 
@@ -37,127 +38,7 @@ type FmpNewsRow = {
 
 type AlpacaBar = { t: string; o: number; h: number; l: number; c: number; v: number };
 
-// ── LLM classifier ────────────────────────────────────────────────────────────
-
-const OPENAI_CHAT_URL = 'https://api.openai.com/v1/chat/completions';
-
-const LLM_SYSTEM_PROMPT = `You are an institutional equity analyst assistant specialising in pre-earnings risk assessment.
-
-Your task: given a chronological list of news headlines for a specific stock ticker, identify NEGATIVE risk signals that could weigh on the stock price or increase uncertainty into its earnings report.
-
-What counts as a risk:
-- Competitive threat: a new entrant, a rival product launch framed as a displacement risk, or an article explicitly noting competitive pressure on this company
-- Analyst downgrade or price-target cut
-- Guidance reduction, pre-announcement of a miss, or management warning of weakness
-- Material customer or contract loss
-- Regulatory, legal, or SEC investigation
-- Sector-wide repricing, broad-based selloff commentary specific to the company's sector
-
-What does NOT count as a risk (common false positives to exclude):
-- Positive investor or analyst coverage ("Billionaire bets on X", "Why X is a top pick")
-- Partnership or customer win announcements
-- General market or macro commentary not specifically about this company's risk
-- Product launch news framed positively (unless framing is explicitly competitive/displacement)
-- Upgrade, buy recommendation, or price-target raise
-
-For each risk you identify, also check whether any LATER headline in the same list resolves or neutralises that specific risk (e.g. reaffirmed guidance, issue addressed by management, regulatory clearance, partner publicly denies threat).
-
-Return ONLY valid JSON matching this schema — no extra text:
-{
-  "risks": [
-    {
-      "i": <int>,            // 0-based index of the risk headline in the input list
-      "category": "<competitive|sector_repricing|downgrade|guidance_concern|customer_loss|regulatory|macro_specific>",
-      "severity": <1-5>,     // 1=minor mention, 3=notable, 5=material/actionable
-      "summary": "<one sentence describing the specific risk>",
-      "resolved": <bool>     // true if a LATER headline in the list addresses this risk
-    }
-  ]
-}
-
-If there are no risks, return { "risks": [] }.`;
-
-type LlmRiskResult = {
-  i: number;
-  category: OverhangCategory;
-  severity: number;
-  summary: string;
-  resolved: boolean;
-};
-
-async function classifyHeadlinesWithLlm(
-  ticker: string,
-  headlines: Array<{ i: number; date: string; title: string }>,
-): Promise<LlmRiskResult[]> {
-  const key = process.env.OPENAI_API_KEY;
-  if (!key || headlines.length === 0) return [];
-
-  // Format headlines as a numbered list with dates so the model has time context
-  // for resolution detection.
-  const numbered = headlines
-    .map(h => `[${h.i}] (${h.date}) ${h.title}`)
-    .join('\n');
-
-  let res: Response;
-  try {
-    res = await fetch(OPENAI_CHAT_URL, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${key}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        response_format: { type: 'json_object' },
-        messages: [
-          { role: 'system', content: LLM_SYSTEM_PROMPT },
-          {
-            role: 'user',
-            content: `Ticker: ${ticker}\n\nHeadlines (chronological, oldest first):\n${numbered}`,
-          },
-        ],
-        max_tokens: 2048,
-        temperature: 0,
-      }),
-      // Never cache: we need fresh classifications each scan.
-      cache: 'no-store',
-    });
-  } catch {
-    // Network error — fall back to regex silently.
-    return [];
-  }
-
-  if (!res.ok) return [];
-
-  try {
-    const data = (await res.json()) as {
-      choices?: Array<{ message?: { content?: string } }>;
-    };
-    const content = data.choices?.[0]?.message?.content ?? '{}';
-    const parsed = JSON.parse(content) as { risks?: LlmRiskResult[] };
-
-    const valid: LlmRiskResult[] = [];
-    for (const r of parsed.risks ?? []) {
-      // Validate category is a known OverhangCategory value.
-      const VALID_CATS: OverhangCategory[] = [
-        'competitive', 'sector_repricing', 'downgrade', 'guidance_concern',
-        'customer_loss', 'regulatory', 'macro_specific',
-      ];
-      if (
-        typeof r.i === 'number' &&
-        VALID_CATS.includes(r.category as OverhangCategory) &&
-        typeof r.severity === 'number' &&
-        typeof r.summary === 'string' &&
-        typeof r.resolved === 'boolean'
-      ) {
-        valid.push(r);
-      }
-    }
-    return valid;
-  } catch {
-    return [];
-  }
-}
+// LLM classification is handled by lib/llmClassifier.ts (Gemini + OpenAI).
 
 // ── Regex fallback (original keyword-bucket approach) ─────────────────────────
 
@@ -320,17 +201,15 @@ export async function detectOverhangs(opts: {
     const overhangs: NarrativeOverhang[] = [];
     const seen = new Set<string>();
 
-    const useLlm = !!process.env.OPENAI_API_KEY;
-
-    if (useLlm) {
-      // ── LLM path ────────────────────────────────────────────────────────────
+    if (hasLlmProvider()) {
+      // ── LLM path (Gemini > OpenAI) ───────────────────────────────────────────
       const headlines = filteredNews.map((n, i) => ({
         i,
         date: newsPublishedDate(n),
         title: n.title ?? '',
       }));
 
-      const llmResults = await classifyHeadlinesWithLlm(ticker, headlines);
+      const llmResults = await classifyHeadlines(ticker, headlines);
 
       for (const r of llmResults) {
         // Skip very minor mentions (severity 1 = noise).
