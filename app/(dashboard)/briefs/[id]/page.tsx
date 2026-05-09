@@ -5,6 +5,7 @@ import { FinalActionBadge, SignalBadge } from '@/components/SignalBadge';
 import { ScreamTestCard } from '@/components/ScreamTestCard';
 import { ScanDiffBanner } from '@/components/ScanDiffBanner';
 import { RescanBriefButton } from '@/components/RescanBriefButton';
+import { getStockSnapshot } from '@/lib/alpaca';
 import type { FilterResult, NarrativeOverhang } from '@/lib/screamTest';
 import type { BriefScanRow } from '@/lib/scanDiff';
 
@@ -60,6 +61,16 @@ export default async function BriefPage({ params }: { params: { id: string } }) 
   const rawFmp = brief.raw_fmp as { screamUnresolvedOverhangs?: NarrativeOverhang[] } | null;
   const screamUnresolved = rawFmp?.screamUnresolvedOverhangs ?? null;
 
+  // Fetch live price — Alpaca latestTrade, falls back to stored scan price if unavailable.
+  let livePrice: number | null = null;
+  try {
+    const snap = await getStockSnapshot(brief.ticker);
+    if (snap.price > 0) livePrice = snap.price;
+  } catch {
+    // Non-fatal — display falls back to scan-time price below.
+  }
+  const displayPrice = livePrice ?? brief.spot_price;
+
   const finalAction: string | null = brief.final_action ?? null;
   const finalRationale: string | null = brief.final_action_rationale ?? null;
   // Older briefs predate reconcile — fall back gracefully to old structure action
@@ -81,8 +92,15 @@ export default async function BriefPage({ params }: { params: { id: string } }) 
         </div>
         <div className="flex flex-wrap items-baseline gap-3 sm:gap-6 mb-4">
           <h1 className="text-4xl sm:text-5xl font-bold">{brief.ticker}</h1>
-          <div className="text-2xl sm:text-3xl text-fg-muted">
-            ${brief.spot_price?.toFixed(2)}
+          <div className="flex items-baseline gap-2">
+            <div className="text-2xl sm:text-3xl text-fg-muted">
+              ${displayPrice?.toFixed(2)}
+            </div>
+            {livePrice !== null ? (
+              <span className="text-xs text-emerald-400 tracking-wide">LIVE</span>
+            ) : (
+              <span className="text-xs text-fg-dim tracking-wide" title="Live price unavailable — showing scan-time price">AT SCAN</span>
+            )}
           </div>
         </div>
         <div className="text-2xl font-bold">
