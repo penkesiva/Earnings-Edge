@@ -293,6 +293,13 @@ async function generateBrief(ticker: string, earningsDate: string) {
     sectorReturn5d,
   });
 
+  // Use the same-week Friday as the display expiry for strike tables.
+  // chain.expiry (from Alpaca's snapshot) can jump to the following week if
+  // same-week options weren't in the snapshot, but earnings plays target the
+  // Friday that immediately follows the report — so we lock the display to
+  // expiryAfter (the Friday of the earnings week).
+  const displayExpiry = expiryAfter;
+
   const structure = suggestStructure({
     spot: snapshot.price,
     ivRank,
@@ -300,7 +307,7 @@ async function generateBrief(ticker: string, earningsDate: string) {
     expectedMoveDollar: expectedMove.dollar,
     composite: score.composite,
     signal: score.signal,
-    preferredExpiry: chain.expiry,
+    preferredExpiry: displayExpiry,
   });
 
   const reconciled = reconcileSignals({
@@ -309,7 +316,7 @@ async function generateBrief(ticker: string, earningsDate: string) {
     ivRank,
     spot: snapshot.price,
     expectedMoveDollar: expectedMove.dollar,
-    preferredExpiry: chain.expiry,
+    preferredExpiry: displayExpiry,
     netInsiderBuying90d: netInsider,
     sectorReturn5d,
   });
