@@ -61,10 +61,17 @@ export function reconcileSignals(opts: {
   const { beatScore, scream, ivRank, netInsiderBuying90d, sectorReturn5d } = opts;
 
   // ── Tier gate vars ────────────────────────────────────────────────────────
-  const screamQualifies =
-    scream.score >= 4 &&
-    scream.directionalBias !== 'mixed' &&
-    scream.directionalBias !== 'none';
+  // Use the pre-computed qualifies flag from screamTest — it already applies
+  // the directional-confirmation-count rules and opposing-signal gates.
+  const screamQualifies = scream.qualifies;
+
+  // "Warns" = not qualified, but ≥3 total filters passed with a clear bias.
+  // Uses the raw activity score (not directional confirm count) so that a
+  // 4-active/3-directional case like HIMS still enters Tier B where the
+  // primaryOpposingSignalExtreme gate can redirect it to SKIP_CONFLICT.
+  const sameDirectionConfirmCount =
+    scream.directionalBias === 'bearish' ? scream.bearishConfirmCount :
+    scream.directionalBias === 'bullish' ? scream.bullishConfirmCount : 0;
 
   const screamWarns =
     !screamQualifies &&
@@ -214,11 +221,15 @@ export function reconcileSignals(opts: {
   // TIER A — Scream qualifies directionally (score ≥ 4)
   // ─────────────────────────────────────────────────────────────────────────
   if (screamQualifies) {
+    // scream.qualifies already enforces sameDirectionConfirmCount >= 4 AND
+    // no extreme opposing signal, so Tier A is clean by construction.
+    const screamSummary = `${scream.score} active · ${sameDirectionConfirmCount} ${scream.directionalBias} · ${scream.opposingCount} opposing`;
+
     if (scream.directionalBias === 'bearish') {
       return {
         final_action: 'PUT_DEBIT_SPREAD',
         rationale:
-          `Scream qualifies bearish (${scream.score}/5). Defined-risk put spread. ` +
+          `Scream qualifies bearish (${screamSummary}). Defined-risk put spread. ` +
           `Beat score ${beatScore.composite}, IV rank ${ivRank}.`,
       };
     }
@@ -227,7 +238,7 @@ export function reconcileSignals(opts: {
       return {
         final_action: 'CALL_DEBIT_SPREAD',
         rationale:
-          `Scream qualifies bullish (${scream.score}/5) but IV rank ${ivRank} is elevated — ` +
+          `Scream qualifies bullish (${screamSummary}) but IV rank ${ivRank} is elevated — ` +
           `call spread limits vega crush exposure.`,
       };
     }
@@ -235,7 +246,7 @@ export function reconcileSignals(opts: {
       return {
         final_action: 'SKIP_CONFLICT',
         rationale:
-          `Scream qualifies bullish but beat score composite ${beatScore.composite} is SKIP — ` +
+          `Scream qualifies bullish (${screamSummary}) but beat score ${beatScore.composite} is SKIP — ` +
           `options signal is bullish but fundamentals lack edge.`,
       };
     }
@@ -243,22 +254,41 @@ export function reconcileSignals(opts: {
       return {
         final_action: 'LONG_CALL',
         rationale:
-          `Scream qualifies bullish (${scream.score}/5) and beat score ${beatScore.composite} ` +
+          `Scream qualifies bullish (${screamSummary}) and beat score ${beatScore.composite} ` +
           `is HIGH_CONVICTION with IV rank ${ivRank} — vol is cheap, go directional.`,
       };
     }
     return {
       final_action: 'CALL_DEBIT_SPREAD',
       rationale:
-        `Scream qualifies bullish (${scream.score}/5), beat score ${beatScore.composite} ` +
+        `Scream qualifies bullish (${screamSummary}), beat score ${beatScore.composite} ` +
         `(${beatScore.signal}), IV rank ${ivRank} — call spread for edge with risk control.`,
     };
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // TIER B — Scream warns (score = 3, clear single bias)
+  // TIER B — Scream warns (≥3 same-direction confirmations, below qualify bar)
   // ─────────────────────────────────────────────────────────────────────────
   if (screamWarns) {
+    // ── Hard gate: extreme opposing primary chain signal ───────────────────
+    // When F1 (chain volume) is strongly opposing the candidate direction at
+    // ≥10× ratio (e.g. HIMS: call vol 22× put vol while thesis is bearish),
+    // the directional edge is NOT clean regardless of other signals.
+    // Force SKIP_CONFLICT rather than a directional trade or credit spread.
+    if (scream.primaryOpposingSignalExtreme) {
+      const opposingDesc =
+        scream.directionalBias === 'bearish'
+          ? `call vol ${scream.chainVolRatio.toFixed(1)}× put vol (bullish chain flow)`
+          : `put vol ${(1 / scream.chainVolRatio).toFixed(1)}× call vol (bearish chain flow)`;
+      return {
+        final_action: 'SKIP_CONFLICT',
+        rationale:
+          `${sameDirectionConfirmCount} of ${scream.score} active filters confirm ` +
+          `${scream.directionalBias}, but F1 chain conviction extremely opposes ` +
+          `the thesis: ${opposingDesc}. Directional edge is not clean enough to trade.`,
+      };
+    }
+
     if (scream.directionalBias === 'bearish') {
       if (asymmetricDownsideRisk) {
         return {

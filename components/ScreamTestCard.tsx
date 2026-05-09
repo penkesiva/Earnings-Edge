@@ -128,6 +128,40 @@ export function ScreamTestCard({
           ? 'text-signal-watch'
           : 'text-fg-muted';
 
+  // Derive confirmation counts from stored filter data (backward compatible —
+  // works on old briefs that don't have the new count fields in raw_fmp).
+  const allFilters = Object.values(scream_filters);
+  const bullishConfirmCount = allFilters.filter(f => f.passed && f.direction === 'bullish').length;
+  const bearishConfirmCount = allFilters.filter(f => f.passed && f.direction === 'bearish').length;
+  const sameDirectionCount =
+    scream_direction === 'bearish' ? bearishConfirmCount :
+    scream_direction === 'bullish' ? bullishConfirmCount : 0;
+  const opposingCount =
+    scream_direction === 'bearish' ? bullishConfirmCount :
+    scream_direction === 'bullish' ? bearishConfirmCount : 0;
+
+  // Determine if there's a conflict and how to badge the score header.
+  const hasOpposing = opposingCount > 0;
+  // "4 active · 3 bearish · 1 bullish opposing · CONFLICT"
+  // vs "4/5 bearish · QUALIFIES"
+  const scoreLabel = hasOpposing
+    ? `${scream_score} active · ${sameDirectionCount} ${scream_direction} · ${opposingCount} opposing`
+    : `${scream_score}/5 ${scream_direction}`;
+  const statusLabel =
+    scream_qualifies ? 'QUALIFIES'
+    : hasOpposing    ? 'CONFLICT'
+    : sameDirectionCount >= 3 ? 'warns'
+    : 'below bar';
+  const statusColor =
+    scream_qualifies    ? 'text-signal-buy'
+    : hasOpposing        ? 'text-signal-watch'
+    : sameDirectionCount >= 3 ? 'text-fg-muted'
+    : 'text-fg-dim';
+  const scoreColor =
+    scream_qualifies    ? 'text-signal-buy'
+    : hasOpposing        ? 'text-signal-watch'
+    : 'text-fg-muted';
+
   return (
     <section className="border border-border bg-bg-elevated p-6">
       <div className="flex justify-between items-start gap-4 mb-4 flex-wrap">
@@ -139,15 +173,11 @@ export function ScreamTestCard({
           </p>
         </div>
         <div className="text-right">
-          <div
-            className={`font-bold text-2xl tabular-nums ${
-              scream_qualifies ? 'text-signal-buy' : 'text-fg-muted'
-            }`}
-          >
-            {scream_score}/5
+          <div className={`font-bold text-xl tabular-nums font-mono ${scoreColor}`}>
+            {scoreLabel}
           </div>
-          <div className="text-[11px] text-fg-dim capitalize mt-0.5">
-            {scream_direction} · {scream_qualifies ? 'QUALIFIES' : 'below bar'}
+          <div className={`text-[11px] font-bold tracking-widest mt-0.5 ${statusColor}`}>
+            {statusLabel}
           </div>
         </div>
       </div>

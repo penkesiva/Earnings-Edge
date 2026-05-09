@@ -74,9 +74,19 @@ export interface FilterResult {
 
 export interface ScreamTestResult {
   ticker: string;
+  /**
+   * Raw activity count — number of filters that produced any directional pass.
+   * Does NOT equal directional conviction. Use bearishConfirmCount /
+   * bullishConfirmCount for qualification logic.
+   */
   score: number; // 0-5
   directionalBias: Direction; // dominant direction across passing filters
-  qualifies: boolean; // score >= 4 AND consistent direction (not mixed/none)
+  /**
+   * True only when same-direction confirmation count >= 4 AND the opposing
+   * primary chain signal is not extreme. "4 active" is no longer sufficient
+   * on its own — all 4 must point the same way (or at most 1 weak opposing).
+   */
+  qualifies: boolean;
   recommendation: 'calls' | 'puts' | 'skip' | 'stock-only';
   filters: {
     chainConviction: FilterResult;
@@ -95,6 +105,33 @@ export interface ScreamTestResult {
    * Zero when IV data is unavailable.
    */
   putSkewPts: number;
+
+  // ── Directional confirmation breakdown ────────────────────────────────────
+  /** Passing filters whose direction is bullish. */
+  bullishConfirmCount: number;
+  /** Passing filters whose direction is bearish. */
+  bearishConfirmCount: number;
+  /**
+   * Opposing confirmation count relative to the dominant bias.
+   * bearish candidate → bullishConfirmCount; bullish candidate → bearishConfirmCount.
+   */
+  opposingCount: number;
+  /**
+   * nearMoneyCallVol / nearMoneyPutVol. > 1 = calls heavier. Used for
+   * opposing-signal strength classification (strong ≥ 5, extreme ≥ 10).
+   */
+  chainVolRatio: number;
+  /**
+   * True when F1 chain conviction OPPOSES the overall directionalBias AND
+   * the opposing vol ratio is ≥ 5. Reduces qualification confidence.
+   */
+  primaryOpposingSignalStrong: boolean;
+  /**
+   * True when F1 chain conviction OPPOSES the overall directionalBias AND
+   * the opposing vol ratio is ≥ 10. Hard blocker — forces SKIP_CONFLICT
+   * regardless of other signals.
+   */
+  primaryOpposingSignalExtreme: boolean;
 }
 
 // --- Filter implementations ---
@@ -318,28 +355,66 @@ export function computeScreamTest(inputs: ScreamTestInputs): ScreamTestResult {
   const passing = Object.values(filters).filter(f => f.passed);
   const score = passing.length;
 
-  // Determine dominant direction among passing filters
-  const dirs = passing.map(f => f.direction);
-  const bullCount = dirs.filter(d => d === 'bullish').length;
-  const bearCount = dirs.filter(d => d === 'bearish').length;
+  // ── Directional breakdown ──────────────────────────────────────────────────
+  const bullishConfirmCount = passing.filter(f => f.direction === 'bullish').length;
+  const bearishConfirmCount = passing.filter(f => f.direction === 'bearish').length;
 
-  // Simple majority: any winning side determines bias.
-  // A 2:1 split at score=3 is "warns bearish/bullish" not "mixed" — the old
-  // ≥3 floor hid directional pressure at low score counts.
+  // Dominant direction by simple majority (any imbalance wins — a 2:1 split at
+  // score=3 is "warns" not "mixed"; the old ≥3 floor hid real pressure).
   let directionalBias: Direction = 'mixed';
-  if (bullCount > bearCount) directionalBias = 'bullish';
-  else if (bearCount > bullCount) directionalBias = 'bearish';
-  else if (bullCount === 0 && bearCount === 0) directionalBias = 'none';
-  // tie with at least one passing filter on each side → 'mixed' (default)
+  if (bullishConfirmCount > bearishConfirmCount) directionalBias = 'bullish';
+  else if (bearishConfirmCount > bullishConfirmCount) directionalBias = 'bearish';
+  else if (bullishConfirmCount === 0 && bearishConfirmCount === 0) directionalBias = 'none';
+  // tie with confirmations on both sides → 'mixed' (default)
 
+  const sameDirectionConfirmCount =
+    directionalBias === 'bearish' ? bearishConfirmCount :
+    directionalBias === 'bullish' ? bullishConfirmCount : 0;
+  const opposingCount =
+    directionalBias === 'bearish' ? bullishConfirmCount :
+    directionalBias === 'bullish' ? bearishConfirmCount : 0;
+
+  // ── F1 opposing signal strength ────────────────────────────────────────────
+  // Chain vol ratio = callVol / putVol. > 1 = calls heavier.
+  const chainVolRatio =
+    inputs.nearMoneyPutVol === 0
+      ? (inputs.nearMoneyCallVol > 0 ? Infinity : 1)
+      : inputs.nearMoneyCallVol / inputs.nearMoneyPutVol;
+
+  // Is F1 pointing OPPOSITE to the dominant bias?
+  const f1OpposesCandidate =
+    filters.chainConviction.passed &&
+    filters.chainConviction.direction !== directionalBias &&
+    filters.chainConviction.direction !== 'none' &&
+    filters.chainConviction.direction !== 'mixed';
+
+  // For bearish candidate: how heavily bullish is the opposing chain (callPutRatio)?
+  // For bullish candidate: how heavily bearish is the opposing chain (putCallRatio)?
+  const opposingChainRatio =
+    directionalBias === 'bearish' ? chainVolRatio :
+    directionalBias === 'bullish' ? (chainVolRatio > 0 ? 1 / chainVolRatio : 0) : 0;
+
+  const primaryOpposingSignalStrong  = f1OpposesCandidate && opposingChainRatio >= 5;
+  const primaryOpposingSignalExtreme = f1OpposesCandidate && opposingChainRatio >= 10;
+
+  // ── Qualification rule ────────────────────────────────────────────────────
+  // Must have ≥4 filters confirming the SAME direction. A passing filter that
+  // points the opposite way does NOT count as a same-direction confirmation
+  // (old system treated "4 active" as "4 directional" — that was the bug).
+  //
+  // Allowed exception: exactly 1 weak opposing filter that is NOT the primary
+  // chain conviction signal (F5 sector going the other way is ignorable noise).
   const qualifies =
-    score >= 4 &&
+    sameDirectionConfirmCount >= 4 &&
     directionalBias !== 'mixed' &&
-    directionalBias !== 'none';
+    directionalBias !== 'none' &&
+    !primaryOpposingSignalExtreme &&
+    (opposingCount === 0 || (opposingCount === 1 && !primaryOpposingSignalStrong));
 
   let recommendation: ScreamTestResult['recommendation'];
   if (!qualifies) {
-    recommendation = score >= 3 ? 'stock-only' : 'skip';
+    recommendation =
+      sameDirectionConfirmCount >= 3 ? 'stock-only' : 'skip';
   } else if (directionalBias === 'bullish') {
     recommendation = 'calls';
   } else {
@@ -347,20 +422,41 @@ export function computeScreamTest(inputs: ScreamTestInputs): ScreamTestResult {
   }
 
   const notes: string[] = [];
-  if (score < 4)
+  if (sameDirectionConfirmCount < 4 && score >= 4) {
+    notes.push(
+      `${score} filters active but only ${sameDirectionConfirmCount} confirm direction ` +
+      `— ${opposingCount} opposing signal(s) prevent directional qualification`
+    );
+  } else if (score < 4) {
     notes.push('Below scream threshold — most prints are noise, default to no trade');
+  }
+  if (primaryOpposingSignalExtreme) {
+    notes.push(
+      `Extreme opposing chain signal: ${directionalBias === 'bearish'
+        ? `call vol ${chainVolRatio.toFixed(1)}× put vol (bullish flow opposing bearish thesis)`
+        : `put vol ${(1 / chainVolRatio).toFixed(1)}× call vol (bearish flow opposing bullish thesis)`
+      }`
+    );
+  } else if (primaryOpposingSignalStrong) {
+    notes.push(
+      `Strong opposing chain signal detected (${directionalBias === 'bearish'
+        ? `call vol ${chainVolRatio.toFixed(1)}× put vol`
+        : `put vol ${(1 / chainVolRatio).toFixed(1)}× call vol`
+      }) — reduces qualification confidence`
+    );
+  }
   if (directionalBias === 'mixed' && score >= 4) {
     notes.push('Filters pass but direction is split — chain is hedged, avoid directional options');
   }
   if (directionalBias === 'none' && score >= 4) {
-    notes.push('Passing filters lack a 3+ directional cluster — no clear scream bias');
+    notes.push('Passing filters lack a directional cluster — no clear scream bias');
   }
   if (unresolvedOverhangs.length > 0) {
     notes.push(
       `${unresolvedOverhangs.length} unresolved narrative risk(s) in the lookback window`
     );
   }
-  if (score === 5) notes.push('Maximum conviction — rare setup, size accordingly');
+  if (qualifies && score === 5) notes.push('Maximum conviction — rare setup, size accordingly');
 
   return {
     ticker: inputs.ticker,
@@ -372,5 +468,11 @@ export function computeScreamTest(inputs: ScreamTestInputs): ScreamTestResult {
     notes,
     unresolvedOverhangs,
     putSkewPts,
+    bullishConfirmCount,
+    bearishConfirmCount,
+    opposingCount,
+    chainVolRatio,
+    primaryOpposingSignalStrong,
+    primaryOpposingSignalExtreme,
   };
 }
