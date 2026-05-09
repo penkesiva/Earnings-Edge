@@ -310,6 +310,8 @@ async function generateBrief(ticker: string, earningsDate: string) {
     spot: snapshot.price,
     expectedMoveDollar: expectedMove.dollar,
     preferredExpiry: chain.expiry,
+    netInsiderBuying90d: netInsider,
+    sectorReturn5d,
   });
 
   const { data: brief, error } = await sb

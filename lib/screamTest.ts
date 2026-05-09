@@ -88,6 +88,13 @@ export interface ScreamTestResult {
   notes: string[];
   /** Unresolved narrative rows feeding Filter 4 bearish path (audit / UI). */
   unresolvedOverhangs: NarrativeOverhang[];
+  /**
+   * 25-delta put-call IV differential in vol points.
+   * Positive = puts richer than calls (bearish skew / downside fear).
+   * Negative = calls richer than puts (bullish skew / upside demand).
+   * Zero when IV data is unavailable.
+   */
+  putSkewPts: number;
 }
 
 // --- Filter implementations ---
@@ -285,6 +292,12 @@ function filter5SectorTailwind(i: ScreamTestInputs): FilterResult {
 export function computeScreamTest(inputs: ScreamTestInputs): ScreamTestResult {
   const unresolvedOverhangs = (inputs.narrativeOverhangs ?? []).filter(n => !n.resolved);
 
+  // 25Δ put-call skew in vol points. Positive = puts richer (bearish fear).
+  const putSkewPts =
+    inputs.iv25dCall != null && inputs.iv25dPut != null
+      ? (inputs.iv25dPut - inputs.iv25dCall) * 100
+      : 0;
+
   const filters = {
     chainConviction: filter1ChainConviction(inputs),
     skewAlignment: filter2SkewAlignment(inputs),
@@ -345,5 +358,6 @@ export function computeScreamTest(inputs: ScreamTestInputs): ScreamTestResult {
     filters,
     notes,
     unresolvedOverhangs,
+    putSkewPts,
   };
 }
