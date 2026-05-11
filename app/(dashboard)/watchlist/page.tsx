@@ -2,6 +2,7 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { AddTickerForm } from './AddTickerForm';
 import { BatchImportForm } from './BatchImportForm';
 import { deleteTicker, setManualEarnings, toggleTicker } from './actions';
+import { DashboardRefresh } from '@/components/DashboardRefresh';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,13 +15,16 @@ export default async function WatchlistPage() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight mb-2">
-          <span className="text-fg-subtle">›</span> WATCHLIST
-        </h1>
-        <p className="text-sm text-fg-subtle">
-          {tickers?.filter(t => t.active).length ?? 0} active · {tickers?.length ?? 0} total
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight mb-2">
+            <span className="text-fg-subtle">›</span> WATCHLIST
+          </h1>
+          <p className="text-sm text-fg-subtle">
+            {tickers?.filter(t => t.active).length ?? 0} active · {tickers?.length ?? 0} total
+          </p>
+        </div>
+        <DashboardRefresh />
       </div>
 
       <AddTickerForm />

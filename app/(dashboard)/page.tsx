@@ -3,7 +3,6 @@ import { Suspense } from 'react';
 import { supabaseAdmin } from '@/lib/supabase';
 import { addCalendarDays, earningsSessionDate } from '@/lib/earningsDate';
 import { FinalActionBadge, ConvictionArrows } from '@/components/SignalBadge';
-import { DashboardRefresh } from '@/components/DashboardRefresh';
 import { FearGreedIndex, FearGreedIndexSkeleton } from '@/components/FearGreedIndex';
 import { LastScanned } from '@/components/LastScanned';
 import { PrepDateButton } from '@/components/PrepDateButton';
@@ -60,12 +59,9 @@ export default async function HomePage() {
 
   return (
     <div className="space-y-12">
-      <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
-        <DashboardRefresh />
-        <Suspense fallback={<FearGreedIndexSkeleton />}>
-          <FearGreedIndex />
-        </Suspense>
-      </div>
+      <Suspense fallback={<FearGreedIndexSkeleton />}>
+        <FearGreedIndex />
+      </Suspense>
 
       <section>
         <div className="flex items-center justify-between mb-4 sm:mb-6">
@@ -82,7 +78,7 @@ export default async function HomePage() {
 
         {!todayBriefs?.length ? (
           <div className="border border-border bg-bg-elevated p-8 text-center text-fg-subtle text-sm">
-            No briefs yet — hit <span className="text-fg-muted">RUN SCAN</span> above when a watchlist name reports today, or <span className="text-fg-muted">SYNC CALENDAR</span> if dates are stale.
+            No briefs yet — hit <span className="text-fg-muted">RUN SCAN</span> when a watchlist name reports today. If dates look stale, go to <span className="text-fg-muted">WATCHLIST → SYNC CALENDAR</span>.
           </div>
         ) : (
           <>
@@ -244,8 +240,9 @@ export default async function HomePage() {
 
         {!upcoming?.length ? (
           <div className="text-fg-subtle text-sm">
-            No earnings dates in range — try{' '}
-            <span className="text-fg-muted">SYNC CALENDAR</span> above (needs FMP + watchlist).
+            No earnings dates in range — go to{' '}
+            <span className="text-fg-muted">WATCHLIST</span> and hit{' '}
+            <span className="text-fg-muted">SYNC CALENDAR</span> to pull dates from FMP.
           </div>
         ) : (
           <div className="space-y-4">
