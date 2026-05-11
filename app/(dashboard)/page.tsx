@@ -258,19 +258,70 @@ export default async function HomePage() {
                   <PrepDateButton date={date} />
                 </div>
 
+                {/* Column header — desktop only */}
+                <div className="hidden md:grid grid-cols-12 gap-4 px-4 py-2 text-xs text-fg-subtle uppercase tracking-widest border-b border-border-subtle bg-bg">
+                  <div className="col-span-2">TKR</div>
+                  <div className="col-span-2">TIMING</div>
+                  <div className="col-span-1">SCORE</div>
+                  <div className="col-span-4">ACTION</div>
+                  <div className="col-span-2">SCANNED</div>
+                  <div className="col-span-1" />
+                </div>
+
                 {/* Ticker rows */}
                 <div className="divide-y divide-border-subtle">
                   {events!.map(e => {
                     const brief = briefByKey.get(`${date}:${e.ticker}`);
+                    const RowWrapper = brief
+                      ? ({ children }: { children: React.ReactNode }) => (
+                          <Link href={`/briefs/${brief.id}`} className="block terminal-row">
+                            {children}
+                          </Link>
+                        )
+                      : ({ children }: { children: React.ReactNode }) => (
+                          <div>{children}</div>
+                        );
+
                     return (
-                      <div key={e.id} className="px-4 py-2.5 text-sm">
-                        {/* Row 1: Ticker · timing · source badge  +  VIEW link */}
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span className="font-bold shrink-0">{e.ticker}</span>
-                            <span className="text-[10px] text-fg-subtle shrink-0">{e.timing}</span>
+                      <RowWrapper key={e.id}>
+                        {/* ── Mobile: 2-line layout ── */}
+                        <div className="md:hidden px-4 py-2.5 text-sm">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="font-bold shrink-0">{e.ticker}</span>
+                              <span className="text-[10px] text-fg-subtle shrink-0">{e.timing}</span>
+                              <span
+                                className={`text-[10px] px-1.5 py-0.5 border tracking-widest shrink-0 ${
+                                  e.source === 'MANUAL'
+                                    ? 'text-signal-watch border-signal-watch/50'
+                                    : 'text-fg-dim border-border-subtle'
+                                }`}
+                              >
+                                {e.source || 'UNK'}
+                              </span>
+                            </div>
+                            {brief ? (
+                              <span className="text-[10px] text-fg-subtle tracking-widest shrink-0">VIEW →</span>
+                            ) : (
+                              <span className="text-[10px] text-fg-dim tracking-widest shrink-0">NO BRIEF</span>
+                            )}
+                          </div>
+                          {brief && (
+                            <div className="flex items-center gap-2 mt-1.5">
+                              <ConvictionArrows action={brief.final_action ?? null} />
+                              <FinalActionBadge action={brief.final_action ?? null} />
+                              <LastScanned updatedAt={brief.updated_at ?? brief.generated_at ?? null} />
+                            </div>
+                          )}
+                        </div>
+
+                        {/* ── Desktop: aligned grid columns ── */}
+                        <div className="hidden md:grid grid-cols-12 gap-4 px-4 py-3 text-sm items-center">
+                          <div className="col-span-2 font-bold">{e.ticker}</div>
+                          <div className="col-span-2 text-fg-muted text-xs">
+                            <span>{e.timing}</span>
                             <span
-                              className={`text-[10px] px-1.5 py-0.5 border tracking-widest shrink-0 ${
+                              className={`ml-2 text-[10px] px-1 border tracking-widest ${
                                 e.source === 'MANUAL'
                                   ? 'text-signal-watch border-signal-watch/50'
                                   : 'text-fg-dim border-border-subtle'
@@ -279,26 +330,33 @@ export default async function HomePage() {
                               {e.source || 'UNK'}
                             </span>
                           </div>
-                          {brief ? (
-                            <Link
-                              href={`/briefs/${brief.id}`}
-                              className="text-[10px] text-fg-subtle hover:text-fg tracking-widest underline underline-offset-2 shrink-0"
-                            >
-                              VIEW →
-                            </Link>
-                          ) : (
-                            <span className="text-[10px] text-fg-dim tracking-widest shrink-0">NO BRIEF</span>
-                          )}
-                        </div>
-                        {/* Row 2: Action badge + scanned timestamp (only when brief exists) */}
-                        {brief && (
-                          <div className="flex items-center gap-2 mt-1.5">
-                            <ConvictionArrows action={brief.final_action ?? null} />
-                            <FinalActionBadge action={brief.final_action ?? null} />
-                            <LastScanned updatedAt={brief.updated_at ?? brief.generated_at ?? null} />
+                          <div className="col-span-1">
+                            {brief ? <ScoreCell value={brief.composite_score} /> : <span className="text-fg-dim">—</span>}
                           </div>
-                        )}
-                      </div>
+                          <div className="col-span-4 flex items-center gap-2">
+                            {brief ? (
+                              <>
+                                <ConvictionArrows action={brief.final_action ?? null} />
+                                <FinalActionBadge action={brief.final_action ?? null} />
+                              </>
+                            ) : (
+                              <span className="text-xs text-fg-dim tracking-widest">NO BRIEF</span>
+                            )}
+                          </div>
+                          <div className="col-span-2">
+                            {brief ? (
+                              <LastScanned updatedAt={brief.updated_at ?? brief.generated_at ?? null} />
+                            ) : (
+                              <span className="text-fg-dim">—</span>
+                            )}
+                          </div>
+                          <div className="col-span-1 text-right">
+                            {brief && (
+                              <span className="text-[10px] text-fg-subtle tracking-widest">VIEW →</span>
+                            )}
+                          </div>
+                        </div>
+                      </RowWrapper>
                     );
                   })}
                 </div>
