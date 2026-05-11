@@ -103,9 +103,14 @@ export default async function BriefPage({ params }: { params: { id: string } }) 
             )}
           </div>
         </div>
-        <div className="text-2xl font-bold">
-          SCORE <span className={scoreColor(brief.composite_score)}>{brief.composite_score}</span>
-          <span className="text-fg-subtle text-base ml-2">/ 100</span>
+        <div>
+          <div className="text-2xl font-bold">
+            SCORE <span className={scoreColor(brief.composite_score)}>{brief.composite_score}</span>
+            <span className="text-fg-subtle text-base ml-2">/ 100</span>
+          </div>
+          <div className="text-xs text-fg-dim mt-1">
+            {beatProbabilityLabel(brief.composite_score)}
+          </div>
         </div>
       </div>
 
@@ -142,6 +147,9 @@ export default async function BriefPage({ params }: { params: { id: string } }) 
         <Stat label="Expected Move" value={`±$${brief.expected_move_dollar?.toFixed(2)}`} sub={`${brief.expected_move_pct?.toFixed(1)}%`} />
         <Stat label="P/C Ratio (all strikes)" value={brief.put_call_ratio?.toFixed(2)} />
       </div>
+
+      {/* ── News Sentiment ─────────────────────────────────────────────────── */}
+      <NewsSentimentSection overhangs={screamUnresolved} />
 
       {/* ── Outcome (if logged) ────────────────────────────────────────────── */}
       {outcome && (
@@ -192,7 +200,7 @@ export default async function BriefPage({ params }: { params: { id: string } }) 
 
           {/* Beat score components */}
           <section>
-            <div className="text-xs tracking-widest text-fg-subtle mb-1">BEAT SCORE COMPONENTS</div>
+            <div className="text-xs tracking-widest text-fg-subtle mb-1">BEAT SCORE — HOW LIKELY TO BEAT EARNINGS?</div>
             <div className="flex items-center gap-2 mb-4">
               <SignalBadge
                 signal={brief.signal}
@@ -711,8 +719,83 @@ function ComponentBar({ label, value }: { label: string; value: number | null })
   );
 }
 
+const CATEGORY_LABELS: Record<string, string> = {
+  competitive:      'Competitive threat',
+  sector_repricing: 'Sector repricing',
+  downgrade:        'Analyst downgrade',
+  guidance_concern: 'Guidance concern',
+  customer_loss:    'Customer / contract loss',
+  regulatory:       'Regulatory / legal',
+  macro_specific:   'Macro / price action',
+};
+
+function NewsSentimentSection({ overhangs }: { overhangs: NarrativeOverhang[] | null }) {
+  // Compute overall sentiment from unresolved overhangs
+  const risks = overhangs ?? [];
+  const maxSeverity = risks.reduce((m, r) => Math.max(m, (r as any).severity ?? 3), 0);
+
+  let badge: { label: string; cls: string };
+  let summary: string;
+  if (risks.length === 0) {
+    badge = { label: 'CLEAN', cls: 'bg-signal-buy/10 text-signal-buy border-signal-buy/20' };
+    summary = 'No material risk signals detected in recent headlines.';
+  } else if (risks.length <= 2 && maxSeverity <= 3) {
+    badge = { label: 'CAUTIOUS', cls: 'bg-signal-watch/10 text-signal-watch border-signal-watch/20' };
+    summary = `${risks.length} minor concern${risks.length > 1 ? 's' : ''} — monitor but not disqualifying.`;
+  } else {
+    badge = { label: 'ELEVATED RISK', cls: 'bg-signal-sell/10 text-signal-sell border-signal-sell/20' };
+    summary = `${risks.length} unresolved risk${risks.length > 1 ? 's' : ''} — material headwinds into earnings.`;
+  }
+
+  return (
+    <section className="border border-border bg-bg-elevated p-5 sm:p-6">
+      <div className="flex items-center gap-3 mb-4">
+        <div className="text-xs tracking-widest text-fg-subtle">NEWS SENTIMENT</div>
+        <span className={`text-[11px] font-bold px-2 py-0.5 border tracking-widest ${badge.cls}`}>
+          {badge.label}
+        </span>
+      </div>
+      <p className="text-sm text-fg-muted mb-4">{summary}</p>
+
+      {risks.length > 0 && (
+        <div className="space-y-2">
+          {risks.map((r, i) => {
+            const sev = (r as any).severity as number | undefined;
+            const sevColor = sev && sev >= 4 ? 'text-signal-sell' : sev && sev >= 3 ? 'text-signal-watch' : 'text-fg-dim';
+            return (
+              <div key={i} className="flex items-start gap-3 text-xs">
+                <span className={`shrink-0 font-bold tabular-nums ${sevColor}`}>
+                  {sev ? `S${sev}` : '—'}
+                </span>
+                <span className="text-fg-subtle shrink-0 w-[130px]">
+                  {CATEGORY_LABELS[r.category] ?? r.category}
+                </span>
+                <span className="text-fg-muted">{r.description}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {risks.length === 0 && (
+        <p className="text-xs text-fg-dim">
+          Powered by LLM headline analysis (60-day window). No negative signals found.
+        </p>
+      )}
+    </section>
+  );
+}
+
 function scoreColor(score: number) {
   if (score >= 65) return 'text-signal-buy';
   if (score >= 40) return 'text-signal-watch';
   return 'text-signal-sell';
+}
+
+function beatProbabilityLabel(score: number): string {
+  if (score >= 80) return 'Strong earnings beat likelihood — historically high beat frequency and magnitude';
+  if (score >= 65) return 'Above-average beat likelihood — positive analyst revisions and beat history';
+  if (score >= 50) return 'Moderate beat likelihood — mixed signals, no strong edge either way';
+  if (score >= 35) return 'Below-average beat likelihood — weak history or negative revisions';
+  return 'Low beat likelihood — poor beat history, deteriorating estimates';
 }

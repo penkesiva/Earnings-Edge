@@ -15,21 +15,24 @@ const config: Config = {
         display: ['Söhne', 'Inter Display', 'sans-serif'],
       },
       colors: {
+        // Theme-aware tokens — values come from CSS vars set in globals.css.
+        // Light/dark switching happens automatically via prefers-color-scheme.
         bg: {
-          DEFAULT: '#0a0a0a',
-          elevated: '#171717',
-          hover: '#1f1f1f',
+          DEFAULT: 'var(--color-bg)',
+          elevated: 'var(--color-bg-elevated)',
+          hover: 'var(--color-bg-hover)',
         },
         border: {
-          DEFAULT: '#262626',
-          subtle: '#1a1a1a',
+          DEFAULT: 'var(--color-border)',
+          subtle: 'var(--color-border-subtle)',
         },
         fg: {
-          DEFAULT: '#fafafa',
-          muted: '#a3a3a3',
-          subtle: '#737373',
-          dim: '#525252',
+          DEFAULT: 'var(--color-fg)',
+          muted: 'var(--color-fg-muted)',
+          subtle: 'var(--color-fg-subtle)',
+          dim: 'var(--color-fg-dim)',
         },
+        // Signal colors are intentionally theme-invariant (same green/amber/red on both).
         signal: {
           buy: '#22c55e',
           watch: '#eab308',
