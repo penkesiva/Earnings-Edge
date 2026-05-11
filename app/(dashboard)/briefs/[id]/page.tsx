@@ -111,6 +111,16 @@ export default async function BriefPage({ params }: { params: { id: string } }) 
           <div className="text-xs text-fg-dim mt-1">
             {beatProbabilityLabel(brief.composite_score)}
           </div>
+          <BriefInsightStrip
+            compositeScore={brief.composite_score}
+            finalAction={finalAction}
+            ivRank={brief.iv_rank ?? null}
+            putCallRatio={brief.put_call_ratio ?? null}
+            expectedMovePct={brief.expected_move_pct ?? null}
+            screamDirection={brief.scream_direction ?? null}
+            screamScore={brief.scream_score ?? null}
+            overhangs={screamUnresolved}
+          />
         </div>
       </div>
 
@@ -719,6 +729,147 @@ function ComponentBar({ label, value }: { label: string; value: number | null })
   );
 }
 
+// ── Brief Insight Strip ───────────────────────────────────────────────────────
+
+function BriefInsightStrip({
+  compositeScore, finalAction, ivRank, putCallRatio,
+  expectedMovePct, screamDirection, screamScore, overhangs,
+}: {
+  compositeScore: number;
+  finalAction: string | null;
+  ivRank: number | null;
+  putCallRatio: number | null;
+  expectedMovePct: number | null;
+  screamDirection: string | null;
+  screamScore: number | null;
+  overhangs: NarrativeOverhang[] | null;
+}) {
+  // ── Beat probability ──────────────────────────────────────────────────────
+  const beatLabel =
+    compositeScore >= 65 ? 'LIKELY'      :
+    compositeScore >= 50 ? 'POSSIBLE'    :
+    compositeScore >= 35 ? 'UNLIKELY'    : 'LOW ODDS';
+  const beatCls =
+    compositeScore >= 65 ? 'text-signal-buy'   :
+    compositeScore >= 50 ? 'text-signal-watch' : 'text-signal-sell';
+
+  // ── Options flow (P/C ratio) ──────────────────────────────────────────────
+  const pc = putCallRatio;
+  const [flowLabel, flowCls] =
+    pc === null                ? ['NO DATA',           'text-fg-dim']         :
+    pc < 0.70                  ? ['CALL HEAVY ▲',      'text-signal-buy']     :
+    pc < 0.90                  ? ['SLIGHT CALL LEAN',  'text-signal-buy/70']  :
+    pc <= 1.10                 ? ['BALANCED',          'text-fg-muted']       :
+    pc <= 1.40                 ? ['SLIGHT PUT LEAN',   'text-signal-sell/70'] :
+                                 ['PUT HEAVY ▼',       'text-signal-sell'];
+  const flowSub = pc !== null ? `P/C ${pc.toFixed(2)}` : '';
+
+  // ── News sentiment ────────────────────────────────────────────────────────
+  const risks = overhangs ?? [];
+  const maxSev = risks.reduce((m, r) => Math.max(m, r.severity ?? 3), 0);
+  const [newsLabel, newsCls] =
+    risks.length === 0           ? ['CLEAN ✓',                  'text-signal-buy']   :
+    risks.length <= 2 && maxSev <= 3 ? [`${risks.length} RISKS`,  'text-signal-watch'] :
+                                   [`${risks.length} RISKS ⚠`,   'text-signal-sell'];
+  const newsSub =
+    risks.length === 0 ? 'no material risks' :
+    maxSev >= 4 ? 'material headwinds' : 'monitor closely';
+
+  // ── IV environment ────────────────────────────────────────────────────────
+  const ivr = ivRank;
+  const [ivLabel, ivCls] =
+    ivr === null ? ['NO DATA',    'text-fg-dim']       :
+    ivr >= 80    ? ['EXTREME',    'text-signal-sell']  :
+    ivr >= 60    ? ['ELEVATED',   'text-signal-watch'] :
+    ivr >= 40    ? ['MODERATE',   'text-fg-muted']     :
+                   ['LOW',        'text-signal-buy'];
+  const ivSub = ivr !== null ? `rank ${ivr}` : '';
+
+  // ── Signal lean (from final action + scream) ──────────────────────────────
+  const bullishActions = new Set([
+    'LONG_CALL', 'CALL_DEBIT_SPREAD', 'PUT_CREDIT_SPREAD', 'BULLISH_WATCH',
+    'SKIP_ASYMMETRIC_UPSIDE_RISK',
+  ]);
+  const bearishActions = new Set([
+    'LONG_PUT', 'PUT_DEBIT_SPREAD', 'CALL_CREDIT_SPREAD', 'BEARISH_WATCH',
+    'SKIP_ASYMMETRIC_DOWNSIDE_RISK',
+  ]);
+
+  const [leanLabel, leanCls] =
+    finalAction && bullishActions.has(finalAction)  ? ['BULLISH ▲',     'text-signal-buy']   :
+    finalAction && bearishActions.has(finalAction)  ? ['BEARISH ▼',     'text-signal-sell']  :
+    finalAction === 'IRON_CONDOR'                   ? ['NEUTRAL ↔',     'text-signal-watch'] :
+    finalAction === 'SKIP_CONFLICT'                 ? ['CONFLICTED',    'text-fg-muted']     :
+                                                      ['UNCLEAR',       'text-fg-dim'];
+
+  // ── Stock direction take ──────────────────────────────────────────────────
+  const isBullish = finalAction && bullishActions.has(finalAction);
+  const isBearish = finalAction && bearishActions.has(finalAction);
+  const isNeutral = finalAction === 'IRON_CONDOR';
+  const move = expectedMovePct ? `≈±${expectedMovePct.toFixed(1)}%` : null;
+  const screamNote = screamScore && screamScore >= 4 && screamDirection && screamDirection !== 'none' && screamDirection !== 'mixed'
+    ? ` (${screamScore}/5 ${screamDirection} chain)`
+    : '';
+
+  let directionTake: string;
+  let directionCls: string;
+  if (isBullish) {
+    directionTake = `Stock likely UP${move ? ` ${move}` : ''}${screamNote}`;
+    directionCls = 'text-signal-buy';
+  } else if (isBearish) {
+    directionTake = `Stock likely DOWN${move ? ` ${move}` : ''}${screamNote}`;
+    directionCls = 'text-signal-sell';
+  } else if (isNeutral) {
+    directionTake = `Likely contained${move ? ` within ${move}` : ''} — vol sell`;
+    directionCls = 'text-signal-watch';
+  } else {
+    directionTake = `Direction unclear${move ? ` — market pricing ${move} move` : ''}`;
+    directionCls = 'text-fg-muted';
+  }
+
+  return (
+    <div className="mt-4 pt-3 border-t border-border-subtle space-y-3">
+      {/* 4-cell signal grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-2">
+        <InsightCell label="BEAT" value={beatLabel} sub={`${compositeScore}/100`} valueCls={beatCls} />
+        <InsightCell label="OPTIONS FLOW" value={flowLabel} sub={flowSub} valueCls={flowCls} />
+        <InsightCell label="NEWS" value={newsLabel} sub={newsSub} valueCls={newsCls} />
+        <InsightCell label="IV ENV" value={ivLabel} sub={ivSub} valueCls={ivCls} />
+      </div>
+
+      {/* Final take row */}
+      <div className="text-xs border-t border-border-subtle pt-2 space-y-0.5">
+        <div>
+          <span className="text-fg-dim tracking-widest">SIGNAL LEAN  </span>
+          <span className={`font-bold ${leanCls}`}>{leanLabel}</span>
+          <span className="text-fg-dim">  ·  </span>
+          <span className={directionCls}>{directionTake}</span>
+        </div>
+        <div className="text-fg-dim">
+          Beat: <span className={beatCls}>{beatLabel}</span>
+          {ivr !== null && ivr >= 60 && (
+            <span> · High IV → option premium is expensive, spreads preferred over naked</span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function InsightCell({
+  label, value, sub, valueCls,
+}: {
+  label: string; value: string; sub?: string; valueCls: string;
+}) {
+  return (
+    <div>
+      <div className="text-[10px] text-fg-dim tracking-widest uppercase mb-0.5">{label}</div>
+      <div className={`text-xs font-bold ${valueCls}`}>{value}</div>
+      {sub && <div className="text-[10px] text-fg-dim">{sub}</div>}
+    </div>
+  );
+}
+
 const CATEGORY_LABELS: Record<string, string> = {
   competitive:      'Competitive threat',
   sector_repricing: 'Sector repricing',
@@ -732,7 +883,7 @@ const CATEGORY_LABELS: Record<string, string> = {
 function NewsSentimentSection({ overhangs }: { overhangs: NarrativeOverhang[] | null }) {
   // Compute overall sentiment from unresolved overhangs
   const risks = overhangs ?? [];
-  const maxSeverity = risks.reduce((m, r) => Math.max(m, (r as any).severity ?? 3), 0);
+  const maxSeverity = risks.reduce((m, r) => Math.max(m, r.severity ?? 3), 0);
 
   let badge: { label: string; cls: string };
   let summary: string;
@@ -760,7 +911,7 @@ function NewsSentimentSection({ overhangs }: { overhangs: NarrativeOverhang[] | 
       {risks.length > 0 && (
         <div className="space-y-2">
           {risks.map((r, i) => {
-            const sev = (r as any).severity as number | undefined;
+            const sev = r.severity;
             const sevColor = sev && sev >= 4 ? 'text-signal-sell' : sev && sev >= 3 ? 'text-signal-watch' : 'text-fg-dim';
             return (
               <div key={i} className="flex items-start gap-3 text-xs">
