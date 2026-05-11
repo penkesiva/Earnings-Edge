@@ -76,6 +76,9 @@ export default async function BriefPage({ params }: { params: { id: string } }) 
   // Older briefs predate reconcile — fall back gracefully to old structure action
   const legacyFallback = !finalAction;
 
+  const preferredExpiry: string | null =
+    structure?.preferredExpiry ?? structure?.legs?.[0]?.expiry ?? null;
+
   return (
     <div className="space-y-8">
       <Link href="/" className="text-xs text-fg-subtle hover:text-fg">
@@ -117,6 +120,9 @@ export default async function BriefPage({ params }: { params: { id: string } }) 
             ivRank={brief.iv_rank ?? null}
             putCallRatio={brief.put_call_ratio ?? null}
             expectedMovePct={brief.expected_move_pct ?? null}
+            expectedMoveDollar={brief.expected_move_dollar ?? null}
+            spot={brief.spot_price ?? null}
+            preferredExpiry={preferredExpiry}
             screamDirection={brief.scream_direction ?? null}
             screamScore={brief.scream_score ?? null}
             overhangs={screamUnresolved}
@@ -145,7 +151,7 @@ export default async function BriefPage({ params }: { params: { id: string } }) 
             expectedMovePct={brief.expected_move_pct ?? null}
             ivRank={brief.iv_rank ?? null}
             spot={brief.spot_price ?? null}
-            preferredExpiry={structure?.preferredExpiry ?? structure?.legs?.[0]?.expiry ?? null}
+            preferredExpiry={preferredExpiry}
           />
         )}
       </section>
@@ -733,13 +739,17 @@ function ComponentBar({ label, value }: { label: string; value: number | null })
 
 function BriefInsightStrip({
   compositeScore, finalAction, ivRank, putCallRatio,
-  expectedMovePct, screamDirection, screamScore, overhangs,
+  expectedMovePct, expectedMoveDollar, spot, preferredExpiry,
+  screamDirection, screamScore, overhangs,
 }: {
   compositeScore: number;
   finalAction: string | null;
   ivRank: number | null;
   putCallRatio: number | null;
   expectedMovePct: number | null;
+  expectedMoveDollar: number | null;
+  spot: number | null;
+  preferredExpiry: string | null;
   screamDirection: string | null;
   screamScore: number | null;
   overhangs: NarrativeOverhang[] | null;
@@ -806,6 +816,8 @@ function BriefInsightStrip({
   const isBullish = finalAction && bullishActions.has(finalAction);
   const isBearish = finalAction && bearishActions.has(finalAction);
   const isNeutral = finalAction === 'IRON_CONDOR';
+  const isLongCall = finalAction === 'LONG_CALL';
+  const isLongPut  = finalAction === 'LONG_PUT';
   const move = expectedMovePct ? `≈±${expectedMovePct.toFixed(1)}%` : null;
   const screamNote = screamScore && screamScore >= 4 && screamDirection && screamDirection !== 'none' && screamDirection !== 'mixed'
     ? ` (${screamScore}/5 ${screamDirection} chain)`
@@ -825,6 +837,28 @@ function BriefInsightStrip({
   } else {
     directionTake = `Direction unclear${move ? ` — market pricing ${move} move` : ''}`;
     directionCls = 'text-fg-muted';
+  }
+
+  // ── Naked-option suggestion (LONG_CALL / LONG_PUT only) ───────────────────
+  // Compute ATM strike the same way the legs table does: round spot to nearest
+  // standard increment. Also show a slightly OTM alternative for higher leverage.
+  let nakedOptionLine: React.ReactNode = null;
+  if ((isLongCall || isLongPut) && spot !== null && preferredExpiry) {
+    const atmStrike = roundStrike(spot);
+    const otmStrike = isLongCall
+      ? roundStrike(spot + (expectedMoveDollar ?? spot * 0.05) * 0.5)
+      : roundStrike(spot - (expectedMoveDollar ?? spot * 0.05) * 0.5);
+    const type = isLongCall ? 'CALL' : 'PUT';
+    const typeCls = isLongCall ? 'text-signal-buy' : 'text-signal-sell';
+    nakedOptionLine = (
+      <div className={`font-medium ${typeCls}`}>
+        Buy: <span className="font-bold">${atmStrike} {type}</span>{' '}
+        <span className="text-fg-dim">exp {preferredExpiry}</span>
+        <span className="text-fg-dim"> · OTM alt: </span>
+        <span className="font-bold">${otmStrike} {type}</span>
+        <span className="text-fg-dim"> (higher leverage, smaller size)</span>
+      </div>
+    );
   }
 
   return (
@@ -851,6 +885,7 @@ function BriefInsightStrip({
             <span> · High IV → option premium is expensive, spreads preferred over naked</span>
           )}
         </div>
+        {nakedOptionLine}
       </div>
     </div>
   );
