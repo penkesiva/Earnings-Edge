@@ -55,11 +55,13 @@ export function RescanBriefButton({
   }
 
   const colorClass =
-    state === 'done'
-      ? 'text-signal-buy border-signal-buy/50'
-      : state === 'error'
-        ? 'text-signal-sell border-signal-sell/50'
-        : 'text-fg-subtle border-border hover:border-signal-watch hover:text-signal-watch';
+    state === 'running'
+      ? 'text-signal-watch border-signal-watch animate-pulse cursor-wait'
+      : state === 'done'
+        ? 'text-signal-buy border-signal-buy/50'
+        : state === 'error'
+          ? 'text-signal-sell border-signal-sell/50'
+          : 'text-fg-subtle border-border hover:border-signal-watch hover:text-signal-watch';
 
   return (
     <div className="flex flex-col items-end gap-1.5">
@@ -68,9 +70,9 @@ export function RescanBriefButton({
           type="button"
           disabled={state === 'running'}
           onClick={handleClick}
-          className={`text-xs px-3 py-1.5 border tracking-widest transition-colors disabled:opacity-40 ${colorClass}`}
+          className={`text-xs px-3 py-1.5 border tracking-widest transition-colors ${colorClass}`}
         >
-          {state === 'running' ? 'SCANNING…' : state === 'done' ? '✓ RE-SCANNED' : state === 'error' ? '✗ RESCAN FAILED' : '↻ RE-SCAN'}
+          {state === 'running' ? '⟳ SCANNING…' : state === 'done' ? '✓ RE-SCANNED' : state === 'error' ? '✗ RESCAN FAILED' : '↻ RE-SCAN'}
         </button>
       </div>
       {message && (
