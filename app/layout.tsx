@@ -20,6 +20,14 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={jetbrainsMono.variable}>
+      {/* Inline script runs before paint to restore saved theme — prevents flash */}
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{if(localStorage.getItem('theme')==='light')document.documentElement.classList.add('light')}catch(e){}`,
+          }}
+        />
+      </head>
       <body className="font-mono text-fg bg-bg min-h-screen relative">
         {children}
       </body>

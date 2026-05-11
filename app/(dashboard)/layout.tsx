@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 export default function DashboardLayout({
   children,
@@ -29,9 +30,12 @@ export default function DashboardLayout({
             <Link href="/history" className="hover:text-fg transition-colors py-1">HISTORY</Link>
           </nav>
         </div>
-        {/* Right: time — hidden on very small screens, shown sm+ */}
-        <div className="hidden sm:block text-xs text-fg-subtle text-right shrink-0">
-          {now} PT
+        {/* Right: theme toggle + time */}
+        <div className="flex items-center gap-3 shrink-0">
+          <ThemeToggle />
+          <div className="hidden sm:block text-xs text-fg-subtle text-right">
+            {now} PT
+          </div>
         </div>
       </header>
 
