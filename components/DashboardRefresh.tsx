@@ -3,51 +3,15 @@
 import { useState } from 'react';
 import { syncCalendarAction, type RefreshResult } from '@/app/actions/dashboard-refresh';
 
-async function callRunScan(prep?: 'tomorrow'): Promise<RefreshResult> {
-  const res = await fetch('/api/internal/run-scan', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(prep ? { prep } : {}),
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    return { ok: false, error: data.error ?? `HTTP ${res.status}` };
-  }
-  const count: number | undefined = data.count;
-  const idle: string | undefined = data.idleReason;
-  const targetDate: string | undefined = data.targetDate;
-  const nextScheduled: { ticker: string; earnings_date: string } | null =
-    data.nextScheduled ?? null;
-
-  if (idle === 'empty_watchlist') {
-    return { ok: true, message: 'Watchlist is empty — add tickers on WATCHLIST first.' };
-  }
-  if (idle === 'no_earnings_on_session_date') {
-    const when = prep === 'tomorrow' ? `tomorrow (${targetDate})` : `today (${targetDate})`;
-    const next = nextScheduled
-      ? ` Next in DB: ${nextScheduled.ticker} on ${nextScheduled.earnings_date}.`
-      : ' No upcoming dates in DB — run Sync Calendar first.';
-    return {
-      ok: true,
-      message: `No watchlist earnings ${when}.${next}`,
-    };
-  }
-  if (idle) {
-    return { ok: true, message: `Scan skipped: ${idle}.` };
-  }
-  const label = prep === 'tomorrow' ? 'Tomorrow prep' : 'Daily scan';
-  return { ok: true, message: `${label} finished — ${count ?? 0} ticker${count === 1 ? '' : 's'} processed.` };
-}
-
 export function DashboardRefresh() {
   const [pending, setPending] = useState(false);
   const [last, setLast] = useState<RefreshResult | null>(null);
 
-  async function run(fn: () => Promise<RefreshResult>) {
+  async function run() {
     setLast(null);
     setPending(true);
     try {
-      setLast(await fn());
+      setLast(await syncCalendarAction());
     } finally {
       setPending(false);
     }
@@ -55,61 +19,34 @@ export function DashboardRefresh() {
 
   return (
     <div className="border border-border bg-bg-elevated px-4 py-3 text-sm">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <div className="text-xs text-fg-subtle tracking-widest uppercase">
-              Data refresh
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-2">
+          <div className="text-xs text-fg-subtle tracking-widest uppercase">Calendar</div>
+          <details className="group">
+            <summary className="list-none cursor-pointer select-none text-[10px] px-1.5 py-0.5 border border-border-subtle text-fg-subtle hover:text-fg hover:border-fg-subtle tracking-widest">
+              INFO
+            </summary>
+            <div className="absolute mt-2 max-w-xs sm:max-w-sm border border-border-subtle bg-bg-elevated px-2.5 py-2 text-xs text-fg-muted leading-relaxed z-10 shadow-md">
+              <span className="text-fg">Sync calendar</span> refreshes upcoming earnings dates for
+              your watchlist (30-day pull from FMP). Use the{' '}
+              <span className="text-fg-subtle">RUN SCAN</span> button next to TODAY to generate
+              today&apos;s briefs, and <span className="text-fg-subtle">PREP</span> next to TOMORROW
+              PREP for day-ahead briefs.
             </div>
-            <details className="group">
-              <summary className="list-none cursor-pointer select-none text-[10px] px-1.5 py-0.5 border border-border-subtle text-fg-subtle hover:text-fg hover:border-fg-subtle tracking-widest">
-                INFO
-              </summary>
-              <div className="mt-2 max-w-xl border border-border-subtle bg-bg px-2.5 py-2 text-xs text-fg-muted leading-relaxed">
-                <span className="text-fg">Sync calendar</span> refreshes upcoming dates for your
-                watchlist (30-day pull from FMP; the board below shows{' '}
-                <span className="text-fg-subtle">NEXT 7 DAYS</span>).{' '}
-                <span className="text-fg">Daily scan</span> only runs for names with{' '}
-                <span className="text-fg-subtle">earnings on today&apos;s US session date</span>{' '}
-                (needs Alpaca + FMP). Use{' '}
-                <span className="text-fg-subtle">PREP TOMORROW</span> for day-ahead briefs.
-              </div>
-            </details>
-          </div>
+          </details>
         </div>
-        <div className="grid grid-cols-3 sm:flex sm:flex-wrap gap-2 shrink-0 w-full sm:w-auto">
-          <button
-            type="button"
-            disabled={pending}
-            onClick={() => run(syncCalendarAction)}
-            className="px-2 sm:px-3 py-2 text-[11px] sm:text-xs font-bold tracking-widest border border-border bg-bg hover:border-signal-buy hover:text-signal-buy transition-colors disabled:opacity-40"
-          >
-            <span className="sm:hidden">{pending ? '…' : 'SYNC'}</span>
-            <span className="hidden sm:inline">{pending ? '…' : 'SYNC CALENDAR'}</span>
-          </button>
-          <button
-            type="button"
-            disabled={pending}
-            onClick={() => run(() => callRunScan())}
-            className="px-2 sm:px-3 py-2 text-[11px] sm:text-xs font-bold tracking-widest bg-fg text-bg hover:bg-signal-buy transition-colors disabled:opacity-40"
-          >
-            <span className="sm:hidden">{pending ? '…' : 'SCAN'}</span>
-            <span className="hidden sm:inline">{pending ? '…' : 'RUN DAILY SCAN'}</span>
-          </button>
-          <button
-            type="button"
-            disabled={pending}
-            onClick={() => run(() => callRunScan('tomorrow'))}
-            className="px-2 sm:px-3 py-2 text-[11px] sm:text-xs font-bold tracking-widest border border-border bg-bg hover:border-signal-watch hover:text-signal-watch transition-colors disabled:opacity-40"
-          >
-            <span className="sm:hidden">{pending ? '…' : 'PREP'}</span>
-            <span className="hidden sm:inline">{pending ? '…' : 'PREP TOMORROW'}</span>
-          </button>
-        </div>
+        <button
+          type="button"
+          disabled={pending}
+          onClick={run}
+          className="px-3 py-1.5 text-xs font-bold tracking-widest border border-border bg-bg hover:border-signal-buy hover:text-signal-buy transition-colors disabled:opacity-40 shrink-0"
+        >
+          {pending ? '…' : 'SYNC CALENDAR'}
+        </button>
       </div>
       {last ? (
         <p
-          className={`mt-3 text-xs ${last.ok ? 'text-signal-buy' : 'text-signal-sell'}`}
+          className={`mt-2 text-xs ${last.ok ? 'text-signal-buy' : 'text-signal-sell'}`}
           role="status"
         >
           {last.ok ? last.message : last.error}

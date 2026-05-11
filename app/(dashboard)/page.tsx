@@ -7,6 +7,7 @@ import { DashboardRefresh } from '@/components/DashboardRefresh';
 import { FearGreedIndex, FearGreedIndexSkeleton } from '@/components/FearGreedIndex';
 import { LastScanned } from '@/components/LastScanned';
 import { PrepDateButton } from '@/components/PrepDateButton';
+import { ScanButton } from '@/components/ScanButton';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -67,19 +68,21 @@ export default async function HomePage() {
       </div>
 
       <section>
-        <div className="flex items-baseline justify-between mb-4 sm:mb-6">
+        <div className="flex items-center justify-between mb-4 sm:mb-6">
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
             <span className="text-fg-subtle">›</span> TODAY
           </h1>
-          <div className="text-xs text-fg-subtle">
-            {todayBriefs?.length ?? 0} BRIEF{todayBriefs?.length === 1 ? '' : 'S'}
+          <div className="flex items-center gap-3">
+            <ScanButton mode="today" />
+            <div className="text-xs text-fg-subtle">
+              {todayBriefs?.length ?? 0} BRIEF{todayBriefs?.length === 1 ? '' : 'S'}
+            </div>
           </div>
         </div>
 
         {!todayBriefs?.length ? (
           <div className="border border-border bg-bg-elevated p-8 text-center text-fg-subtle text-sm">
-            No briefs for today yet — run daily scan when a watchlist name reports, or use Sync
-            calendar above if dates are stale.
+            No briefs yet — hit <span className="text-fg-muted">RUN SCAN</span> above when a watchlist name reports today, or <span className="text-fg-muted">SYNC CALENDAR</span> if dates are stale.
           </div>
         ) : (
           <>
@@ -153,17 +156,20 @@ export default async function HomePage() {
       </section>
 
       <section>
-        <div className="flex items-baseline justify-between mb-4 sm:mb-6">
+        <div className="flex items-center justify-between mb-4 sm:mb-6">
           <h2 className="text-lg sm:text-xl font-bold tracking-tight">
             <span className="text-fg-subtle">›</span> TOMORROW PREP
           </h2>
-          <div className="text-xs text-fg-subtle">
-            {tomorrowBriefs?.length ?? 0} BRIEF{tomorrowBriefs?.length === 1 ? '' : 'S'} · {tomorrow}
+          <div className="flex items-center gap-3">
+            <ScanButton mode="tomorrow" />
+            <div className="text-xs text-fg-subtle">
+              {tomorrowBriefs?.length ?? 0} BRIEF{tomorrowBriefs?.length === 1 ? '' : 'S'} · {tomorrow}
+            </div>
           </div>
         </div>
         {!tomorrowBriefs?.length ? (
           <div className="border border-border bg-bg-elevated p-5 text-center text-fg-subtle text-sm">
-            No tomorrow briefs yet — click <span className="text-fg-muted">PREP TOMORROW</span> above.
+            No tomorrow briefs yet — hit <span className="text-fg-muted">PREP</span> above.
           </div>
         ) : (
           <>
