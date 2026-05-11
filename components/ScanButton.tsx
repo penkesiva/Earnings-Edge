@@ -11,6 +11,9 @@ export function ScanButton({ mode }: Props) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const accentIdle   = mode === 'today' ? 'hover:border-signal-buy hover:text-signal-buy'    : 'hover:border-signal-watch hover:text-signal-watch';
+  const accentActive = mode === 'today' ? 'border-signal-buy text-signal-buy'                 : 'border-signal-watch text-signal-watch';
+
   async function run() {
     setError(null);
     setPending(true);
@@ -25,7 +28,7 @@ export function ScanButton({ mode }: Props) {
         setError(data.error ?? `HTTP ${res.status}`);
         return;
       }
-      // Reload the page so new briefs appear — the natural feedback is seeing the list update.
+      // Page reload shows the updated brief list naturally.
       window.location.reload();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed');
@@ -40,16 +43,21 @@ export function ScanButton({ mode }: Props) {
         type="button"
         onClick={run}
         disabled={pending}
-        className={`px-2.5 py-1 text-[11px] font-bold tracking-widest border transition-colors disabled:opacity-40 ${
-          mode === 'today'
-            ? 'border-border bg-bg hover:border-signal-buy hover:text-signal-buy'
-            : 'border-border bg-bg hover:border-signal-watch hover:text-signal-watch'
+        className={`px-3 py-1.5 text-xs font-bold tracking-widest border transition-colors ${
+          pending
+            ? `${accentActive} animate-pulse cursor-not-allowed`
+            : `border-border bg-bg ${accentIdle}`
         }`}
       >
-        {pending ? '…' : mode === 'today' ? 'RUN SCAN' : 'PREP'}
+        {pending
+          ? mode === 'today' ? 'SCANNING…' : 'PREPPING…'
+          : mode === 'today' ? 'RUN SCAN'  : 'PREP'}
       </button>
       {error && (
-        <span className="text-[10px] text-signal-sell max-w-[140px] truncate" title={error}>
+        <span
+          className="text-[10px] text-signal-sell font-mono max-w-[160px] truncate"
+          title={error}
+        >
           {error}
         </span>
       )}
