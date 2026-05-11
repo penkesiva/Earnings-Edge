@@ -1,28 +1,28 @@
 /**
  * Narrative overhang detector — LLM-based sentiment analysis (primary) with
- * regex keyword matching as a fallback when OPENAI_API_KEY is not set.
+ * regex keyword matching as a fallback when no LLM key is configured.
  *
  * Primary path (LLM):
- *   Sends all headlines for the ticker in a single gpt-4o-mini call with
- *   JSON-structured output. The model classifies each headline as a risk or
- *   not, assigns a severity (1–5), picks a category, and determines whether
- *   a later headline in the window resolves it. This eliminates false
- *   positives like "Billionaire bets big on growth stocks" being tagged as
- *   a competitive risk via keyword mismatch.
+ *   1. FMP — up to 100 recent news articles (15-min cache).
+ *   2. Gemini Search grounding — up to 15 supplemental headlines from
+ *      Google News (catches articles not yet in FMP). Requires GEMINI_API_KEY.
+ *   Both sources are de-duplicated by title, merged into one sorted list, and
+ *   sent to the LLM classifier in a single call. Severity (1–5) is persisted
+ *   on each NarrativeOverhang.
  *
  * Fallback path (regex):
- *   Used when OPENAI_API_KEY is absent or the LLM call fails. Identical to
- *   the previous keyword-bucket approach — less accurate but always available.
+ *   Used when neither LLM key is set. Keyword-bucket approach — less accurate
+ *   but always available.
  *
  * Price-action path (always active):
- *   Large single-day drops (≥ 8%) with no matched news are always added as
- *   macro_specific overhangs regardless of the headline classification path.
+ *   Large single-day drops (≥ 8%) with no associated headline are added as
+ *   macro_specific overhangs with auto-assigned severity based on drop size.
  */
 
 import { getHistoricalBars } from '@/lib/alpaca';
 import type { NarrativeOverhang, OverhangCategory } from '@/lib/screamTest';
 import { addCalendarDays, earningsSessionDate } from '@/lib/earningsDate';
-import { classifyHeadlines, hasLlmProvider } from '@/lib/llmClassifier';
+import { classifyHeadlines, fetchGeminiSearchHeadlines, hasLlmProvider } from '@/lib/llmClassifier';
 
 const STABLE = 'https://financialmodelingprep.com/stable';
 
@@ -155,6 +155,14 @@ function findBigDrawdowns(
   return result;
 }
 
+/** Auto-assign severity to a price-action drop based on magnitude. */
+function dropSeverity(pct: number): number {
+  if (pct >= 20) return 5;
+  if (pct >= 15) return 4;
+  if (pct >= 10) return 3;
+  return 2; // 8–10%
+}
+
 async function fetchStableStockNews(ticker: string): Promise<FmpNewsRow[]> {
   const key = process.env.FMP_API_KEY;
   if (!key) return [];
@@ -165,13 +173,18 @@ async function fetchStableStockNews(ticker: string): Promise<FmpNewsRow[]> {
   return Array.isArray(data) ? (data as FmpNewsRow[]) : [];
 }
 
+/** Normalize a title for deduplication (case-insensitive, first 60 chars). */
+function normalizeTitle(t: string): string {
+  return t.toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim().slice(0, 60);
+}
+
 // ── Main entry point ──────────────────────────────────────────────────────────
 
 /**
  * Returns narrative overhang rows for `computeScreamTest` (may be empty).
  *
- * Uses LLM classification when OPENAI_API_KEY is set; otherwise falls back to
- * regex keyword matching. Price-action large-drop detection is always active.
+ * Sources: FMP news headlines + Gemini Search grounding (if GEMINI_API_KEY set)
+ * + Alpaca price-action large-drop detection.
  *
  * @param asOfDate - YYYY-MM-DD end of bar window (defaults to US session today).
  */
@@ -187,97 +200,114 @@ export async function detectOverhangs(opts: {
     const end = opts.asOfDate ?? earningsSessionDate();
     const start = addCalendarDays(end, -daysBack);
 
-    const [news, bars] = await Promise.all([
+    // Fetch FMP news, Alpaca bars, and Gemini search headlines in parallel.
+    const [fmpNews, bars, geminiRaw] = await Promise.all([
       fetchStableStockNews(ticker),
       getHistoricalBars(ticker, start, end, '1Day'),
+      fetchGeminiSearchHeadlines(ticker, end),
     ]);
 
-    const filteredNews = news
+    // Filter FMP to the time window and sort oldest-first.
+    const filteredFmp = fmpNews
       .filter(n => newsPublishedDate(n) >= start)
-      // Sort oldest-first so the LLM can follow resolution logic chronologically.
       .sort((a, b) => newsPublishedDate(a).localeCompare(newsPublishedDate(b)));
+
+    // Build a combined, deduplicated article list.
+    // FMP items come first (richer metadata); Gemini supplements only.
+    type MergedArticle = { date: string; title: string; url: string; site: string };
+    const seenTitles = new Set<string>();
+    const allArticles: MergedArticle[] = [];
+
+    for (const n of filteredFmp) {
+      const title = n.title ?? '';
+      const norm = normalizeTitle(title);
+      if (!norm || seenTitles.has(norm)) continue;
+      seenTitles.add(norm);
+      allArticles.push({ date: newsPublishedDate(n), title, url: n.url ?? '', site: n.site ?? '' });
+    }
+    for (const h of geminiRaw) {
+      const norm = normalizeTitle(h.title);
+      if (!norm || seenTitles.has(norm)) continue;
+      seenTitles.add(norm);
+      allArticles.push({ date: h.date, title: h.title, url: '', site: 'gemini-search' });
+    }
+    // Ensure oldest-first for LLM context.
+    allArticles.sort((a, b) => a.date.localeCompare(b.date));
 
     const drawdowns = findBigDrawdowns((bars || []) as AlpacaBar[], 5);
     const overhangs: NarrativeOverhang[] = [];
-    const seen = new Set<string>();
+    const seenOverhang = new Set<string>();
 
     if (hasLlmProvider()) {
-      // ── LLM path (Gemini > OpenAI) ───────────────────────────────────────────
-      const headlines = filteredNews.map((n, i) => ({
-        i,
-        date: newsPublishedDate(n),
-        title: n.title ?? '',
-      }));
+      // ── LLM path ─────────────────────────────────────────────────────────────
+      const headlines = allArticles.map((a, i) => ({ i, date: a.date, title: a.title }));
 
-      // Pass `end` as the cache date — same ticker rescanned on the same day
-      // will return the cached result without a new LLM call.
+      // Cache key is (ticker, end-date) — same-day rescans skip the LLM call.
       const llmResults = await classifyHeadlines(ticker, headlines, end);
 
       for (const r of llmResults) {
-        // Skip very minor mentions (severity 1 = noise).
-        if (r.severity < 2) continue;
+        if (r.severity < 2) continue; // severity 1 = noise
 
-        const item = filteredNews[r.i];
-        if (!item) continue;
+        const article = allArticles[r.i];
+        if (!article) continue;
 
-        const dateKey = newsPublishedDate(item);
-        const dedupeKey = `${r.category}:${dateKey}`;
-        if (seen.has(dedupeKey)) continue;
-        seen.add(dedupeKey);
+        const dedupeKey = `${r.category}:${article.date}`;
+        if (seenOverhang.has(dedupeKey)) continue;
+        seenOverhang.add(dedupeKey);
 
         const matchedDrawdown = drawdowns.find(d => {
           const diffDays =
-            Math.abs(new Date(d.date).getTime() - new Date(dateKey).getTime()) /
+            Math.abs(new Date(d.date).getTime() - new Date(article.date).getTime()) /
             (24 * 60 * 60 * 1000);
           return diffDays <= 2;
         });
 
         overhangs.push({
           category: r.category,
+          severity: r.severity,
           description: r.summary.length > 200 ? r.summary.slice(0, 197) + '...' : r.summary,
-          detectedDate: dateKey,
+          detectedDate: article.date,
           drawdownPct: matchedDrawdown?.drawdownPct ?? null,
           resolved: r.resolved,
-          source: item.url || item.site || 'llm',
+          source: article.url || article.site || 'llm',
         });
       }
     } else {
       // ── Regex fallback path ────────────────────────────────────────────────
-      for (const item of filteredNews) {
-        const title = item.title ?? '';
-        const text = item.text ?? '';
-        const category = classifyHeadlineRegex(title, text);
+      for (const article of allArticles) {
+        // Regex only has access to title; text not available for Gemini-sourced items.
+        const category = classifyHeadlineRegex(article.title, '');
         if (!category) continue;
 
-        const dateKey = newsPublishedDate(item);
-        const dedupeKey = `${category}:${dateKey}`;
-        if (seen.has(dedupeKey)) continue;
-        seen.add(dedupeKey);
+        const dedupeKey = `${category}:${article.date}`;
+        if (seenOverhang.has(dedupeKey)) continue;
+        seenOverhang.add(dedupeKey);
 
         const matchedDrawdown = drawdowns.find(d => {
           const diffDays =
-            Math.abs(new Date(d.date).getTime() - new Date(dateKey).getTime()) /
+            Math.abs(new Date(d.date).getTime() - new Date(article.date).getTime()) /
             (24 * 60 * 60 * 1000);
           return diffDays <= 2;
         });
 
-        const laterNews = filteredNews.filter(n => newsPublishedDate(n) > dateKey);
-        const title200 = title.length > 200 ? title.slice(0, 197) + '...' : title;
+        // Resolve via regex: look at FMP articles after this date.
+        const laterFmp = filteredFmp.filter(n => newsPublishedDate(n) > article.date);
+        const title200 = article.title.length > 200
+          ? article.title.slice(0, 197) + '...'
+          : article.title;
 
         overhangs.push({
           category,
           description: title200,
-          detectedDate: dateKey,
+          detectedDate: article.date,
           drawdownPct: matchedDrawdown?.drawdownPct ?? null,
-          resolved: detectResolutionRegex(dateKey, laterNews),
-          source: item.url || item.site || 'news',
+          resolved: detectResolutionRegex(article.date, laterFmp),
+          source: article.url || article.site || 'news',
         });
       }
     }
 
     // ── Price-action path (always active) ─────────────────────────────────────
-    // Large drops (≥ 8%) with no associated headline get added regardless of
-    // which classification path was used above.
     for (const d of drawdowns) {
       if (d.drawdownPct < 8) continue;
       const alreadyCovered = overhangs.some(o => {
@@ -289,6 +319,7 @@ export async function detectOverhangs(opts: {
       if (alreadyCovered) continue;
       overhangs.push({
         category: 'macro_specific',
+        severity: dropSeverity(d.drawdownPct),
         description: `Unexplained ${d.drawdownPct}% single-day drop`,
         detectedDate: d.date,
         drawdownPct: d.drawdownPct,

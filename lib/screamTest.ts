@@ -30,6 +30,8 @@ export interface NarrativeOverhang {
   drawdownPct: number | null;
   resolved: boolean;
   source: string;
+  /** LLM severity 1–5, or auto-assigned for price-action drops. Absent on old briefs. */
+  severity?: number;
 }
 
 export interface ScreamTestInputs {

@@ -46,19 +46,22 @@ const SYSTEM_PROMPT = `You are an institutional equity analyst assistant special
 Your task: given a chronological list of news headlines for a specific stock ticker, identify NEGATIVE risk signals that could weigh on the stock price or increase uncertainty into its earnings report.
 
 What counts as a risk:
-- Competitive threat: a new entrant, a rival product launch framed as a displacement risk, or an article explicitly noting competitive pressure on this company
-- Analyst downgrade or price-target cut
+- Competitive threat: a new entrant, a rival product launch EXPLICITLY framed as a displacement risk, or an article explicitly noting competitive pressure ON THIS SPECIFIC COMPANY
+- Analyst downgrade or price-target cut specifically for this company
 - Guidance reduction, pre-announcement of a miss, or management warning of weakness
 - Material customer or contract loss
 - Regulatory, legal, or SEC investigation
 - Sector-wide repricing, broad-based selloff commentary specific to the company's sector
 
-What does NOT count as a risk (common false positives to exclude):
-- Positive investor or analyst coverage ("Billionaire bets on X", "Why X is a top pick")
-- Partnership or customer win announcements
-- General market or macro commentary not specifically about this company's risk
-- Product launch news framed positively (unless framing is explicitly competitive/displacement)
+What does NOT count as a risk (common false positives — EXCLUDE THESE):
+- "Top N stocks", "best stocks to buy", "stock picks", investment roundup articles that list this company alongside other stocks as a positive recommendation
+- Positive investor or analyst coverage ("Billionaire bets on X", "Why X is a top pick", "X among top AI stocks")
+- Partnership, customer win, or product launch announcements framed positively
+- General market or macro commentary not specifically naming this company as at risk
 - Upgrade, buy recommendation, or price-target raise
+- Articles about competitors that do NOT explicitly state they threaten THIS company
+
+IMPORTANT: If a headline lists multiple company tickers (e.g., "MSFT, GOOGL, ASTS & Other Top AI Picks"), this is a positive roundup — NOT a competitive threat. Mark it as NOT a risk.
 
 For each risk you identify, also check whether any LATER headline in the same list resolves or neutralises that specific risk (e.g. reaffirmed guidance, issue addressed by management, regulatory clearance, partner publicly denies threat).
 
@@ -286,4 +289,81 @@ export async function classifyHeadlines(
 /** True when at least one LLM provider key is configured. */
 export function hasLlmProvider(): boolean {
   return !!(process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY);
+}
+
+// ── Gemini Search grounding — supplemental news fetch ─────────────────────────
+
+/**
+ * Uses Gemini's Google Search grounding to pull recent news headlines for a
+ * ticker that may not yet appear in FMP (e.g. articles from the last 24–48 h).
+ *
+ * Returns up to 15 headlines as HeadlineInput. Falls back to [] on any error.
+ * Only available when GEMINI_API_KEY is set.
+ */
+export async function fetchGeminiSearchHeadlines(
+  ticker: string,
+  scanDate: string,
+): Promise<HeadlineInput[]> {
+  const key = process.env.GEMINI_API_KEY;
+  if (!key) return [];
+
+  const prompt =
+    `Search Google News for the most recent news headlines about ${ticker} stock ` +
+    `published in the last 30 days before ${scanDate}. ` +
+    `Return ONLY valid JSON with no other text:\n` +
+    `{ "headlines": [ { "date": "YYYY-MM-DD", "title": "exact headline text" } ] }\n` +
+    `Include up to 15 headlines. Estimate the date if exact date is unclear.`;
+
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          tools: [{ google_search: {} }],
+          generationConfig: { response_mime_type: 'application/json', temperature: 0 },
+        }),
+        cache: 'no-store',
+      },
+    );
+
+    if (!res.ok) return [];
+
+    const data = (await res.json()) as {
+      candidates?: Array<{
+        content?: { parts?: Array<{ text?: string }> };
+        groundingMetadata?: {
+          groundingChunks?: Array<{ web?: { uri?: string; title?: string } }>;
+        };
+      }>;
+    };
+
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '{}';
+
+    // Prefer structured JSON response.
+    try {
+      const parsed = JSON.parse(text) as { headlines?: Array<{ date: string; title: string }> };
+      if (Array.isArray(parsed.headlines) && parsed.headlines.length > 0) {
+        return parsed.headlines
+          .filter(h => h.title?.trim())
+          .map((h, i) => ({
+            i,
+            date: h.date?.slice(0, 10) || scanDate,
+            title: h.title.trim(),
+          }));
+      }
+    } catch {
+      // fall through to groundingChunks
+    }
+
+    // Fallback: extract titles from groundingChunks (no dates available).
+    const chunks = data.candidates?.[0]?.groundingMetadata?.groundingChunks ?? [];
+    return chunks
+      .filter((c) => c.web?.title?.trim())
+      .map((c, i) => ({ i, date: scanDate, title: c.web!.title!.trim() }));
+  } catch {
+    return [];
+  }
 }
