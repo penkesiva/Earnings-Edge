@@ -772,7 +772,11 @@ function BriefInsightStrip({
     pc <= 1.10                 ? ['BALANCED',          'text-fg-muted']       :
     pc <= 1.40                 ? ['SLIGHT PUT LEAN',   'text-signal-sell/70'] :
                                  ['PUT HEAVY ▼',       'text-signal-sell'];
-  const flowSub = pc !== null ? `P/C ${pc.toFixed(2)}` : '';
+  const flowSub =
+    pc === null  ? '' :
+    pc < 1       ? `Call vol ${(1 / pc).toFixed(1)}× put vol` :
+    pc > 1       ? `Put vol ${pc.toFixed(1)}× call vol` :
+                   'Equal vol';
 
   // ── News sentiment ────────────────────────────────────────────────────────
   const risks = overhangs ?? [];
