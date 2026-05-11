@@ -55,6 +55,8 @@ export type RunDailyScanOptions = {
   sendNotifications?: boolean;
   /** Optional explicit US session date (YYYY-MM-DD), defaults to today's session date. */
   targetDate?: string;
+  /** When set, only this ticker is scanned (used by the brief-page re-scan button). */
+  singleTicker?: string;
 };
 
 function isFmpPlanLimitError(err: unknown): boolean {
@@ -84,6 +86,7 @@ export async function runDailyScanJob(
 ): Promise<DailyScanJobResult> {
   const sendNotifications = options.sendNotifications !== false;
   const targetDate = options.targetDate;
+  const singleTicker = options.singleTicker?.toUpperCase();
 
   const sb = supabaseAdmin();
   const today = targetDate || earningsSessionDate();
@@ -101,11 +104,14 @@ export async function runDailyScanJob(
     return { count: 0, idleReason: 'empty_watchlist' };
   }
 
+  // When re-scanning a single brief, restrict to that ticker only (skip the rest).
+  const eligibleTickers = singleTicker ? [singleTicker] : watchTickers;
+
   const { data: events, error: eventsError } = await sb
     .from('earnings_events')
     .select('*')
     .eq('earnings_date', today)
-    .in('ticker', watchTickers);
+    .in('ticker', eligibleTickers);
 
   if (eventsError) throw new Error(eventsError.message);
 

@@ -18,12 +18,17 @@ export async function POST(req: NextRequest) {
   const explicitDate: string | undefined =
     typeof body?.targetDate === 'string' ? body.targetDate : undefined;
 
+  // Brief-page re-scan: single ticker only
+  const singleTicker: string | undefined =
+    typeof body?.ticker === 'string' ? body.ticker : undefined;
+
   const targetDate = explicitDate ?? (prep ? addCalendarDays(earningsSessionDate(), 1) : undefined);
 
   try {
     const result = await runDailyScanJob({
       targetDate,
-      sendNotifications: !prep,
+      singleTicker,
+      sendNotifications: !prep && !singleTicker,
     });
 
     if ('idleReason' in result) {

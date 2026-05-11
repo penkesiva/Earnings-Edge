@@ -26,7 +26,7 @@ export function RescanBriefButton({
       const res = await fetch('/api/internal/run-scan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ targetDate: earningsDate }),
+        body: JSON.stringify({ targetDate: earningsDate, ticker }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
