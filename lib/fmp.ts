@@ -135,9 +135,44 @@ async function getEarningsHistoryForSurprises(
 }
 
 // ----- Surprise history -----
-/** Pass noCache=true when logging outcomes right after an earnings release. */
-export async function getEarningsSurprises(ticker: string, noCache = false) {
-  return getEarningsHistoryForSurprises(ticker, noCache);
+
+/**
+ * FMP's dedicated earnings-surprises endpoint — different data source from
+ * the per-quarter history, often updates faster right after a report.
+ * Used as a fallback when the primary earnings history has no recent match.
+ */
+async function getEarningsSurprisesDedicated(
+  ticker: string,
+  noCache = false,
+): Promise<EarningsSurprise[]> {
+  const data = await fmp(`earnings-surprises?symbol=${encodeURIComponent(ticker)}`, noCache);
+  const rows = Array.isArray(data) ? data : [];
+  const out: EarningsSurprise[] = [];
+  for (const raw of rows as Record<string, unknown>[]) {
+    const act = num(raw.actualEarningResult) ?? num(raw.epsActual);
+    const est = num(raw.estimatedEarning) ?? num(raw.epsEstimated);
+    if (act === null || est === null) continue;
+    out.push({
+      date: String(raw.date ?? ''),
+      symbol: String(raw.symbol ?? ticker),
+      actualEarningResult: act,
+      estimatedEarning: est,
+    });
+  }
+  return out;
+}
+
+/**
+ * Fetch EPS surprise data with fallback:
+ *   1. FMP historical earnings (per-quarter, longer history)
+ *   2. FMP earnings-surprises endpoint (dedicated, often updates sooner)
+ * Both use noCache=true when called right after earnings release.
+ */
+export async function getEarningsSurprises(ticker: string, noCache = false): Promise<EarningsSurprise[]> {
+  const primary = await getEarningsHistoryForSurprises(ticker, noCache).catch(() => []);
+  if (primary.length > 0) return primary;
+  // Primary returned nothing (FMP plan gap or not yet updated) — try dedicated endpoint
+  return getEarningsSurprisesDedicated(ticker, noCache).catch(() => []);
 }
 
 /**

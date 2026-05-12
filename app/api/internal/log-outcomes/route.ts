@@ -49,15 +49,23 @@ export async function POST() {
       // at minimum the next-day price data still gets saved.
       // noCache=true: EPS actuals just came out — bypass the 1-hour FMP cache.
       const surprises = await getEarningsSurprises(ticker, true).catch(() => []);
-      const match = surprises
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-        .find(s => {
-          // Find the surprise row closest to the earnings date (within 5 days)
-          const diff = Math.abs(
-            new Date(s.date).getTime() - new Date(earningsDate).getTime()
-          );
-          return diff <= 5 * 24 * 60 * 60 * 1000;
-        });
+      // Sort newest-first, find the row closest to earningsDate within 7 days.
+      // FMP sometimes stamps the report +1 day (AMC timing), so 7-day window
+      // is more resilient than the previous 5-day window.
+      const sorted = surprises.sort(
+        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+      );
+      const match = sorted.reduce<typeof sorted[0] | null>((best, s) => {
+        const diff = Math.abs(
+          new Date(s.date).getTime() - new Date(earningsDate).getTime()
+        );
+        if (diff > 7 * 24 * 60 * 60 * 1000) return best;
+        if (!best) return s;
+        const bestDiff = Math.abs(
+          new Date(best.date).getTime() - new Date(earningsDate).getTime()
+        );
+        return diff < bestDiff ? s : best;
+      }, null);
 
       const beatOrMiss: 'BEAT' | 'MISS' | null = match
         ? match.actualEarningResult >= match.estimatedEarning ? 'BEAT' : 'MISS'
