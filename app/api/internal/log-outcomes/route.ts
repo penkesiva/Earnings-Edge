@@ -114,6 +114,8 @@ export async function POST() {
         .upsert(
           {
             brief_id: brief.brief_id,
+            ticker,
+            earnings_date: earningsDate,
             beat_or_miss: beatOrMiss,
             surprise_pct: surprisePct,
             next_day_open_pct: nextDayOpenPct,
