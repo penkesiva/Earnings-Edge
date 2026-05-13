@@ -55,7 +55,7 @@ export default async function HomePage() {
   // Existing briefs for the same window (so we can show links + badge + staleness)
   const { data: upcomingBriefs } = await sb
     .from('earnings_briefs')
-    .select('id, ticker, earnings_date, final_action, composite_score, updated_at, generated_at')
+    .select('id, ticker, earnings_date, final_action, composite_score, updated_at, generated_at, expected_move_dollar, expected_move_pct')
     .gt('earnings_date', tomorrow)
     .lte('earnings_date', in7)
     .order('composite_score', { ascending: false });
@@ -283,11 +283,10 @@ export default async function HomePage() {
                 {/* Column header — desktop only */}
                 <div className="hidden md:grid grid-cols-12 gap-4 px-4 py-2 text-xs text-fg-subtle uppercase tracking-widest border-b border-border-subtle bg-bg">
                   <div className="col-span-2">TKR</div>
-                  <div className="col-span-2">TIMING</div>
-                  <div className="col-span-1">SCORE</div>
-                  <div className="col-span-4">ACTION</div>
+                  <div className="col-span-2">SCORE</div>
+                  <div className="col-span-3">ACTION</div>
+                  <div className="col-span-3">EXP MOVE</div>
                   <div className="col-span-2">SCANNED</div>
-                  <div className="col-span-1" />
                 </div>
 
                 {/* Ticker rows */}
@@ -311,16 +310,7 @@ export default async function HomePage() {
                           <div className="flex items-center justify-between gap-2">
                             <div className="flex items-center gap-2 min-w-0">
                               <span className="font-bold shrink-0">{e.ticker}</span>
-                              <span className="text-[10px] text-fg-subtle shrink-0">{e.timing}</span>
-                              <span
-                                className={`text-[10px] px-1.5 py-0.5 border tracking-widest shrink-0 ${
-                                  e.source === 'MANUAL'
-                                    ? 'text-signal-watch border-signal-watch/50'
-                                    : 'text-fg-dim border-border-subtle'
-                                }`}
-                              >
-                                {e.source || 'UNK'}
-                              </span>
+                              <TimingBadge timing={e.timing} />
                             </div>
                             {brief ? (
                               <span className="text-[10px] text-fg-subtle tracking-widest shrink-0">VIEW →</span>
@@ -337,25 +327,16 @@ export default async function HomePage() {
                           )}
                         </div>
 
-                        {/* ── Desktop: aligned grid columns ── */}
+                        {/* ── Desktop: aligned grid columns (mirrors TOMORROW PREP) ── */}
                         <div className="hidden md:grid grid-cols-12 gap-4 px-4 py-3 text-sm items-center">
-                          <div className="col-span-2 font-bold">{e.ticker}</div>
-                          <div className="col-span-2 text-fg-muted text-xs">
-                            <span>{e.timing}</span>
-                            <span
-                              className={`ml-2 text-[10px] px-1 border tracking-widest ${
-                                e.source === 'MANUAL'
-                                  ? 'text-signal-watch border-signal-watch/50'
-                                  : 'text-fg-dim border-border-subtle'
-                              }`}
-                            >
-                              {e.source || 'UNK'}
-                            </span>
+                          <div className="col-span-2 font-bold flex items-center gap-1.5">
+                            {e.ticker}
+                            <TimingBadge timing={e.timing} />
                           </div>
-                          <div className="col-span-1">
+                          <div className="col-span-2">
                             {brief ? <ScoreCell value={brief.composite_score} /> : <span className="text-fg-dim">—</span>}
                           </div>
-                          <div className="col-span-4 flex items-center gap-2">
+                          <div className="col-span-3 flex items-center gap-2">
                             {brief ? (
                               <>
                                 <ConvictionArrows action={brief.final_action ?? null} />
@@ -365,16 +346,16 @@ export default async function HomePage() {
                               <span className="text-xs text-fg-dim tracking-widest">NO BRIEF</span>
                             )}
                           </div>
+                          <div className="col-span-3 text-fg-muted">
+                            {brief?.expected_move_dollar != null
+                              ? `±$${(brief.expected_move_dollar as number).toFixed(2)} (${(brief.expected_move_pct as number).toFixed(1)}%)`
+                              : <span className="text-fg-dim">—</span>}
+                          </div>
                           <div className="col-span-2">
                             {brief ? (
                               <LastScanned updatedAt={brief.updated_at ?? brief.generated_at ?? null} />
                             ) : (
                               <span className="text-fg-dim">—</span>
-                            )}
-                          </div>
-                          <div className="col-span-1 text-right">
-                            {brief && (
-                              <span className="text-[10px] text-fg-subtle tracking-widest">VIEW →</span>
                             )}
                           </div>
                         </div>
