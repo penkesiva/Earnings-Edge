@@ -29,6 +29,20 @@ export default async function HomePage() {
     .eq('earnings_date', tomorrow)
     .order('composite_score', { ascending: false });
 
+  // Fetch timing (AMC/BMO) from earnings_events for today + tomorrow
+  const { data: todayEvents } = await sb
+    .from('earnings_events')
+    .select('ticker, timing')
+    .eq('earnings_date', today);
+
+  const { data: tomorrowEvents } = await sb
+    .from('earnings_events')
+    .select('ticker, timing')
+    .eq('earnings_date', tomorrow);
+
+  const timingToday    = new Map((todayEvents    ?? []).map(e => [e.ticker, e.timing as string]));
+  const timingTomorrow = new Map((tomorrowEvents ?? []).map(e => [e.ticker, e.timing as string]));
+
   // Upcoming events (next 7 days, excluding today/tomorrow which have their own sections)
   const in7 = addCalendarDays(today, 7);
   const { data: upcoming } = await sb
@@ -89,6 +103,7 @@ export default async function HomePage() {
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
                       <span className="font-bold text-xl tracking-tight">{b.ticker}</span>
+                      <TimingBadge timing={timingToday.get(b.ticker)} />
                       <ConvictionArrows action={b.final_action ?? null} />
                     </div>
                     <div className="flex items-center gap-2">
@@ -126,7 +141,10 @@ export default async function HomePage() {
                 href={`/briefs/${b.id}`}
                 className="terminal-row grid grid-cols-12 gap-4 px-4 py-3 text-sm border-b border-border-subtle"
               >
-                <div className="col-span-1 font-bold">{b.ticker}</div>
+                <div className="col-span-1 font-bold flex items-center gap-1.5">
+                  {b.ticker}
+                  <TimingBadge timing={timingToday.get(b.ticker)} />
+                </div>
                 <div className="col-span-1">
                   <ScoreCell value={b.composite_score} />
                 </div>
@@ -176,6 +194,7 @@ export default async function HomePage() {
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
                       <span className="font-bold text-xl tracking-tight">{b.ticker}</span>
+                      <TimingBadge timing={timingTomorrow.get(b.ticker)} />
                       <ConvictionArrows action={b.final_action ?? null} />
                     </div>
                     <div className="flex items-center gap-2">
@@ -210,7 +229,10 @@ export default async function HomePage() {
                 href={`/briefs/${b.id}`}
                 className="terminal-row grid grid-cols-12 gap-4 px-4 py-3 text-sm border-b border-border-subtle"
               >
-                <div className="col-span-2 font-bold">{b.ticker}</div>
+                <div className="col-span-2 font-bold flex items-center gap-1.5">
+                  {b.ticker}
+                  <TimingBadge timing={timingTomorrow.get(b.ticker)} />
+                </div>
                 <div className="col-span-2">
                   <ScoreCell value={b.composite_score} />
                 </div>
@@ -366,6 +388,20 @@ export default async function HomePage() {
         )}
       </section>
     </div>
+  );
+}
+
+function TimingBadge({ timing }: { timing: string | undefined }) {
+  if (!timing || timing === 'UNK') return <span className="text-[10px] text-fg-dim">UNK</span>;
+  const isBmo = timing === 'BMO';
+  return (
+    <span className={`text-[10px] font-bold tracking-widest px-1 py-0.5 border ${
+      isBmo
+        ? 'text-sky-400 border-sky-400/40'
+        : 'text-amber-400 border-amber-400/40'
+    }`}>
+      {timing}
+    </span>
   );
 }
 
