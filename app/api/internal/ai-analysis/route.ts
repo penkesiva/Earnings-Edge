@@ -62,21 +62,24 @@ Important:
 
 Now compress everything into a final trader call.
 
-Do not give a long report.
-Give me:
+STRICT FORMAT — follow exactly, no deviation:
+
+START with this line (fill in the values):
+My final call: [TICKER] moves [UP/DOWN] $X to $Y after earnings, closing around $Z[, optional one-clause caveat if critical].
+
+Then give the summary on separate lines, NO markdown bold or asterisks:
 1. Direction: UP or DOWN
-2. Expected dollar move
-3. Expected % move
-4. Expected after-earnings price
-5. Confidence 1–10
-6. Best trade structure
+2. Move: -$X to -$Y  |  -X% to -Y%  |  target ~$Z
+3. Confidence: N/10
+4. Best trade: [one concise sentence]
 
-Then end with exactly one sentence in this format:
-"My final call: [ticker] [up/down] $X to $Y after earnings, closing around $Z."
+Then 2–3 sentences of reasoning. No headers, no bullet points, no markdown.
 
-Example: "My final call: DLO moves UP +$0.80 to +$1.40 after earnings, closing around $13.10–$13.70, but long calls are risky because IV is too high."
-
-Keep the full analysis brief. Lead with the numbered summary, end with the final call sentence.`;
+Rules:
+- Final call sentence comes FIRST, always.
+- Items 2 combines dollar move, % move, and target price on one line separated by | 
+- No ** or markdown formatting anywhere.
+- Plain text only.`;
 
 function buildUserMessage(brief: AiBriefPayload): string {
   const lines: string[] = [];
