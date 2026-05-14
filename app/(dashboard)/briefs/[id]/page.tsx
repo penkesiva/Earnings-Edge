@@ -45,10 +45,17 @@ export default async function BriefPage({ params }: { params: { id: string } }) 
     .eq('brief_id', params.id);
 
   if (aiError) {
-    console.error('[brief-page] failed to load ai analyses:', aiError.message);
+    console.error('[brief-page] ai query error:', aiError.message, aiError.code, aiError.details);
   } else {
     console.log('[brief-page] ai analyses for', params.id, '→', (aiRows ?? []).map(r => r.provider));
   }
+
+  // DEBUG: check if PostgREST can read the table at all (no filter)
+  const { data: allAiRows, error: allAiError } = await sb
+    .from('brief_ai_analyses')
+    .select('brief_id, provider')
+    .limit(5);
+  console.log('[brief-page] all ai rows (no filter):', allAiRows, allAiError?.message);
 
   const savedAnalyses: SavedAnalyses = {};
   for (const row of aiRows ?? []) {
