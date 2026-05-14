@@ -27,6 +27,8 @@ export async function POST(req: NextRequest) {
     }
 
     const sb = supabaseAdmin();
+    console.log('[save-ai-analysis] upserting', { brief_id, provider, textLen: text.length });
+
     const { error } = await sb
       .from('brief_ai_analyses')
       .upsert(
@@ -35,10 +37,11 @@ export async function POST(req: NextRequest) {
       );
 
     if (error) {
-      console.error('[save-ai-analysis]', error.message);
+      console.error('[save-ai-analysis] error:', error.message, { brief_id, provider });
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
+    console.log('[save-ai-analysis] saved OK', { brief_id, provider });
     return NextResponse.json({ ok: true });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
