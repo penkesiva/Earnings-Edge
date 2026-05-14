@@ -128,7 +128,30 @@ export default async function BriefPage({ params }: { params: { id: string } }) 
             screamScore={brief.scream_score ?? null}
             overhangs={screamUnresolved}
           />
-          <AiBriefAnalysis brief={brief as Record<string, unknown>} />
+          <AiBriefAnalysis brief={{
+            ticker:                   brief.ticker,
+            earnings_date:            brief.earnings_date,
+            composite_score:          brief.composite_score,
+            beat_streak_score:        brief.beat_streak_score,
+            surprise_magnitude_score: brief.surprise_magnitude_score,
+            revision_trend_score:     brief.revision_trend_score,
+            whisper_delta_score:      brief.whisper_delta_score,
+            iv_rank_score:            brief.iv_rank_score,
+            sector_momentum_score:    brief.sector_momentum_score,
+            insider_score:            brief.insider_score,
+            iv_rank:                  brief.iv_rank,
+            iv_30d:                   brief.iv_30d,
+            expected_move_dollar:     brief.expected_move_dollar,
+            expected_move_pct:        brief.expected_move_pct,
+            put_call_ratio:           brief.put_call_ratio,
+            scream_direction:         brief.scream_direction,
+            scream_score:             brief.scream_score,
+            scream_qualifies:         brief.scream_qualifies,
+            scream_notes:             brief.scream_notes,
+            final_action:             brief.final_action,
+            final_action_rationale:   brief.final_action_rationale,
+            overhangs:                screamUnresolved ?? [],
+          }} />
         </div>
       </div>
 

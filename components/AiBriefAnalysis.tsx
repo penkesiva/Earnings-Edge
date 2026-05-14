@@ -1,15 +1,39 @@
 'use client';
 
 import { useState } from 'react';
+import type { NarrativeOverhang } from '@/lib/screamTest';
 
-type BriefPayload = Record<string, unknown>;
+export type AiBriefPayload = {
+  ticker: string;
+  earnings_date: string;
+  composite_score: number;
+  beat_streak_score: number | null;
+  surprise_magnitude_score: number | null;
+  revision_trend_score: number | null;
+  whisper_delta_score: number | null;
+  iv_rank_score: number | null;
+  sector_momentum_score: number | null;
+  insider_score: number | null;
+  iv_rank: number | null;
+  iv_30d: number | null;
+  expected_move_dollar: number | null;
+  expected_move_pct: number | null;
+  put_call_ratio: number | null;
+  scream_direction: string | null;
+  scream_score: number | null;
+  scream_qualifies: boolean | string | null;
+  scream_notes: string | null;
+  final_action: string | null;
+  final_action_rationale: string | null;
+  overhangs: NarrativeOverhang[];
+};
 
 type State = 'idle' | 'loading' | 'streaming' | 'done' | 'error';
 
-export function AiBriefAnalysis({ brief }: { brief: BriefPayload }) {
-  const [state, setState]   = useState<State>('idle');
-  const [text, setText]     = useState('');
-  const [error, setError]   = useState('');
+export function AiBriefAnalysis({ brief }: { brief: AiBriefPayload }) {
+  const [state, setState] = useState<State>('idle');
+  const [text, setText]   = useState('');
+  const [error, setError] = useState('');
 
   async function runAnalysis() {
     setState('loading');
@@ -47,9 +71,8 @@ export function AiBriefAnalysis({ brief }: { brief: BriefPayload }) {
 
         buffer += decoder.decode(value, { stream: true });
 
-        // OpenAI SSE lines look like: "data: {...}\n\n"
         const lines = buffer.split('\n');
-        buffer = lines.pop() ?? '';  // keep incomplete last line
+        buffer = lines.pop() ?? '';
 
         for (const line of lines) {
           const trimmed = line.trim();
@@ -57,11 +80,11 @@ export function AiBriefAnalysis({ brief }: { brief: BriefPayload }) {
           const payload = trimmed.slice(5).trim();
           if (payload === '[DONE]') break;
           try {
-            const json    = JSON.parse(payload);
-            const delta   = json.choices?.[0]?.delta?.content as string | undefined;
+            const json  = JSON.parse(payload);
+            const delta = json.choices?.[0]?.delta?.content as string | undefined;
             if (delta) setText(prev => prev + delta);
           } catch {
-            // Partial JSON chunk — ignore
+            // partial SSE chunk — skip
           }
         }
       }
@@ -72,8 +95,6 @@ export function AiBriefAnalysis({ brief }: { brief: BriefPayload }) {
       setState('error');
     }
   }
-
-  // ── Render ────────────────────────────────────────────────────────────────
 
   if (state === 'idle') {
     return (
@@ -91,7 +112,6 @@ export function AiBriefAnalysis({ brief }: { brief: BriefPayload }) {
 
   return (
     <div className="mt-4 pt-3 border-t border-violet-500/30">
-      {/* Section header */}
       <div className="flex items-center gap-3 mb-3">
         <span className="text-[10px] tracking-widest text-violet-400/70 uppercase">
           GPT-5.5 ANALYSIS
@@ -114,18 +134,18 @@ export function AiBriefAnalysis({ brief }: { brief: BriefPayload }) {
         <p className="text-xs text-signal-sell">{error}</p>
       )}
 
+      {state === 'loading' && (
+        <div className="text-xs text-violet-400/50 animate-pulse tracking-widest">
+          Assembling brief data…
+        </div>
+      )}
+
       {(state === 'streaming' || state === 'done') && text && (
         <div className="text-xs text-fg-muted leading-relaxed whitespace-pre-wrap font-mono border border-violet-500/20 bg-violet-500/5 px-4 py-3">
           {text}
           {state === 'streaming' && (
             <span className="inline-block w-1.5 h-3 bg-violet-400 animate-pulse ml-0.5 align-middle" />
           )}
-        </div>
-      )}
-
-      {state === 'loading' && (
-        <div className="text-xs text-violet-400/50 animate-pulse">
-          Assembling brief data…
         </div>
       )}
     </div>

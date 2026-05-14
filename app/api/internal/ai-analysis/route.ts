@@ -7,6 +7,7 @@
  * Called only from the brief page on demand — never during batch scans.
  */
 import { NextRequest } from 'next/server';
+import type { AiBriefPayload } from '@/components/AiBriefAnalysis';
 
 export const maxDuration = 120;
 
@@ -57,11 +58,9 @@ Important:
 - Avoid generic advice.
 - Make the strongest probabilistic estimate possible.`;
 
-function buildUserMessage(brief: Record<string, unknown>): string {
+function buildUserMessage(brief: AiBriefPayload): string {
   const lines: string[] = [];
-  const pc = brief.put_call_ratio as number | null;
-  const raw = brief.raw_fmp as Record<string, unknown> | null;
-  const overhangs = (raw?.screamUnresolvedOverhangs as Array<Record<string, unknown>> | undefined) ?? [];
+  const pc = brief.put_call_ratio;
 
   lines.push(`## Ticker: ${brief.ticker}  |  Earnings: ${brief.earnings_date}`);
   lines.push('');
@@ -79,17 +78,17 @@ function buildUserMessage(brief: Record<string, unknown>): string {
 
   lines.push('## Options Environment');
   lines.push(`  IV Rank         : ${brief.iv_rank ?? '—'}`);
-  lines.push(`  IV 30d          : ${brief.iv_30d != null ? `${((brief.iv_30d as number) * 100).toFixed(1)}%` : '—'}`);
-  lines.push(`  Expected Move   : ±$${(brief.expected_move_dollar as number | null)?.toFixed(2) ?? '—'} (±${(brief.expected_move_pct as number | null)?.toFixed(1) ?? '—'}%)`);
+  lines.push(`  IV 30d          : ${brief.iv_30d != null ? `${(brief.iv_30d * 100).toFixed(1)}%` : '—'}`);
+  lines.push(`  Expected Move   : ±$${brief.expected_move_dollar?.toFixed(2) ?? '—'} (±${brief.expected_move_pct?.toFixed(1) ?? '—'}%)`);
   lines.push(`  Put/Call Ratio  : ${pc?.toFixed(2) ?? '—'} — ${pc == null ? 'no data' : pc < 0.7 ? 'strongly call-heavy (bullish flow)' : pc < 0.9 ? 'slight call lean' : pc <= 1.1 ? 'balanced' : pc <= 1.4 ? 'slight put lean' : 'strongly put-heavy (bearish flow)'}`);
   lines.push('');
 
   lines.push('## Options Chain Analysis (Scream Test)');
-  lines.push(`  Direction : ${(brief.scream_direction as string | null)?.toUpperCase() ?? 'NONE'}`);
+  lines.push(`  Direction : ${brief.scream_direction?.toUpperCase() ?? 'NONE'}`);
   lines.push(`  Score     : ${brief.scream_score ?? 0}/5 conviction filters passed`);
   lines.push(`  Qualifies : ${brief.scream_qualifies ? 'YES — strong institutional positioning detected' : 'NO — mixed or insufficient chain signal'}`);
   if (brief.scream_notes) {
-    const notes = (brief.scream_notes as string).split('\n').slice(0, 3).join('; ');
+    const notes = brief.scream_notes.split('\n').slice(0, 3).join('; ');
     lines.push(`  Notes     : ${notes}`);
   }
   lines.push('');
@@ -101,6 +100,7 @@ function buildUserMessage(brief: Record<string, unknown>): string {
   }
   lines.push('');
 
+  const overhangs = brief.overhangs ?? [];
   if (overhangs.length > 0) {
     lines.push(`## News & Sentiment Risks (${overhangs.length} unresolved)`);
     for (const o of overhangs) {
@@ -114,6 +114,7 @@ function buildUserMessage(brief: Record<string, unknown>): string {
 }
 
 export async function POST(req: NextRequest) {
+  try {
   const key = process.env.OPENAI_API_KEY;
   if (!key) {
     return new Response(
@@ -122,7 +123,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  let brief: Record<string, unknown>;
+  let brief: AiBriefPayload;
   try {
     brief = await req.json();
   } catch {
@@ -167,4 +168,12 @@ export async function POST(req: NextRequest) {
       'X-Accel-Buffering': 'no',
     },
   });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error('[ai-analysis] unhandled error:', msg);
+    return new Response(JSON.stringify({ error: msg }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
 }
