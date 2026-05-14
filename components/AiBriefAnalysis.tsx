@@ -128,10 +128,19 @@ function AnalysisBlock({
   runSignal: number;
   savedText?: string;
 }) {
-  const [state, setState] = useState<PanelState>(savedText ? 'done' : 'idle');
-  const [text, setText]   = useState(savedText ?? '');
+  const [state, setState] = useState<PanelState>('idle');
+  const [text, setText]   = useState('');
   const [error, setError] = useState('');
   const runningRef        = useRef(false);
+
+  // Load saved text after hydration to avoid server/client HTML mismatch
+  useEffect(() => {
+    if (savedText) {
+      setText(savedText);
+      setState('done');
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const cfg = CONFIGS[provider];
   const c   = cfg.color;
