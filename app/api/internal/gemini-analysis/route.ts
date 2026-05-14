@@ -1,15 +1,16 @@
 /**
- * POST /api/internal/ai-analysis
+ * POST /api/internal/gemini-analysis
  *
- * Receives brief data, builds a comprehensive trading prompt, and streams
- * a GPT-4o response back via Server-Sent Events.
- *
- * Called only from the brief page on demand — never during batch scans.
+ * Same prompt as /api/internal/ai-analysis but routed through
+ * Google Gemini 3.1 Pro Preview with SSE streaming.
  */
 import { NextRequest } from 'next/server';
 import type { AiBriefPayload } from '@/components/AiBriefAnalysis';
 
 export const maxDuration = 120;
+
+// Re-export the shared prompt and message builder — defined here to keep
+// the two routes self-contained and avoid a circular import with the component.
 
 const SYSTEM_PROMPT = `Act like a professional earnings trader and options analyst.
 
@@ -82,7 +83,7 @@ Then 2–3 sentences of reasoning. No headers, no bullet points, no markdown.
 
 Rules:
 - Final call sentence comes FIRST, always.
-- Items 2 combines dollar move, % move, and target price on one line separated by | 
+- Items 2 combines dollar move, % move, and target price on one line separated by |
 - No ** or markdown formatting anywhere.
 - Plain text only.`;
 
@@ -92,7 +93,6 @@ function buildUserMessage(brief: AiBriefPayload): string {
 
   lines.push(`## Ticker: ${brief.ticker}  |  Earnings: ${brief.earnings_date}`);
   lines.push('');
-
   lines.push(`## Beat Probability Score: ${brief.composite_score}/100`);
   lines.push('Components (0–100 each):');
   lines.push(`  Beat streak history     : ${brief.beat_streak_score ?? '—'}`);
@@ -103,14 +103,12 @@ function buildUserMessage(brief: AiBriefPayload): string {
   lines.push(`  Sector momentum (5d)    : ${brief.sector_momentum_score ?? '—'}`);
   lines.push(`  Insider buying (90d)    : ${brief.insider_score ?? '—'}`);
   lines.push('');
-
   lines.push('## Options Environment');
   lines.push(`  IV Rank         : ${brief.iv_rank ?? '—'}`);
   lines.push(`  IV 30d          : ${brief.iv_30d != null ? `${(brief.iv_30d * 100).toFixed(1)}%` : '—'}`);
   lines.push(`  Expected Move   : ±$${brief.expected_move_dollar?.toFixed(2) ?? '—'} (±${brief.expected_move_pct?.toFixed(1) ?? '—'}%)`);
   lines.push(`  Put/Call Ratio  : ${pc?.toFixed(2) ?? '—'} — ${pc == null ? 'no data' : pc < 0.7 ? 'strongly call-heavy (bullish flow)' : pc < 0.9 ? 'slight call lean' : pc <= 1.1 ? 'balanced' : pc <= 1.4 ? 'slight put lean' : 'strongly put-heavy (bearish flow)'}`);
   lines.push('');
-
   lines.push('## Options Chain Analysis (Scream Test)');
   lines.push(`  Direction : ${brief.scream_direction?.toUpperCase() ?? 'NONE'}`);
   lines.push(`  Score     : ${brief.scream_score ?? 0}/5 conviction filters passed`);
@@ -123,85 +121,74 @@ function buildUserMessage(brief: AiBriefPayload): string {
     lines.push(`  Notes     : ${notes}`);
   }
   lines.push('');
-
   lines.push('## System Recommendation');
   lines.push(`  Action    : ${brief.final_action ?? 'N/A'}`);
-  if (brief.final_action_rationale) {
-    lines.push(`  Rationale : ${brief.final_action_rationale}`);
-  }
+  if (brief.final_action_rationale) lines.push(`  Rationale : ${brief.final_action_rationale}`);
   lines.push('');
-
   const overhangs = brief.overhangs ?? [];
   if (overhangs.length > 0) {
     lines.push(`## News & Sentiment Risks (${overhangs.length} unresolved)`);
-    for (const o of overhangs) {
-      lines.push(`  [S${o.severity ?? '?'} ${o.category}] ${o.description}`);
-    }
+    for (const o of overhangs) lines.push(`  [S${o.severity ?? '?'} ${o.category}] ${o.description}`);
   } else {
     lines.push('## News & Sentiment: CLEAN — no material risks detected in recent headlines');
   }
-
   return lines.join('\n');
 }
 
 export async function POST(req: NextRequest) {
   try {
-  const key = process.env.OPENAI_API_KEY;
-  if (!key) {
-    return new Response(
-      JSON.stringify({ error: 'OPENAI_API_KEY not configured' }),
-      { status: 503, headers: { 'Content-Type': 'application/json' } }
+    const key = process.env.GEMINI_API_KEY;
+    if (!key) {
+      return new Response(
+        JSON.stringify({ error: 'GEMINI_API_KEY not configured' }),
+        { status: 503, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    let brief: AiBriefPayload;
+    try {
+      brief = await req.json();
+    } catch {
+      return new Response('Invalid JSON', { status: 400 });
+    }
+
+    const userMessage = buildUserMessage(brief);
+
+    // Gemini streaming: alt=sse returns SSE events
+    const model = 'gemini-3.1-pro-preview';
+    const upstream = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?key=${key}&alt=sse`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
+          contents: [{ parts: [{ text: userMessage }] }],
+          generationConfig: { maxOutputTokens: 1500 },
+        }),
+        cache: 'no-store',
+      }
     );
-  }
 
-  let brief: AiBriefPayload;
-  try {
-    brief = await req.json();
-  } catch {
-    return new Response('Invalid JSON', { status: 400 });
-  }
+    if (!upstream.ok) {
+      const err = await upstream.text();
+      return new Response(JSON.stringify({ error: err }), {
+        status: 502,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
 
-  const userMessage = buildUserMessage(brief);
-
-  const upstream = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${key}`,
-      'Content-Type': 'application/json',
-    },
-      body: JSON.stringify({
-        model: 'gpt-5.5',
-        stream: true,
-        messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user',   content: userMessage },
-        ],
-        max_completion_tokens: 1500,
-        reasoning_effort: 'medium',
-      }),
-    // No cache — always fresh analysis
-    cache: 'no-store',
-  });
-
-  if (!upstream.ok) {
-    const err = await upstream.text();
-    return new Response(JSON.stringify({ error: err }), {
-      status: 502,
-      headers: { 'Content-Type': 'application/json' },
+    // Pipe Gemini SSE stream to client — client parses Gemini's JSON format
+    return new Response(upstream.body, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache, no-store',
+        'X-Accel-Buffering': 'no',
+      },
     });
-  }
-
-  // Pipe the OpenAI SSE stream directly back to the client
-  return new Response(upstream.body, {
-    headers: {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache, no-store',
-      'X-Accel-Buffering': 'no',
-    },
-  });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    console.error('[ai-analysis] unhandled error:', msg);
+    console.error('[gemini-analysis] unhandled error:', msg);
     return new Response(JSON.stringify({ error: msg }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
