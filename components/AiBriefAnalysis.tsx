@@ -83,7 +83,7 @@ export function AiBriefAnalysis({ brief }: { brief: BriefPayload }) {
           onClick={runAnalysis}
           className="text-xs px-3 py-1.5 border border-violet-500/40 text-violet-400 hover:border-violet-400 hover:text-violet-300 tracking-widest transition-colors"
         >
-          ✦ ANALYZE WITH GPT-4
+          ✦ ANALYZE WITH GPT-5.5
         </button>
       </div>
     );
@@ -94,7 +94,7 @@ export function AiBriefAnalysis({ brief }: { brief: BriefPayload }) {
       {/* Section header */}
       <div className="flex items-center gap-3 mb-3">
         <span className="text-[10px] tracking-widest text-violet-400/70 uppercase">
-          GPT-4 ANALYSIS
+          GPT-5.5 ANALYSIS
         </span>
         {(state === 'loading' || state === 'streaming') && (
           <span className="text-[10px] text-violet-400 animate-pulse">● THINKING…</span>
