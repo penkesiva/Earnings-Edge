@@ -175,7 +175,7 @@ export async function POST(req: NextRequest) {
         body: JSON.stringify({
           system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
           contents: [{ parts: [{ text: userMessage }] }],
-          generationConfig: { maxOutputTokens: 1500 },
+          generationConfig: { maxOutputTokens: 2500 },
         }),
         cache: 'no-store',
       }

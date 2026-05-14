@@ -132,12 +132,15 @@ function AnalysisBlock({
   const [text, setText]   = useState('');
   const [error, setError] = useState('');
   const runningRef        = useRef(false);
+  // Mirror state in a ref so the runSignal effect can read current state without stale closure
+  const stateRef          = useRef<PanelState>('idle');
+  const setStateSync      = (s: PanelState) => { stateRef.current = s; setState(s); };
 
   // Load saved text after hydration to avoid server/client HTML mismatch
   useEffect(() => {
     if (savedText) {
       setText(savedText);
-      setState('done');
+      setStateSync('done');
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -148,7 +151,7 @@ function AnalysisBlock({
   async function run() {
     if (runningRef.current) return;
     runningRef.current = true;
-    setState('loading');
+    setStateSync('loading');
     setText('');
     setError('');
 
@@ -162,13 +165,13 @@ function AnalysisBlock({
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         setError(data.error ?? `HTTP ${res.status}`);
-        setState('error');
+        setStateSync('error');
         return;
       }
 
-      if (!res.body) { setError('No response body'); setState('error'); return; }
+      if (!res.body) { setError('No response body'); setStateSync('error'); return; }
 
-      setState('streaming');
+      setStateSync('streaming');
       const reader  = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer    = '';
@@ -190,7 +193,7 @@ function AnalysisBlock({
           }
         }
       }
-      setState('done');
+      setStateSync('done');
 
       // Persist to DB fire-and-forget (don't await — never block UI)
       if (accText) {
@@ -209,14 +212,17 @@ function AnalysisBlock({
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Network error');
-      setState('error');
+      setStateSync('error');
     } finally {
       runningRef.current = false;
     }
   }
 
   useEffect(() => {
-    if (runSignal > 0) run();
+    // Only auto-trigger if the panel is idle — prevents accidental re-runs
+    // when the toolbar button is clicked on an already-active panel.
+    // Use ↻ RE-RUN in the panel header to intentionally re-run.
+    if (runSignal > 0 && stateRef.current === 'idle') run();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [runSignal]);
 
