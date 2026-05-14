@@ -5,6 +5,7 @@ import { FinalActionBadge, SignalBadge } from '@/components/SignalBadge';
 import { ScreamTestCard } from '@/components/ScreamTestCard';
 import { ScanDiffBanner } from '@/components/ScanDiffBanner';
 import { RescanBriefButton } from '@/components/RescanBriefButton';
+import { AiBriefAnalysis } from '@/components/AiBriefAnalysis';
 import { getStockSnapshot } from '@/lib/alpaca';
 import type { FilterResult, NarrativeOverhang } from '@/lib/screamTest';
 import type { BriefScanRow } from '@/lib/scanDiff';
@@ -127,6 +128,7 @@ export default async function BriefPage({ params }: { params: { id: string } }) 
             screamScore={brief.scream_score ?? null}
             overhangs={screamUnresolved}
           />
+          <AiBriefAnalysis brief={brief as Record<string, unknown>} />
         </div>
       </div>
 
