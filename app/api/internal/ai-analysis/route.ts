@@ -88,7 +88,10 @@ function buildUserMessage(brief: AiBriefPayload): string {
   lines.push(`  Score     : ${brief.scream_score ?? 0}/5 conviction filters passed`);
   lines.push(`  Qualifies : ${brief.scream_qualifies ? 'YES — strong institutional positioning detected' : 'NO — mixed or insufficient chain signal'}`);
   if (brief.scream_notes) {
-    const notes = brief.scream_notes.split('\n').slice(0, 3).join('; ');
+    const raw = brief.scream_notes;
+    const notes = Array.isArray(raw)
+      ? (raw as string[]).slice(0, 3).join('; ')
+      : String(raw).split('\n').slice(0, 3).join('; ');
     lines.push(`  Notes     : ${notes}`);
   }
   lines.push('');

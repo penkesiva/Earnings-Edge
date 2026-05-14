@@ -22,7 +22,7 @@ export type AiBriefPayload = {
   scream_direction: string | null;
   scream_score: number | null;
   scream_qualifies: boolean | string | null;
-  scream_notes: string | null;
+  scream_notes: string | string[] | null;
   final_action: string | null;
   final_action_rationale: string | null;
   overhangs: NarrativeOverhang[];
