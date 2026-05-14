@@ -56,7 +56,27 @@ Important:
 - Distinguish between bullish stock movement and bullish options strategy.
 - If data is mixed, state which signal dominates and why.
 - Avoid generic advice.
-- Make the strongest probabilistic estimate possible.`;
+- Make the strongest probabilistic estimate possible.
+
+---
+
+Now compress everything into a final trader call.
+
+Do not give a long report.
+Give me:
+1. Direction: UP or DOWN
+2. Expected dollar move
+3. Expected % move
+4. Expected after-earnings price
+5. Confidence 1–10
+6. Best trade structure
+
+Then end with exactly one sentence in this format:
+"My final call: [ticker] [up/down] $X to $Y after earnings, closing around $Z."
+
+Example: "My final call: DLO moves UP +$0.80 to +$1.40 after earnings, closing around $13.10–$13.70, but long calls are risky because IV is too high."
+
+Keep the full analysis brief. Lead with the numbered summary, end with the final call sentence.`;
 
 function buildUserMessage(brief: AiBriefPayload): string {
   const lines: string[] = [];
