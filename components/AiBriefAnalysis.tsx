@@ -189,7 +189,14 @@ function AnalysisBlock({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ brief_id: brief.brief_id, provider, text: accText }),
-        }).catch(() => { /* silent — non-critical */ });
+        }).then(async r => {
+          if (!r.ok) {
+            const msg = await r.text().catch(() => r.status.toString());
+            console.warn(`[ai-analysis] save failed (${provider}):`, msg);
+          }
+        }).catch(err => {
+          console.warn(`[ai-analysis] save network error (${provider}):`, err);
+        });
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Network error');
