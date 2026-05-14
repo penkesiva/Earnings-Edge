@@ -137,16 +137,16 @@ export async function POST(req: NextRequest) {
       Authorization: `Bearer ${key}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
+      body: JSON.stringify({
         model: 'gpt-5.5',
-      stream: true,
-      messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user',   content: userMessage },
-      ],
-      max_tokens: 1500,
-      temperature: 0.25,
-    }),
+        stream: true,
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'user',   content: userMessage },
+        ],
+        max_completion_tokens: 1500,
+        reasoning_effort: 'medium',
+      }),
     // No cache — always fresh analysis
     cache: 'no-store',
   });
