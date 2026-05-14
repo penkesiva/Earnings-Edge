@@ -5,7 +5,7 @@ import { FinalActionBadge, SignalBadge } from '@/components/SignalBadge';
 import { ScreamTestCard } from '@/components/ScreamTestCard';
 import { ScanDiffBanner } from '@/components/ScanDiffBanner';
 import { RescanBriefButton } from '@/components/RescanBriefButton';
-import { AiBriefAnalysis } from '@/components/AiBriefAnalysis';
+import { AiBriefAnalysis, type SavedAnalyses } from '@/components/AiBriefAnalysis';
 import { getStockSnapshot } from '@/lib/alpaca';
 import type { FilterResult, NarrativeOverhang } from '@/lib/screamTest';
 import type { BriefScanRow } from '@/lib/scanDiff';
@@ -37,6 +37,19 @@ export default async function BriefPage({ params }: { params: { id: string } }) 
     .select('*')
     .eq('brief_id', params.id)
     .maybeSingle();
+
+  // Saved AI analyses for this brief
+  const { data: aiRows } = await sb
+    .from('brief_ai_analyses')
+    .select('provider, analysis_text')
+    .eq('brief_id', params.id);
+
+  const savedAnalyses: SavedAnalyses = {};
+  for (const row of aiRows ?? []) {
+    if (row.provider === 'openai' || row.provider === 'gemini' || row.provider === 'claude') {
+      savedAnalyses[row.provider] = row.analysis_text;
+    }
+  }
 
   // Two most recent scans for this ticker (for flip detection)
   const { data: scans } = await sb
@@ -128,7 +141,8 @@ export default async function BriefPage({ params }: { params: { id: string } }) 
             screamScore={brief.scream_score ?? null}
             overhangs={screamUnresolved}
           />
-          <AiBriefAnalysis brief={{
+          <AiBriefAnalysis savedAnalyses={savedAnalyses} brief={{
+            brief_id:                 brief.id,
             ticker:                   brief.ticker,
             earnings_date:            brief.earnings_date,
             composite_score:          brief.composite_score,
