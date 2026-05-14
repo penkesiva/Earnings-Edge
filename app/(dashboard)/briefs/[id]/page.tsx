@@ -857,30 +857,55 @@ function BriefInsightStrip({
                                                       ['UNCLEAR',       'text-fg-dim'];
 
   // ── Stock direction take ──────────────────────────────────────────────────
-  const isBullish = finalAction && bullishActions.has(finalAction);
-  const isBearish = finalAction && bearishActions.has(finalAction);
-  const isNeutral = finalAction === 'IRON_CONDOR';
+  const isBullish  = finalAction && bullishActions.has(finalAction);
+  const isBearish  = finalAction && bearishActions.has(finalAction);
+  const isNeutral  = finalAction === 'IRON_CONDOR';
   const isLongCall = finalAction === 'LONG_CALL';
   const isLongPut  = finalAction === 'LONG_PUT';
-  const move = expectedMovePct ? `≈±${expectedMovePct.toFixed(1)}%` : null;
-  const screamNote = screamScore && screamScore >= 4 && screamDirection && screamDirection !== 'none' && screamDirection !== 'mixed'
-    ? ` (${screamScore}/5 ${screamDirection} chain)`
+
+  // Dollar range: show ≈$X if available, fallback to %
+  const movePctStr = expectedMovePct ? `±${expectedMovePct.toFixed(1)}%` : null;
+  const moveDolStr = expectedMoveDollar ? `≈$${expectedMoveDollar.toFixed(2)}` : null;
+  const moveStr    = moveDolStr && movePctStr ? `${moveDolStr} (${movePctStr})` : movePctStr ?? null;
+
+  // Strong scream conviction note
+  const screamNote = screamScore && screamScore >= 4 && screamDirection &&
+    screamDirection !== 'none' && screamDirection !== 'mixed'
+    ? ` · ${screamScore}/5 ${screamDirection} chain`
     : '';
+
+  // IV implication (terse)
+  const ivNote =
+    ivr === null      ? '' :
+    ivr >= 80         ? ' · Extreme IV — sell premium over buying' :
+    ivr >= 60         ? ' · High IV — spreads over naked' :
+                        '';
 
   let directionTake: string;
   let directionCls: string;
   if (isBullish) {
-    directionTake = `Stock likely UP${move ? ` ${move}` : ''}${screamNote}`;
+    directionTake = `Likely UP${moveStr ? ` ${moveStr}` : ''}${screamNote}${ivNote}`;
     directionCls = 'text-signal-buy';
   } else if (isBearish) {
-    directionTake = `Stock likely DOWN${move ? ` ${move}` : ''}${screamNote}`;
+    directionTake = `Likely DOWN${moveStr ? ` ${moveStr}` : ''}${screamNote}${ivNote}`;
     directionCls = 'text-signal-sell';
   } else if (isNeutral) {
-    directionTake = `Likely contained${move ? ` within ${move}` : ''} — vol sell`;
+    directionTake = `Contained${moveStr ? ` ${moveStr}` : ''} — vol crush expected${ivNote}`;
     directionCls = 'text-signal-watch';
   } else {
-    directionTake = `Direction unclear${move ? ` — market pricing ${move} move` : ''}`;
+    directionTake = `Direction unclear${moveStr ? ` — market pricing ${moveStr}` : ''}${ivNote}`;
     directionCls = 'text-fg-muted';
+  }
+
+  // ── Beat ↔ direction tension note ─────────────────────────────────────────
+  // Surfaces sell-the-news or buy-the-rumor setups explicitly.
+  let tensionNote: string | null = null;
+  if (isBearish && compositeScore >= 65) {
+    tensionNote = `Beat ${beatLabel} but chain bearish — classic sell-the-news setup`;
+  } else if (isBullish && compositeScore < 40) {
+    tensionNote = `Beat ${beatLabel} but chain bullish — buy-the-rumor momentum play`;
+  } else if (isNeutral && compositeScore >= 65) {
+    tensionNote = `Beat ${beatLabel} — IV crush likely to offset any directional move`;
   }
 
   // ── Naked-option suggestion (LONG_CALL / LONG_PUT only) ───────────────────
@@ -915,20 +940,17 @@ function BriefInsightStrip({
         <InsightCell label="IV ENV" value={ivLabel} sub={ivSub} valueCls={ivCls} />
       </div>
 
-      {/* Final take row */}
-      <div className="text-xs border-t border-border-subtle pt-2 space-y-0.5">
+      {/* System verdict — single crisp line */}
+      <div className="text-xs border-t border-border-subtle pt-2 space-y-1">
         <div>
-          <span className="text-fg-dim tracking-widest">SIGNAL LEAN  </span>
-          <span className={`font-bold ${leanCls}`}>{leanLabel}</span>
+          <span className="text-fg-dim tracking-widest">System  </span>
+          <span className={`font-semibold ${leanCls}`}>{leanLabel}</span>
           <span className="text-fg-dim">  ·  </span>
           <span className={directionCls}>{directionTake}</span>
         </div>
-        <div className="text-fg-dim">
-          Beat: <span className={beatCls}>{beatLabel}</span>
-          {ivr !== null && ivr >= 60 && (
-            <span> · High IV → option premium is expensive, spreads preferred over naked</span>
-          )}
-        </div>
+        {tensionNote && (
+          <div className="text-fg-dim italic">{tensionNote}</div>
+        )}
         {nakedOptionLine}
       </div>
     </div>
