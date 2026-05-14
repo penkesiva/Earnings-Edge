@@ -39,10 +39,14 @@ export default async function BriefPage({ params }: { params: { id: string } }) 
     .maybeSingle();
 
   // Saved AI analyses for this brief
-  const { data: aiRows } = await sb
+  const { data: aiRows, error: aiError } = await sb
     .from('brief_ai_analyses')
     .select('provider, analysis_text')
     .eq('brief_id', params.id);
+
+  if (aiError) {
+    console.error('[brief-page] failed to load ai analyses:', aiError.message);
+  }
 
   const savedAnalyses: SavedAnalyses = {};
   for (const row of aiRows ?? []) {
