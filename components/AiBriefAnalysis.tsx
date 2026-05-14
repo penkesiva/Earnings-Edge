@@ -26,6 +26,8 @@ export type AiBriefPayload = {
   final_action: string | null;
   final_action_rationale: string | null;
   overhangs: NarrativeOverhang[];
+  /** Raw merged headlines (FMP + Gemini search) stored at scan time. */
+  raw_headlines: { date: string; title: string; source: string }[] | null;
 };
 
 type PanelState = 'idle' | 'loading' | 'streaming' | 'done' | 'error';

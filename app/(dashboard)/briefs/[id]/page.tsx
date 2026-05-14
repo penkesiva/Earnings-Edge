@@ -151,6 +151,7 @@ export default async function BriefPage({ params }: { params: { id: string } }) 
             final_action:             brief.final_action,
             final_action_rationale:   brief.final_action_rationale,
             overhangs:                screamUnresolved ?? [],
+            raw_headlines:            (brief.raw_headlines as { date: string; title: string; source: string }[] | null) ?? null,
           }} />
         </div>
       </div>

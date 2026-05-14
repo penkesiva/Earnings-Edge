@@ -24,6 +24,8 @@ import type { NarrativeOverhang, OverhangCategory } from '@/lib/screamTest';
 import { addCalendarDays, earningsSessionDate } from '@/lib/earningsDate';
 import { classifyHeadlines, fetchGeminiSearchHeadlines, hasLlmProvider } from '@/lib/llmClassifier';
 
+export type RawHeadline = { date: string; title: string; source: string };
+
 const STABLE = 'https://financialmodelingprep.com/stable';
 
 type FmpNewsRow = {
@@ -180,8 +182,14 @@ function normalizeTitle(t: string): string {
 
 // ── Main entry point ──────────────────────────────────────────────────────────
 
+export type OverhangResult = {
+  overhangs: NarrativeOverhang[];
+  /** Deduplicated, oldest-first headline list (FMP + Gemini search). */
+  rawHeadlines: RawHeadline[];
+};
+
 /**
- * Returns narrative overhang rows for `computeScreamTest` (may be empty).
+ * Returns narrative overhangs and the raw headline list for `computeScreamTest`.
  *
  * Sources: FMP news headlines + Gemini Search grounding (if GEMINI_API_KEY set)
  * + Alpaca price-action large-drop detection.
@@ -192,7 +200,7 @@ export async function detectOverhangs(opts: {
   ticker: string;
   daysBack?: number;
   asOfDate?: string;
-}): Promise<NarrativeOverhang[]> {
+}): Promise<OverhangResult> {
   const daysBack = opts.daysBack ?? 60;
   const ticker = opts.ticker.toUpperCase();
 
@@ -330,8 +338,16 @@ export async function detectOverhangs(opts: {
 
     // Return newest-first (matches original ordering).
     overhangs.sort((a, b) => (a.detectedDate < b.detectedDate ? 1 : -1));
-    return overhangs;
+
+    // Raw headlines stay oldest-first (already sorted above).
+    const rawHeadlines: RawHeadline[] = allArticles.map(a => ({
+      date: a.date,
+      title: a.title,
+      source: a.site || a.url || 'fmp',
+    }));
+
+    return { overhangs, rawHeadlines };
   } catch {
-    return [];
+    return { overhangs: [], rawHeadlines: [] };
   }
 }

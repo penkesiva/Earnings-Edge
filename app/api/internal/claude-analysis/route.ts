@@ -133,6 +133,17 @@ function buildUserMessage(brief: AiBriefPayload): string {
   } else {
     lines.push('## News & Sentiment: CLEAN — no material risks detected in recent headlines');
   }
+
+  const headlines = brief.raw_headlines ?? [];
+  if (headlines.length > 0) {
+    lines.push('');
+    lines.push(`## Raw News Headlines (${headlines.length} total, oldest first)`);
+    lines.push('Use these to form your own independent view — do not just echo back the classified risks above.');
+    for (const h of headlines) {
+      lines.push(`  (${h.date}) ${h.title}`);
+    }
+  }
+
   return lines.join('\n');
 }
 

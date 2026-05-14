@@ -266,8 +266,11 @@ async function generateBrief(ticker: string, earningsDate: string) {
   );
 
   let narrativeOverhangs: ScreamTestInputs['narrativeOverhangs'] = [];
+  let rawHeadlines: { date: string; title: string; source: string }[] = [];
   try {
-    narrativeOverhangs = await detectOverhangs({ ticker, asOfDate: earningsDate });
+    const overhangResult = await detectOverhangs({ ticker, asOfDate: earningsDate });
+    narrativeOverhangs = overhangResult.overhangs;
+    rawHeadlines = overhangResult.rawHeadlines;
   } catch (e) {
     console.warn(`[daily-scan] ${ticker} narrative overhangs skipped:`, e);
   }
@@ -381,6 +384,7 @@ async function generateBrief(ticker: string, earningsDate: string) {
           narrativeOverhangs,
           screamUnresolvedOverhangs: screamResult.unresolvedOverhangs,
         } as object,
+        raw_headlines: rawHeadlines as unknown as object,
       },
       { onConflict: 'ticker,earnings_date' }
     )
