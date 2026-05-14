@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { NarrativeOverhang } from '@/lib/screamTest';
 
 export type AiBriefPayload = {
@@ -28,92 +28,109 @@ export type AiBriefPayload = {
   overhangs: NarrativeOverhang[];
 };
 
-type State = 'idle' | 'loading' | 'streaming' | 'done' | 'error';
-
-type Provider = 'openai' | 'gemini';
+type PanelState = 'idle' | 'loading' | 'streaming' | 'done' | 'error';
+type Provider   = 'openai' | 'gemini' | 'claude';
 
 interface ProviderConfig {
   label: string;
-  buttonLabel: string;
+  shortLabel: string;
   endpoint: string;
-  // Parses a single SSE data payload into a text chunk (or null to skip)
   parseChunk: (payload: string) => string | null;
-  colorClass: {
+  color: {
     border: string;
-    borderSubtle: string;
     text: string;
     textDim: string;
     bg: string;
-    pulse: string;
-    cursor: string;
+    dotColor: string;
   };
 }
 
+const PROVIDERS: Provider[] = ['openai', 'gemini', 'claude'];
+
 const CONFIGS: Record<Provider, ProviderConfig> = {
   openai: {
-    label: 'GPT-5.5 ANALYSIS',
-    buttonLabel: '✦ ANALYZE WITH GPT-5.5',
-    endpoint: '/api/internal/ai-analysis',
+    label:      'GPT-5.5 ANALYSIS',
+    shortLabel: 'GPT-5.5',
+    endpoint:   '/api/internal/ai-analysis',
     parseChunk(payload) {
       if (payload === '[DONE]') return null;
       try {
         const json = JSON.parse(payload);
         return (json.choices?.[0]?.delta?.content as string | undefined) ?? null;
-      } catch {
-        return null;
-      }
+      } catch { return null; }
     },
-    colorClass: {
-      border:      'border-violet-500/40',
-      borderSubtle:'border-violet-500/30',
-      text:        'text-violet-400',
-      textDim:     'text-violet-400/70',
-      bg:          'bg-violet-500/5',
-      pulse:       'bg-violet-400',
-      cursor:      'border-violet-400 text-violet-300',
+    color: {
+      border:   'border-violet-500/40',
+      text:     'text-violet-400',
+      textDim:  'text-violet-400/60',
+      bg:       'bg-violet-500/5',
+      dotColor: 'bg-violet-400',
     },
   },
   gemini: {
-    label: 'GEMINI 3.1 PRO ANALYSIS',
-    buttonLabel: '✦ ANALYZE WITH GEMINI',
-    endpoint: '/api/internal/gemini-analysis',
+    label:      'GEMINI 3.1 PRO ANALYSIS',
+    shortLabel: 'GEMINI',
+    endpoint:   '/api/internal/gemini-analysis',
     parseChunk(payload) {
       try {
         const json = JSON.parse(payload);
-        // Gemini streaming format: candidates[0].content.parts[0].text
-        const text = json.candidates?.[0]?.content?.parts?.[0]?.text as string | undefined;
-        return text ?? null;
-      } catch {
-        return null;
-      }
+        return (json.candidates?.[0]?.content?.parts?.[0]?.text as string | undefined) ?? null;
+      } catch { return null; }
     },
-    colorClass: {
-      border:      'border-blue-500/40',
-      borderSubtle:'border-blue-500/30',
-      text:        'text-blue-400',
-      textDim:     'text-blue-400/70',
-      bg:          'bg-blue-500/5',
-      pulse:       'bg-blue-400',
-      cursor:      'border-blue-400 text-blue-300',
+    color: {
+      border:   'border-blue-500/40',
+      text:     'text-blue-400',
+      textDim:  'text-blue-400/60',
+      bg:       'bg-blue-500/5',
+      dotColor: 'bg-blue-400',
+    },
+  },
+  claude: {
+    label:      'CLAUDE OPUS 4.7 ANALYSIS',
+    shortLabel: 'CLAUDE',
+    endpoint:   '/api/internal/claude-analysis',
+    parseChunk(payload) {
+      // Anthropic SSE delta: { type: "content_block_delta", delta: { type: "text_delta", text } }
+      try {
+        const json = JSON.parse(payload);
+        if (json.type === 'content_block_delta' && json.delta?.type === 'text_delta') {
+          return json.delta.text as string;
+        }
+        return null;
+      } catch { return null; }
+    },
+    color: {
+      border:   'border-amber-500/40',
+      text:     'text-amber-400',
+      textDim:  'text-amber-400/60',
+      bg:       'bg-amber-500/5',
+      dotColor: 'bg-amber-400',
     },
   },
 };
 
-function AnalysisPanel({
+// ── Individual analysis output block (no button UI here) ─────────────────────
+
+function AnalysisBlock({
   provider,
   brief,
+  runSignal,
 }: {
   provider: Provider;
   brief: AiBriefPayload;
+  runSignal: number;
 }) {
-  const [state, setState] = useState<State>('idle');
+  const [state, setState] = useState<PanelState>('idle');
   const [text, setText]   = useState('');
   const [error, setError] = useState('');
+  const runningRef        = useRef(false);
 
   const cfg = CONFIGS[provider];
-  const c   = cfg.colorClass;
+  const c   = cfg.color;
 
   async function run() {
+    if (runningRef.current) return;
+    runningRef.current = true;
     setState('loading');
     setText('');
     setError('');
@@ -132,11 +149,7 @@ function AnalysisPanel({
         return;
       }
 
-      if (!res.body) {
-        setError('No response body');
-        setState('error');
-        return;
-      }
+      if (!res.body) { setError('No response body'); setState('error'); return; }
 
       setState('streaming');
       const reader  = res.body.getReader();
@@ -146,75 +159,56 @@ function AnalysisPanel({
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split('\n');
         buffer = lines.pop() ?? '';
-
         for (const line of lines) {
           const trimmed = line.trim();
           if (!trimmed.startsWith('data:')) continue;
-          const payload = trimmed.slice(5).trim();
-          const chunk = cfg.parseChunk(payload);
+          const chunk = cfg.parseChunk(trimmed.slice(5).trim());
           if (chunk) setText(prev => prev + chunk);
         }
       }
-
       setState('done');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Network error');
       setState('error');
+    } finally {
+      runningRef.current = false;
     }
   }
 
+  useEffect(() => {
+    if (runSignal > 0) run();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [runSignal]);
+
+  if (state === 'idle') return null;
+
   return (
-    <div>
-      {/* Header row: label + status when active, button when idle */}
-      {state === 'idle' ? (
-        <button
-          type="button"
-          onClick={run}
-          className={`text-xs px-3 py-1.5 border ${c.border} ${c.text} hover:border-opacity-80 hover:opacity-90 tracking-widest transition-colors`}
-        >
-          {cfg.buttonLabel}
-        </button>
-      ) : (
-        <div className={`pt-3 border-t ${c.borderSubtle}`}>
-          <div className="flex items-center gap-3 mb-3">
-            <span className={`text-[10px] tracking-widest ${c.textDim} uppercase`}>
-              {cfg.label}
-            </span>
-            {(state === 'loading' || state === 'streaming') && (
-              <span className={`text-[10px] ${c.text} animate-pulse`}>● THINKING…</span>
-            )}
-            {state === 'done' && (
-              <button
-                type="button"
-                onClick={run}
-                className="text-[10px] text-fg-dim hover:text-fg tracking-widest transition-colors"
-              >
-                ↻ RE-RUN
-              </button>
-            )}
-          </div>
+    <div className={`pt-3 border-t ${c.border}`}>
+      <div className="flex items-center gap-3 mb-2">
+        <span className={`text-[10px] tracking-widest font-medium uppercase ${c.textDim}`}>
+          {cfg.label}
+        </span>
+        {(state === 'loading' || state === 'streaming') && (
+          <span className={`text-[10px] ${c.text} animate-pulse`}>● THINKING…</span>
+        )}
+      </div>
 
-          {state === 'error' && (
-            <p className="text-xs text-signal-sell">{error}</p>
-          )}
-
-          {state === 'loading' && (
-            <div className={`text-xs ${c.textDim} animate-pulse tracking-widest`}>
-              Assembling brief data…
-            </div>
-          )}
-
-          {(state === 'streaming' || state === 'done') && text && (
-            <div className={`text-xs text-fg-muted leading-relaxed whitespace-pre-wrap font-mono border ${c.borderSubtle} ${c.bg} px-4 py-3`}>
-              {text}
-              {state === 'streaming' && (
-                <span className={`inline-block w-1.5 h-3 ${c.pulse} animate-pulse ml-0.5 align-middle`} />
-              )}
-            </div>
+      {state === 'error' && (
+        <p className="text-xs text-signal-sell">{error}</p>
+      )}
+      {state === 'loading' && (
+        <p className={`text-xs ${c.textDim} animate-pulse tracking-widest`}>
+          Assembling brief data…
+        </p>
+      )}
+      {(state === 'streaming' || state === 'done') && text && (
+        <div className={`text-xs text-fg-muted leading-relaxed whitespace-pre-wrap font-mono border ${c.border} ${c.bg} px-4 py-3`}>
+          {text}
+          {state === 'streaming' && (
+            <span className={`inline-block w-1.5 h-3 ${c.dotColor} animate-pulse ml-0.5 align-middle`} />
           )}
         </div>
       )}
@@ -222,11 +216,69 @@ function AnalysisPanel({
   );
 }
 
+// ── Container ─────────────────────────────────────────────────────────────────
+
 export function AiBriefAnalysis({ brief }: { brief: AiBriefPayload }) {
+  const [signals, setSignals] = useState<Record<Provider, number>>({
+    openai: 0,
+    gemini: 0,
+    claude: 0,
+  });
+
+  function trigger(provider: Provider) {
+    setSignals(prev => ({ ...prev, [provider]: prev[provider] + 1 }));
+  }
+
+  function runAll() {
+    setSignals(prev => ({
+      openai: prev.openai + 1,
+      gemini: prev.gemini + 1,
+      claude: prev.claude + 1,
+    }));
+  }
+
   return (
     <div className="mt-4 pt-3 border-t border-border-subtle space-y-4">
-      <AnalysisPanel provider="openai" brief={brief} />
-      <AnalysisPanel provider="gemini" brief={brief} />
+
+      {/* Toolbar — always visible */}
+      <div className="flex flex-wrap items-center gap-2">
+        {PROVIDERS.map(p => {
+          const cfg = CONFIGS[p];
+          const c   = cfg.color;
+          const ran = signals[p] > 0;
+          return (
+            <button
+              key={p}
+              type="button"
+              onClick={() => trigger(p)}
+              title={ran ? `Re-run ${cfg.label}` : `Run ${cfg.label}`}
+              className={`text-xs px-3 py-1.5 border ${c.border} ${c.text} hover:opacity-90 tracking-widest transition-colors`}
+            >
+              {ran ? `↻ ${cfg.shortLabel}` : `✦ ${cfg.shortLabel}`}
+            </button>
+          );
+        })}
+
+        <span className="text-fg-dim/30 text-xs select-none">|</span>
+
+        <button
+          type="button"
+          onClick={runAll}
+          className="text-xs px-3 py-1.5 border border-fg-subtle/30 text-fg-subtle hover:border-fg-subtle hover:text-fg tracking-widest transition-colors"
+        >
+          ✦ RUN ALL
+        </button>
+      </div>
+
+      {/* Analysis blocks — render below toolbar, stacked, only when active */}
+      {PROVIDERS.map(p => (
+        <AnalysisBlock
+          key={p}
+          provider={p}
+          brief={brief}
+          runSignal={signals[p]}
+        />
+      ))}
     </div>
   );
 }
