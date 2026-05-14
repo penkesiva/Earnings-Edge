@@ -46,6 +46,8 @@ export default async function BriefPage({ params }: { params: { id: string } }) 
 
   if (aiError) {
     console.error('[brief-page] failed to load ai analyses:', aiError.message);
+  } else {
+    console.log('[brief-page] ai analyses for', params.id, '→', (aiRows ?? []).map(r => r.provider));
   }
 
   const savedAnalyses: SavedAnalyses = {};
