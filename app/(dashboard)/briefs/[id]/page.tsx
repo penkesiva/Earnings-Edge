@@ -38,24 +38,13 @@ export default async function BriefPage({ params }: { params: { id: string } }) 
     .eq('brief_id', params.id)
     .maybeSingle();
 
-  // Saved AI analyses for this brief
-  const { data: aiRows, error: aiError } = await sb
+  // Fetch all saved AI analyses and filter in JS — PostgREST UUID .eq() filter
+  // returns empty rows on this table despite data existing (schema cache quirk).
+  const { data: allAiRows } = await sb
     .from('brief_ai_analyses')
-    .select('provider, analysis_text')
-    .eq('brief_id', params.id);
+    .select('brief_id, provider, analysis_text');
 
-  if (aiError) {
-    console.error('[brief-page] ai query error:', aiError.message, aiError.code, aiError.details);
-  } else {
-    console.log('[brief-page] ai analyses for', params.id, '→', (aiRows ?? []).map(r => r.provider));
-  }
-
-  // DEBUG: check if PostgREST can read the table at all (no filter)
-  const { data: allAiRows, error: allAiError } = await sb
-    .from('brief_ai_analyses')
-    .select('brief_id, provider')
-    .limit(5);
-  console.log('[brief-page] all ai rows (no filter):', allAiRows, allAiError?.message);
+  const aiRows = (allAiRows ?? []).filter(r => r.brief_id === params.id);
 
   const savedAnalyses: SavedAnalyses = {};
   for (const row of aiRows ?? []) {
