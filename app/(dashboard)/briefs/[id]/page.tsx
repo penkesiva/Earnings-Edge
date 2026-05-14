@@ -46,8 +46,9 @@ export default async function BriefPage({ params }: { params: { id: string } }) 
 
   const savedAnalyses: SavedAnalyses = {};
   for (const row of aiRows ?? []) {
-    if (row.provider === 'openai' || row.provider === 'gemini' || row.provider === 'claude') {
-      savedAnalyses[row.provider] = row.analysis_text;
+    const p = row.provider as string;
+    if (p === 'openai' || p === 'gemini' || p === 'claude') {
+      savedAnalyses[p as 'openai' | 'gemini' | 'claude'] = row.analysis_text as string;
     }
   }
 
