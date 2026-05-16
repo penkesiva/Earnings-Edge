@@ -1,19 +1,21 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { applyTheme, readStoredTheme } from '@/lib/theme';
 
 export function ThemeToggle() {
   const [isLight, setIsLight] = useState(false);
 
-  // Sync with whatever the anti-FOUC script already applied.
   useEffect(() => {
-    setIsLight(document.documentElement.classList.contains('light'));
+    const stored = readStoredTheme();
+    const next = stored === 'light' || (stored === null && document.documentElement.classList.contains('light'));
+    applyTheme(next);
+    setIsLight(next);
   }, []);
 
   function toggle() {
     const next = !isLight;
-    document.documentElement.classList.toggle('light', next);
-    try { localStorage.setItem('theme', next ? 'light' : 'dark'); } catch { /* private mode */ }
+    applyTheme(next);
     setIsLight(next);
   }
 

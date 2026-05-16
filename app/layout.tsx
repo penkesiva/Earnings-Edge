@@ -1,5 +1,8 @@
 import type { Metadata } from 'next';
 import { JetBrains_Mono } from 'next/font/google';
+import Script from 'next/script';
+import { cookies } from 'next/headers';
+import { THEME_COOKIE, THEME_INIT_SCRIPT } from '@/lib/theme';
 import './globals.css';
 
 const jetbrainsMono = JetBrains_Mono({
@@ -18,17 +21,21 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const themeCookie = cookies().get(THEME_COOKIE)?.value;
+  const isLight = themeCookie === 'light';
+
+  const htmlClass = [jetbrainsMono.variable, isLight ? 'light' : null]
+    .filter(Boolean)
+    .join(' ');
+
   return (
-    <html lang="en" className={jetbrainsMono.variable}>
-      {/* Inline script runs before paint to restore saved theme — prevents flash */}
-      <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `try{if(localStorage.getItem('theme')==='light')document.documentElement.classList.add('light')}catch(e){}`,
-          }}
-        />
-      </head>
+    <html lang="en" className={htmlClass} suppressHydrationWarning>
       <body className="font-mono text-fg bg-bg min-h-screen relative">
+        <Script
+          id="theme-init"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }}
+        />
         {children}
       </body>
     </html>
