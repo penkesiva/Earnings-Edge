@@ -111,8 +111,7 @@ export function ScreamTestCard({
         <h2 className="text-xs tracking-widest text-fg-subtle mb-2">SCREAM TEST</h2>
         <p className="text-xs text-fg-muted">
           No scream test snapshot for this brief. Re-run{' '}
-          <span className="text-fg-subtle font-bold">daily scan</span> after migrating the DB (
-          <code className="text-fg-dim">0002_scream_test.sql</code>).
+          <span className="text-fg-subtle font-bold">daily scan</span> to populate scream fields.
         </p>
       </section>
     );

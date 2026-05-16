@@ -41,11 +41,10 @@ NOTIFY_EMAIL=siva@yourdomain.com
 CRON_SECRET=  # generate any long random string
 ```
 
-### 4. Run Supabase migrations
+### 4. Run Supabase schema
 ```bash
-psql $DATABASE_URL -f supabase/migrations/0001_init.sql
-psql $DATABASE_URL -f supabase/migrations/0002_scream_test.sql
-# or paste SQL into Supabase SQL editor (order: 0001 then 0002)
+psql $DATABASE_URL -f supabase/schema.sql
+# or paste supabase/schema.sql into the Supabase SQL editor
 ```
 
 ### 5. Seed your watchlist
@@ -123,9 +122,7 @@ lib/
   email.ts                        # Resend wrapper
   push.ts                         # Web Push (PWA)
   supabase.ts                     # DB client
-supabase/migrations/
-  0001_init.sql                   # schema
-  0002_scream_test.sql            # scream columns on earnings_briefs
+supabase/schema.sql               # full DB schema (run once on fresh project)
 ```
 
 ## Caveats
