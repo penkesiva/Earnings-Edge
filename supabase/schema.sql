@@ -92,6 +92,7 @@ create table if not exists earnings_briefs (
   raw_alpaca jsonb,
   raw_fmp jsonb,
   raw_headlines jsonb,
+  news_sentiment jsonb,
 
   unique (ticker, earnings_date)
 );
@@ -181,6 +182,8 @@ create table if not exists llm_scan_cache (
   ticker text not null,
   scan_date date not null,
   risks jsonb not null default '[]'::jsonb,
+  headline_sentiments jsonb not null default '[]'::jsonb,
+  news_overall jsonb,
   created_at timestamptz not null default now(),
   primary key (ticker, scan_date)
 );

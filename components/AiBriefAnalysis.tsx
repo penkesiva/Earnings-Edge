@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import type { NarrativeOverhang } from '@/lib/screamTest';
+import type { NewsOverallSentiment, RawHeadline } from '@/lib/newsSentiment';
 import { ConsensusVerdict } from '@/components/ConsensusVerdict';
 import { RescanBriefButton } from '@/components/RescanBriefButton';
 import {
@@ -39,8 +40,10 @@ export type AiBriefPayload = {
   final_action: string | null;
   final_action_rationale: string | null;
   overhangs: NarrativeOverhang[];
-  /** Raw merged headlines (FMP + Gemini search) stored at scan time. */
-  raw_headlines: { date: string; title: string; source: string }[] | null;
+  /** Raw merged headlines (FMP + Gemini search) with per-headline sentiment tags. */
+  raw_headlines: RawHeadline[] | null;
+  /** LLM overall news bias from system scan. */
+  news_sentiment: NewsOverallSentiment | null;
 };
 
 type PanelState = 'idle' | 'loading' | 'streaming' | 'done' | 'error';

@@ -7,6 +7,7 @@ import {
   finalVerdictPanelBorder,
   finalVerdictTextCls,
   parseSynthesisResponse,
+  resolveVerdictWhy,
   type AlignmentChip,
   type Direction,
 } from '@/lib/aiConsensus';
@@ -146,6 +147,7 @@ export function ConsensusVerdict({
     analyses,
     parsed.direction
   );
+  const whyText = resolveVerdictWhy(parsed, analyses);
 
   const isSaved = !!savedText && effectiveText === savedText;
 
@@ -190,6 +192,11 @@ export function ConsensusVerdict({
       </div>
 
       {parsed.move && <p className="text-sm font-mono text-fg">{parsed.move}</p>}
+      {whyText && (
+        <p className="text-sm text-fg leading-relaxed border-l-2 border-border-subtle pl-3">
+          {whyText}
+        </p>
+      )}
       {parsed.trade && (
         <p className="text-xs text-fg-muted leading-relaxed">
           <span className="text-fg-dim tracking-widest text-[10px]">TRADE </span>

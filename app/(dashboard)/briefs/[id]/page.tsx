@@ -9,6 +9,13 @@ import { loadBriefAiAnalyses } from '@/lib/loadBriefAiAnalyses';
 import { getStockSnapshot } from '@/lib/alpaca';
 import type { FilterResult, NarrativeOverhang } from '@/lib/screamTest';
 import type { BriefScanRow } from '@/lib/scanDiff';
+import type { NewsOverallSentiment, RawHeadline } from '@/lib/newsSentiment';
+import {
+  newsInsightFromOverall,
+  newsInsightFromRisks,
+  sentimentChipClass,
+  sentimentChipLabel,
+} from '@/lib/newsSentiment';
 
 export const dynamic = 'force-dynamic';
 
@@ -89,6 +96,9 @@ export default async function BriefPage({ params }: { params: { id: string } }) 
   const preferredExpiry: string | null =
     structure?.preferredExpiry ?? structure?.legs?.[0]?.expiry ?? null;
 
+  const newsOverall = (brief.news_sentiment as NewsOverallSentiment | null) ?? null;
+  const rawHeadlines = (brief.raw_headlines as RawHeadline[] | null) ?? null;
+
   return (
     <div className="space-y-6 sm:space-y-8 brief-page-pad-bottom">
       <Link href="/" className="text-xs text-fg-subtle hover:text-fg">
@@ -133,6 +143,7 @@ export default async function BriefPage({ params }: { params: { id: string } }) 
             screamDirection={brief.scream_direction ?? null}
             screamScore={brief.scream_score ?? null}
             overhangs={screamUnresolved}
+            newsOverall={newsOverall}
           />
           <AiBriefAnalysis
             savedAnalyses={savedAnalyses}
@@ -162,7 +173,8 @@ export default async function BriefPage({ params }: { params: { id: string } }) 
             final_action:             brief.final_action,
             final_action_rationale:   brief.final_action_rationale,
             overhangs:                screamUnresolved ?? [],
-            raw_headlines:            (brief.raw_headlines as { date: string; title: string; source: string }[] | null) ?? null,
+            raw_headlines:            rawHeadlines,
+            news_sentiment:           newsOverall,
           }} />
         </div>
       </div>
@@ -204,9 +216,8 @@ export default async function BriefPage({ params }: { params: { id: string } }) 
       {/* ── News Sentiment ─────────────────────────────────────────────────── */}
       <NewsSentimentSection
         overhangs={screamUnresolved}
-        rawHeadlines={
-          (brief.raw_headlines as { date: string; title: string; source: string }[] | null) ?? null
-        }
+        rawHeadlines={rawHeadlines}
+        newsOverall={newsOverall}
       />
 
       {/* ── Outcome (if logged) ────────────────────────────────────────────── */}
@@ -782,7 +793,7 @@ function ComponentBar({ label, value }: { label: string; value: number | null })
 function BriefInsightStrip({
   compositeScore, finalAction, ivRank, putCallRatio,
   expectedMovePct, expectedMoveDollar, spot, preferredExpiry,
-  screamDirection, screamScore, overhangs,
+  screamDirection, screamScore, overhangs, newsOverall,
 }: {
   compositeScore: number;
   finalAction: string | null;
@@ -795,6 +806,7 @@ function BriefInsightStrip({
   screamDirection: string | null;
   screamScore: number | null;
   overhangs: NarrativeOverhang[] | null;
+  newsOverall: NewsOverallSentiment | null;
 }) {
   // ── Beat probability ──────────────────────────────────────────────────────
   const beatLabel =
@@ -823,13 +835,12 @@ function BriefInsightStrip({
   // ── News sentiment ────────────────────────────────────────────────────────
   const risks = overhangs ?? [];
   const maxSev = risks.reduce((m, r) => Math.max(m, r.severity ?? 3), 0);
-  const [newsLabel, newsCls] =
-    risks.length === 0           ? ['CLEAN ✓',                  'text-signal-buy']   :
-    risks.length <= 2 && maxSev <= 3 ? [`${risks.length} RISKS`,  'text-signal-watch'] :
-                                   [`${risks.length} RISKS ⚠`,   'text-signal-sell'];
-  const newsSub =
-    risks.length === 0 ? 'no material risks' :
-    maxSev >= 4 ? 'material headwinds' : 'monitor closely';
+  const newsInsight =
+    newsInsightFromOverall(newsOverall) ??
+    newsInsightFromRisks(risks.length, maxSev);
+  const newsLabel = newsInsight.label;
+  const newsCls = newsInsight.cls;
+  const newsSub = newsOverall?.summary?.slice(0, 48) ?? newsInsight.sub;
 
   // ── IV environment ────────────────────────────────────────────────────────
   const ivr = ivRank;
@@ -1026,14 +1037,14 @@ const CATEGORY_LABELS: Record<string, string> = {
   macro_specific:   'Macro / price action',
 };
 
-type RawHeadline = { date: string; title: string; source: string };
-
 function NewsSentimentSection({
   overhangs,
   rawHeadlines,
+  newsOverall,
 }: {
   overhangs: NarrativeOverhang[] | null;
   rawHeadlines: RawHeadline[] | null;
+  newsOverall: NewsOverallSentiment | null;
 }) {
   const risks = overhangs ?? [];
   const headlines = [...(rawHeadlines ?? [])].reverse();
@@ -1041,9 +1052,22 @@ function NewsSentimentSection({
 
   let badge: { label: string; cls: string };
   let summary: string;
-  if (risks.length === 0) {
+  if (newsOverall) {
+    const biasLabel =
+      newsOverall.bias === 'bullish' ? 'BULLISH BIAS' :
+      newsOverall.bias === 'bearish' ? 'BEARISH BIAS' :
+      newsOverall.bias === 'mixed' ? 'MIXED BIAS' :
+      'NEUTRAL BIAS';
+    const biasCls =
+      newsOverall.bias === 'bullish' ? 'bg-signal-buy/10 text-signal-buy border-signal-buy/20' :
+      newsOverall.bias === 'bearish' ? 'bg-signal-sell/10 text-signal-sell border-signal-sell/20' :
+      newsOverall.bias === 'mixed' ? 'bg-signal-watch/10 text-signal-watch border-signal-watch/20' :
+      'bg-bg text-fg-muted border-border-subtle';
+    badge = { label: biasLabel, cls: biasCls };
+    summary = `${newsOverall.summary} (${newsOverall.bullish}↑ ${newsOverall.bearish}↓ ${newsOverall.neutral}—)`;
+  } else if (risks.length === 0) {
     badge = { label: 'CLEAN', cls: 'bg-signal-buy/10 text-signal-buy border-signal-buy/20' };
-    summary = 'No material risk signals detected in recent headlines.';
+    summary = 'No material risk signals detected. Re-run scan for full sentiment tags.';
   } else if (risks.length <= 2 && maxSeverity <= 3) {
     badge = { label: 'CAUTIOUS', cls: 'bg-signal-watch/10 text-signal-watch border-signal-watch/20' };
     summary = `${risks.length} minor concern${risks.length > 1 ? 's' : ''} — monitor but not disqualifying.`;
@@ -1101,9 +1125,15 @@ function NewsSentimentSection({
           <>
             <div className="max-h-72 overflow-y-auto space-y-2 pr-1">
               {headlines.map((h, i) => (
-                <div key={i} className="flex items-start gap-3 text-xs">
+                <div key={i} className="flex items-start gap-2 text-xs">
+                  <span
+                    className={`shrink-0 w-5 text-center text-[10px] font-bold border ${sentimentChipClass(h.sentiment)}`}
+                    title={h.note ?? h.sentiment ?? 'neutral'}
+                  >
+                    {sentimentChipLabel(h.sentiment)}
+                  </span>
                   <span className="shrink-0 tabular-nums text-fg-dim w-[4.5rem]">{h.date}</span>
-                  <span className="text-fg-muted leading-snug">{h.title}</span>
+                  <span className="text-fg-muted leading-snug flex-1 min-w-0">{h.title}</span>
                   {h.source ? (
                     <span className="shrink-0 text-fg-dim hidden sm:block max-w-[7rem] truncate" title={h.source}>
                       {h.source}

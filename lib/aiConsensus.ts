@@ -223,8 +223,35 @@ export interface ParsedSynthesis {
   direction: Direction | null;
   move: string | null;
   confidence: string | null;
+  why: string | null;
   trade: string | null;
   raw: string;
+}
+
+/** Reasoning after "4. Best trade" from a single-model analysis (saved syntheses may lack WHY). */
+export function extractModelReasoning(text: string): string | null {
+  const m = text.match(/\n4\.\s*Best trade:\s*[^\n]+\n+([\s\S]+)/i);
+  if (!m?.[1]) return null;
+  const block = m[1]
+    .replace(/\*\*/g, '')
+    .replace(/\n+/g, ' ')
+    .trim();
+  if (block.length < 24) return null;
+  const sentences = block.match(/[^.!?]+[.!?]+/g) ?? [block];
+  return sentences.slice(0, 2).join(' ').trim().slice(0, 320) || null;
+}
+
+/** WHY from synthesis, else first available model reasoning snippet. */
+export function resolveVerdictWhy(
+  parsed: ParsedSynthesis,
+  analyses: Partial<Record<'openai' | 'gemini' | 'claude', string>>,
+): string | null {
+  if (parsed.why?.trim()) return parsed.why.trim();
+  for (const p of ['openai', 'gemini', 'claude'] as const) {
+    const r = analyses[p] ? extractModelReasoning(analyses[p]!) : null;
+    if (r) return r;
+  }
+  return null;
 }
 
 export function parseSynthesisResponse(text: string): ParsedSynthesis {
@@ -250,6 +277,7 @@ export function parseSynthesisResponse(text: string): ParsedSynthesis {
     direction,
     move: line('MOVE'),
     confidence: line('CONFIDENCE'),
+    why: line('WHY'),
     trade: line('TRADE'),
     raw: text,
   };

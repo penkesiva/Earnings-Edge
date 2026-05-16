@@ -1,35 +1,29 @@
 /**
- * LLM-based headline risk classifier — shared by overhangDetector.ts.
+ * LLM-based headline classifier — risks + per-headline sentiment + overall bias
+ * in a single batch call (shared by overhangDetector.ts).
  *
- * Provider selection (first available key wins):
- *   1. GEMINI_API_KEY  → Google Gemini 2.0 Flash
- *   2. OPENAI_API_KEY  → OpenAI GPT-4o-mini
- *   3. Neither set     → returns [] (caller falls back to regex)
- *
- * Both providers use the same structured JSON output schema and the same
- * system prompt so results are equivalent regardless of which key is active.
- *
- * Cache: when `scanDate` (YYYY-MM-DD) is supplied, results are persisted to
- * the `llm_scan_cache` Supabase table. Subsequent calls for the same
- * (ticker, scanDate) pair skip the LLM entirely and return the stored risks.
- * This means multiple rescans of the same ticker on the same day cost one
- * LLM call instead of N.
+ * Provider: Gemini 2.0 Flash > OpenAI GPT-4o-mini
+ * Cache: llm_scan_cache per (ticker, scan_date)
  */
 
 import type { OverhangCategory } from '@/lib/screamTest';
 import { supabaseAdmin } from '@/lib/supabase';
+import type {
+  HeadlineSentiment,
+  HeadlineSentimentLabel,
+  HeadlineRelevance,
+  NewsBias,
+  NewsOverallSentiment,
+} from '@/lib/newsSentiment';
+import { emptyNewsOverall } from '@/lib/newsSentiment';
 
 // ── Shared types ──────────────────────────────────────────────────────────────
 
 export type LlmRiskResult = {
-  /** 0-based index into the input headlines array. */
   i: number;
   category: OverhangCategory;
-  /** 1 = minor mention, 3 = notable, 5 = material / actionable. */
   severity: number;
-  /** One-sentence description of the specific risk. */
   summary: string;
-  /** True if a LATER headline in the same window resolves this risk. */
   resolved: boolean;
 };
 
@@ -39,46 +33,80 @@ export type HeadlineInput = {
   title: string;
 };
 
-// ── Shared prompt ─────────────────────────────────────────────────────────────
+export type LlmClassificationResult = {
+  risks: LlmRiskResult[];
+  sentiments: HeadlineSentiment[];
+  overall: NewsOverallSentiment;
+};
 
-const SYSTEM_PROMPT = `You are an institutional equity analyst assistant specialising in pre-earnings risk assessment.
+// ── Prompt ────────────────────────────────────────────────────────────────────
 
-Your task: given a chronological list of news headlines for a specific stock ticker, identify NEGATIVE risk signals that could weigh on the stock price or increase uncertainty into its earnings report.
+const SYSTEM_PROMPT = `You are an institutional equity analyst assistant specialising in pre-earnings news analysis.
 
-What counts as a risk:
-- Competitive threat: a new entrant, a rival product launch EXPLICITLY framed as a displacement risk, or an article explicitly noting competitive pressure ON THIS SPECIFIC COMPANY
-- Analyst downgrade or price-target cut specifically for this company
-- Guidance reduction, pre-announcement of a miss, or management warning of weakness
-- Material customer or contract loss
+You receive a chronological list of news headlines (oldest first) for ONE stock ticker before its earnings report.
+
+Perform THREE tasks in one response:
+
+## Task A — Per-headline sentiment
+For EVERY headline index in the input list, classify how the headline likely affects the STOCK'S POST-EARNINGS PRICE REACTION (not long-term business quality):
+- sentiment: "bullish" | "bearish" | "neutral"
+- relevance: "low" | "medium" | "high" (weight for earnings trade)
+- note: optional short phrase (max 12 words)
+
+Sentiment rules:
+- Downgrades, misses, weak comps/guidance, margin pressure, regulatory probes → bearish
+- "Will soar", upgrade, strong outlook, relief-rally thesis, beat expectations → bullish
+- Generic market roundups listing many tickers as "top picks" → neutral, relevance low
+- Competitor stories that do NOT explicitly threaten THIS company → neutral, relevance low
+- Positive partnership/product news for THIS company → bullish unless already priced in (then neutral)
+
+## Task B — Overall news bias
+Summarize the full headline set for an earnings trader:
+- bias: "bullish" | "bearish" | "mixed" | "neutral"
+- bullish / bearish / neutral: counts from Task A
+- summary: one sentence (max 30 words) on dominant narrative into earnings
+
+## Task C — Material risks (negative overhangs)
+Identify NEGATIVE risk signals (same rules as before). What counts as a risk:
+- Competitive threat explicitly against THIS company
+- Analyst downgrade or PT cut for THIS company
+- Guidance reduction, pre-announcement miss, management warning
+- Material customer/contract loss
 - Regulatory, legal, or SEC investigation
-- Sector-wide repricing, broad-based selloff commentary specific to the company's sector
+- Sector repricing specifically hurting this name
 
-What does NOT count as a risk (common false positives — EXCLUDE THESE):
-- "Top N stocks", "best stocks to buy", "stock picks", investment roundup articles that list this company alongside other stocks as a positive recommendation
-- Positive investor or analyst coverage ("Billionaire bets on X", "Why X is a top pick", "X among top AI stocks")
-- Partnership, customer win, or product launch announcements framed positively
-- General market or macro commentary not specifically naming this company as at risk
-- Upgrade, buy recommendation, or price-target raise
-- Articles about competitors that do NOT explicitly state they threaten THIS company
+EXCLUDE as risks (but may still be bullish/neutral in Task A):
+- "Top N stocks to buy" roundups
+- Pure buy recommendations and price-target raises
+- Competitor news not framed as a threat to THIS company
 
-IMPORTANT: If a headline lists multiple company tickers (e.g., "MSFT, GOOGL, ASTS & Other Top AI Picks"), this is a positive roundup — NOT a competitive threat. Mark it as NOT a risk.
+For each risk, check if a LATER headline resolves it (resolved: true).
 
-For each risk you identify, also check whether any LATER headline in the same list resolves or neutralises that specific risk (e.g. reaffirmed guidance, issue addressed by management, regulatory clearance, partner publicly denies threat).
-
-Return ONLY valid JSON matching this schema — no extra text:
+Return ONLY valid JSON:
 {
+  "headlines": [
+    { "i": 0, "sentiment": "bearish", "relevance": "high", "note": "optional" }
+  ],
+  "overall": {
+    "bias": "mixed",
+    "bullish": 2,
+    "bearish": 5,
+    "neutral": 8,
+    "summary": "one sentence"
+  },
   "risks": [
     {
-      "i": <int>,            // 0-based index of the risk headline in the input list
-      "category": "<competitive|sector_repricing|downgrade|guidance_concern|customer_loss|regulatory|macro_specific>",
-      "severity": <1-5>,     // 1=minor mention, 3=notable, 5=material/actionable
-      "summary": "<one sentence describing the specific risk>",
-      "resolved": <bool>     // true if a LATER headline in the list addresses this risk
+      "i": 0,
+      "category": "guidance_concern",
+      "severity": 3,
+      "summary": "one sentence",
+      "resolved": false
     }
   ]
 }
 
-If there are no risks, return { "risks": [] }.`;
+You MUST include one entry in "headlines" for every input index 0..N-1.
+If no risks, return "risks": [].`;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -91,37 +119,87 @@ const VALID_CATS: OverhangCategory[] = [
   'customer_loss', 'regulatory', 'macro_specific',
 ];
 
-function parseRisks(json: string): LlmRiskResult[] {
+const VALID_SENTIMENT: HeadlineSentimentLabel[] = ['bullish', 'bearish', 'neutral'];
+const VALID_RELEVANCE: HeadlineRelevance[] = ['low', 'medium', 'high'];
+const VALID_BIAS: NewsBias[] = ['bullish', 'bearish', 'mixed', 'neutral'];
+
+function parseClassification(
+  json: string,
+  headlineCount: number,
+): LlmClassificationResult {
+  let parsed: {
+    headlines?: HeadlineSentiment[];
+    overall?: Partial<NewsOverallSentiment>;
+    risks?: LlmRiskResult[];
+  };
   try {
-    const parsed = JSON.parse(json) as { risks?: LlmRiskResult[] };
-    return (parsed.risks ?? []).filter(
-      r =>
-        typeof r.i === 'number' &&
-        VALID_CATS.includes(r.category as OverhangCategory) &&
-        typeof r.severity === 'number' &&
-        typeof r.summary === 'string' &&
-        typeof r.resolved === 'boolean',
-    );
+    parsed = JSON.parse(json) as typeof parsed;
   } catch {
-    return [];
+    return { risks: [], sentiments: fillMissingSentiments(headlineCount, []), overall: emptyNewsOverall() };
   }
+
+  const rawSentiments = (parsed.headlines ?? []).filter(
+    s =>
+      typeof s.i === 'number' &&
+      VALID_SENTIMENT.includes(s.sentiment as HeadlineSentimentLabel) &&
+      VALID_RELEVANCE.includes(s.relevance as HeadlineRelevance),
+  ) as HeadlineSentiment[];
+
+  const risks = (parsed.risks ?? []).filter(
+    r =>
+      typeof r.i === 'number' &&
+      VALID_CATS.includes(r.category as OverhangCategory) &&
+      typeof r.severity === 'number' &&
+      typeof r.summary === 'string' &&
+      typeof r.resolved === 'boolean',
+  );
+
+  const o = parsed.overall;
+  const overall: NewsOverallSentiment =
+    o && VALID_BIAS.includes(o.bias as NewsBias) && typeof o.summary === 'string'
+      ? {
+          bias: o.bias as NewsBias,
+          bullish: typeof o.bullish === 'number' ? o.bullish : 0,
+          bearish: typeof o.bearish === 'number' ? o.bearish : 0,
+          neutral: typeof o.neutral === 'number' ? o.neutral : 0,
+          summary: o.summary.slice(0, 300),
+        }
+      : emptyNewsOverall();
+
+  return {
+    risks,
+    sentiments: fillMissingSentiments(headlineCount, rawSentiments),
+    overall,
+  };
 }
 
-// ── Provider: Gemini ──────────────────────────────────────────────────────────
+function fillMissingSentiments(
+  count: number,
+  raw: HeadlineSentiment[],
+): HeadlineSentiment[] {
+  const byI = new Map(raw.map(s => [s.i, s]));
+  const out: HeadlineSentiment[] = [];
+  for (let i = 0; i < count; i++) {
+    const s = byI.get(i);
+    out.push(
+      s ?? { i, sentiment: 'neutral', relevance: 'low', note: '' },
+    );
+  }
+  return out;
+}
 
-async function classifyWithGemini(
+async function callLlm(
+  provider: 'gemini' | 'openai',
   ticker: string,
   headlines: HeadlineInput[],
-): Promise<LlmRiskResult[]> {
-  const key = process.env.GEMINI_API_KEY;
-  if (!key || headlines.length === 0) return [];
-
+): Promise<string> {
   const userMessage =
     `Ticker: ${ticker}\n\nHeadlines (chronological, oldest first):\n${buildNumberedList(headlines)}`;
 
-  let res: Response;
-  try {
-    res = await fetch(
+  if (provider === 'gemini') {
+    const key = process.env.GEMINI_API_KEY;
+    if (!key) return '{}';
+    const res = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`,
       {
         method: 'POST',
@@ -132,174 +210,151 @@ async function classifyWithGemini(
           generationConfig: {
             response_mime_type: 'application/json',
             temperature: 0,
+            maxOutputTokens: 8192,
           },
         }),
         cache: 'no-store',
       },
     );
-  } catch {
-    return [];
-  }
-
-  if (!res.ok) return [];
-
-  try {
+    if (!res.ok) return '{}';
     const data = (await res.json()) as {
       candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
     };
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '{}';
-    return parseRisks(text);
-  } catch {
-    return [];
+    return data.candidates?.[0]?.content?.parts?.[0]?.text ?? '{}';
   }
-}
 
-// ── Provider: OpenAI ──────────────────────────────────────────────────────────
-
-async function classifyWithOpenAi(
-  ticker: string,
-  headlines: HeadlineInput[],
-): Promise<LlmRiskResult[]> {
   const key = process.env.OPENAI_API_KEY;
-  if (!key || headlines.length === 0) return [];
-
-  const userMessage =
-    `Ticker: ${ticker}\n\nHeadlines (chronological, oldest first):\n${buildNumberedList(headlines)}`;
-
-  let res: Response;
-  try {
-    res = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${key}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        response_format: { type: 'json_object' },
-        messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: userMessage },
-        ],
-        max_tokens: 2048,
-        temperature: 0,
-      }),
-      cache: 'no-store',
-    });
-  } catch {
-    return [];
-  }
-
-  if (!res.ok) return [];
-
-  try {
-    const data = (await res.json()) as {
-      choices?: Array<{ message?: { content?: string } }>;
-    };
-    const text = data.choices?.[0]?.message?.content ?? '{}';
-    return parseRisks(text);
-  } catch {
-    return [];
-  }
+  if (!key) return '{}';
+  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${key}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'gpt-4o-mini',
+      response_format: { type: 'json_object' },
+      messages: [
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'user', content: userMessage },
+      ],
+      max_tokens: 4096,
+      temperature: 0,
+    }),
+    cache: 'no-store',
+  });
+  if (!res.ok) return '{}';
+  const data = (await res.json()) as {
+    choices?: Array<{ message?: { content?: string } }>;
+  };
+  return data.choices?.[0]?.message?.content ?? '{}';
 }
 
-// ── Supabase cache helpers ─────────────────────────────────────────────────────
+// ── Supabase cache ────────────────────────────────────────────────────────────
 
-async function readCache(
-  ticker: string,
-  scanDate: string,
-): Promise<LlmRiskResult[] | null> {
+type CacheRow = {
+  risks: LlmRiskResult[];
+  headline_sentiments: HeadlineSentiment[];
+  news_overall: NewsOverallSentiment;
+};
+
+async function readCache(ticker: string, scanDate: string): Promise<CacheRow | null> {
   try {
     const db = supabaseAdmin();
     const { data, error } = await db
       .from('llm_scan_cache')
-      .select('risks')
+      .select('risks, headline_sentiments, news_overall')
       .eq('ticker', ticker)
       .eq('scan_date', scanDate)
       .maybeSingle();
     if (error || !data) return null;
-    return data.risks as LlmRiskResult[];
+    const sentiments = data.headline_sentiments as HeadlineSentiment[] | null;
+    const overall = data.news_overall as NewsOverallSentiment | null;
+    if (!sentiments?.length || !overall?.bias) return null;
+    return {
+      risks: (data.risks as LlmRiskResult[]) ?? [],
+      headline_sentiments: sentiments,
+      news_overall: overall,
+    };
   } catch {
     return null;
   }
 }
 
-async function writeCache(
-  ticker: string,
-  scanDate: string,
-  risks: LlmRiskResult[],
-): Promise<void> {
+async function writeCache(ticker: string, scanDate: string, row: CacheRow): Promise<void> {
   try {
     const db = supabaseAdmin();
-    await db
-      .from('llm_scan_cache')
-      .upsert({ ticker, scan_date: scanDate, risks }, { onConflict: 'ticker,scan_date' });
+    await db.from('llm_scan_cache').upsert(
+      {
+        ticker,
+        scan_date: scanDate,
+        risks: row.risks,
+        headline_sentiments: row.headline_sentiments,
+        news_overall: row.news_overall,
+      },
+      { onConflict: 'ticker,scan_date' },
+    );
   } catch {
-    // Cache write failure is non-fatal — next call will just re-classify.
+    // non-fatal
   }
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
 /**
- * Classify a list of news headlines for risk signals using the best available
- * LLM provider. Returns [] if no provider key is configured.
- *
- * Provider priority: Gemini > OpenAI
- *
- * @param ticker    - Stock ticker (used for LLM context and cache key).
- * @param headlines - Headlines to classify.
- * @param scanDate  - YYYY-MM-DD. When provided, results are read from / written
- *                    to `llm_scan_cache`. Multiple rescans on the same day share
- *                    one LLM call.
+ * Classify all headlines in one LLM call: per-headline sentiment, overall bias,
+ * and material risks. Cached per (ticker, scanDate).
  */
 export async function classifyHeadlines(
   ticker: string,
   headlines: HeadlineInput[],
   scanDate?: string,
-): Promise<LlmRiskResult[]> {
-  if (headlines.length === 0) return [];
+): Promise<LlmClassificationResult> {
+  if (headlines.length === 0) {
+    return { risks: [], sentiments: [], overall: emptyNewsOverall() };
+  }
 
-  // ── Cache read ──────────────────────────────────────────────────────────────
   if (scanDate) {
     const cached = await readCache(ticker, scanDate);
-    if (cached !== null) {
-      return cached;
+    if (cached) {
+      return {
+        risks: cached.risks,
+        sentiments: fillMissingSentiments(headlines.length, cached.headline_sentiments),
+        overall: cached.news_overall,
+      };
     }
   }
 
-  // ── LLM call ────────────────────────────────────────────────────────────────
-  let results: LlmRiskResult[] = [];
-
-  if (process.env.GEMINI_API_KEY) {
-    results = await classifyWithGemini(ticker, headlines);
-    // Always proceed — empty array means "no risks found", which is valid.
-  } else if (process.env.OPENAI_API_KEY) {
-    results = await classifyWithOpenAi(ticker, headlines);
+  let json = '{}';
+  try {
+    if (process.env.GEMINI_API_KEY) {
+      json = await callLlm('gemini', ticker, headlines);
+    } else if (process.env.OPENAI_API_KEY) {
+      json = await callLlm('openai', ticker, headlines);
+    }
+  } catch {
+    json = '{}';
   }
 
-  // ── Cache write ─────────────────────────────────────────────────────────────
-  if (scanDate) {
-    await writeCache(ticker, scanDate, results);
+  const result = parseClassification(json, headlines.length);
+
+  if (scanDate && (process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY)) {
+    await writeCache(ticker, scanDate, {
+      risks: result.risks,
+      headline_sentiments: result.sentiments,
+      news_overall: result.overall,
+    });
   }
 
-  return results;
+  return result;
 }
 
-/** True when at least one LLM provider key is configured. */
 export function hasLlmProvider(): boolean {
   return !!(process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY);
 }
 
 // ── Gemini Search grounding — supplemental news fetch ─────────────────────────
 
-/**
- * Uses Gemini's Google Search grounding to pull recent news headlines for a
- * ticker that may not yet appear in FMP (e.g. articles from the last 24–48 h).
- *
- * Returns up to 15 headlines as HeadlineInput. Falls back to [] on any error.
- * Only available when GEMINI_API_KEY is set.
- */
 export async function fetchGeminiSearchHeadlines(
   ticker: string,
   scanDate: string,
@@ -342,7 +397,6 @@ export async function fetchGeminiSearchHeadlines(
 
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '{}';
 
-    // Prefer structured JSON response.
     try {
       const parsed = JSON.parse(text) as { headlines?: Array<{ date: string; title: string }> };
       if (Array.isArray(parsed.headlines) && parsed.headlines.length > 0) {
@@ -355,13 +409,12 @@ export async function fetchGeminiSearchHeadlines(
           }));
       }
     } catch {
-      // fall through to groundingChunks
+      // fall through
     }
 
-    // Fallback: extract titles from groundingChunks (no dates available).
     const chunks = data.candidates?.[0]?.groundingMetadata?.groundingChunks ?? [];
     return chunks
-      .filter((c) => c.web?.title?.trim())
+      .filter(c => c.web?.title?.trim())
       .map((c, i) => ({ i, date: scanDate, title: c.web!.title!.trim() }));
   } catch {
     return [];

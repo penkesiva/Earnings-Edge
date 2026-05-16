@@ -23,8 +23,13 @@ import { getHistoricalBars } from '@/lib/alpaca';
 import type { NarrativeOverhang, OverhangCategory } from '@/lib/screamTest';
 import { addCalendarDays, earningsSessionDate } from '@/lib/earningsDate';
 import { classifyHeadlines, fetchGeminiSearchHeadlines, hasLlmProvider } from '@/lib/llmClassifier';
+import {
+  mergeSentimentsIntoHeadlines,
+  type NewsOverallSentiment,
+  type RawHeadline,
+} from '@/lib/newsSentiment';
 
-export type RawHeadline = { date: string; title: string; source: string };
+export type { RawHeadline } from '@/lib/newsSentiment';
 
 const STABLE = 'https://financialmodelingprep.com/stable';
 
@@ -184,8 +189,10 @@ function normalizeTitle(t: string): string {
 
 export type OverhangResult = {
   overhangs: NarrativeOverhang[];
-  /** Deduplicated, oldest-first headline list (FMP + Gemini search). */
+  /** Deduplicated, oldest-first headline list (FMP + Gemini search) with sentiment tags. */
   rawHeadlines: RawHeadline[];
+  /** LLM overall news bias (null when regex fallback or no provider). */
+  newsOverall: NewsOverallSentiment | null;
 };
 
 /**
@@ -246,14 +253,14 @@ export async function detectOverhangs(opts: {
     const overhangs: NarrativeOverhang[] = [];
     const seenOverhang = new Set<string>();
 
+    let llmClassification: Awaited<ReturnType<typeof classifyHeadlines>> | null = null;
+
     if (hasLlmProvider()) {
-      // ── LLM path ─────────────────────────────────────────────────────────────
+      // ── LLM path — one call: risks + per-headline sentiment + overall bias ──
       const headlines = allArticles.map((a, i) => ({ i, date: a.date, title: a.title }));
+      llmClassification = await classifyHeadlines(ticker, headlines, end);
 
-      // Cache key is (ticker, end-date) — same-day rescans skip the LLM call.
-      const llmResults = await classifyHeadlines(ticker, headlines, end);
-
-      for (const r of llmResults) {
+      for (const r of llmClassification.risks) {
         if (r.severity < 2) continue; // severity 1 = noise
 
         const article = allArticles[r.i];
@@ -339,15 +346,23 @@ export async function detectOverhangs(opts: {
     // Return newest-first (matches original ordering).
     overhangs.sort((a, b) => (a.detectedDate < b.detectedDate ? 1 : -1));
 
-    // Raw headlines stay oldest-first (already sorted above).
-    const rawHeadlines: RawHeadline[] = allArticles.map(a => ({
+    const baseHeadlines: RawHeadline[] = allArticles.map(a => ({
       date: a.date,
       title: a.title,
       source: a.site || a.url || 'fmp',
     }));
 
-    return { overhangs, rawHeadlines };
+    let newsOverall: NewsOverallSentiment | null = llmClassification?.overall ?? null;
+    let rawHeadlines = baseHeadlines;
+    if (llmClassification) {
+      rawHeadlines = mergeSentimentsIntoHeadlines(
+        baseHeadlines,
+        llmClassification.sentiments,
+      );
+    }
+
+    return { overhangs, rawHeadlines, newsOverall };
   } catch {
-    return { overhangs: [], rawHeadlines: [] };
+    return { overhangs: [], rawHeadlines: [], newsOverall: null };
   }
 }

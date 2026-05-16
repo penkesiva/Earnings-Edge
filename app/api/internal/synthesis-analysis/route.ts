@@ -40,9 +40,10 @@ VERDICT: GO | NO-GO | WATCH
 DIRECTION: UP | DOWN | NEUTRAL
 MOVE: [one line: dollar range | % range | target price, e.g. -$7 to -$11 | -9% to -13% | target ~$68]
 CONFIDENCE: N/10
+WHY: [1-2 sentences — dominant thesis for this verdict: what signal wins (skew, IV, positioning, sell-the-news, guidance bar, etc.)]
 TRADE: [one sentence — specific structure]
 
-Do not add ALIGNMENT, WHY, or any extra paragraphs.`;
+Do not add ALIGNMENT or any fields beyond the lines above.`;
 
 export async function POST(req: NextRequest) {
   const key = process.env.OPENAI_API_KEY;
@@ -103,7 +104,7 @@ export async function POST(req: NextRequest) {
         { role: 'system', content: SYSTEM_PROMPT },
         { role: 'user', content: userParts.join('\n') },
       ],
-      max_completion_tokens: 500,
+      max_completion_tokens: 600,
       reasoning_effort: 'low',
     }),
     cache: 'no-store',
