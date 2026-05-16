@@ -4,7 +4,6 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { FinalActionBadge, SignalBadge } from '@/components/SignalBadge';
 import { ScreamTestCard } from '@/components/ScreamTestCard';
 import { ScanDiffBanner } from '@/components/ScanDiffBanner';
-import { RescanBriefButton } from '@/components/RescanBriefButton';
 import { AiBriefAnalysis } from '@/components/AiBriefAnalysis';
 import { loadBriefAiAnalyses } from '@/lib/loadBriefAiAnalyses';
 import { getStockSnapshot } from '@/lib/alpaca';
@@ -39,12 +38,14 @@ export default async function BriefPage({ params }: { params: { id: string } }) 
     .eq('brief_id', params.id)
     .maybeSingle();
 
-  const savedAnalyses = await loadBriefAiAnalyses(
+  const { analyses: savedAnalyses, lastAiScanAt } = await loadBriefAiAnalyses(
     sb,
     params.id,
     brief.ticker as string,
     brief.earnings_date as string
   );
+  const systemScanAt =
+    (brief.updated_at as string | null) ?? (brief.generated_at as string | null);
 
   // Two most recent scans for this ticker (for flip detection)
   const { data: scans } = await sb
@@ -96,11 +97,8 @@ export default async function BriefPage({ params }: { params: { id: string } }) 
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div className="border-l-4 border-signal-buy pl-4 sm:pl-6">
-        <div className="flex items-start justify-between gap-4 mb-2">
-          <div className="text-xs text-fg-subtle tracking-widest">
-            EARNINGS BRIEF · {brief.earnings_date}
-          </div>
-          <RescanBriefButton ticker={brief.ticker} earningsDate={brief.earnings_date} />
+        <div className="text-xs text-fg-subtle tracking-widest mb-2">
+          EARNINGS BRIEF · {brief.earnings_date}
         </div>
         <div className="flex flex-wrap items-baseline gap-3 sm:gap-6 mb-4">
           <h1 className="text-4xl sm:text-5xl font-bold">{brief.ticker}</h1>
@@ -136,7 +134,11 @@ export default async function BriefPage({ params }: { params: { id: string } }) 
             screamScore={brief.scream_score ?? null}
             overhangs={screamUnresolved}
           />
-          <AiBriefAnalysis savedAnalyses={savedAnalyses} brief={{
+          <AiBriefAnalysis
+            savedAnalyses={savedAnalyses}
+            lastAiScanAt={lastAiScanAt}
+            systemScanAt={systemScanAt}
+            brief={{
             brief_id:                 brief.id,
             ticker:                   brief.ticker,
             earnings_date:            brief.earnings_date,

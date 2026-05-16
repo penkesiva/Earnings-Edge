@@ -1,8 +1,14 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import type { NarrativeOverhang } from '@/lib/screamTest';
 import { ConsensusVerdict } from '@/components/ConsensusVerdict';
+import { RescanBriefButton } from '@/components/RescanBriefButton';
+import {
+  formatCooldownWait,
+  formatScanAge,
+  msUntilAiScanAllowed,
+} from '@/lib/aiScanCooldown';
 
 export type SavedAnalyses = Partial<
   Record<'openai' | 'gemini' | 'claude' | 'consensus', string>
@@ -126,12 +132,14 @@ function AnalysisBlock({
   runSignal,
   savedText,
   onComplete,
+  onTerminal,
 }: {
   provider: Provider;
   brief: AiBriefPayload;
   runSignal: number;
   savedText?: string;
   onComplete?: (provider: Provider, text: string) => void;
+  onTerminal?: (provider: Provider) => void;
 }) {
   const [state, setState] = useState<PanelState>('idle');
   const [text, setText]   = useState('');
@@ -219,6 +227,7 @@ function AnalysisBlock({
       setStateSync('error');
     } finally {
       runningRef.current = false;
+      onTerminal?.(provider);
     }
   }
 
@@ -282,14 +291,38 @@ function AnalysisBlock({
   );
 }
 
+// ── Scan age label (re-renders for relative time) ─────────────────────────────
+
+function ScanAgeLabel({ at, neverLabel }: { at: string | null; neverLabel: string }) {
+  const [, tick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => tick(n => n + 1), 30_000);
+    return () => clearInterval(id);
+  }, []);
+  if (!at) return <span className="text-[10px] text-fg-dim">{neverLabel}</span>;
+  void tick;
+  return (
+    <span className="text-[10px] text-fg-dim font-mono tabular-nums">
+      Last: {formatScanAge(at)}
+    </span>
+  );
+}
+
+const ACTION_BTN =
+  'text-xs px-3 py-1.5 border tracking-widest transition-colors w-full sm:w-auto';
+
 // ── Container ─────────────────────────────────────────────────────────────────
 
 export function AiBriefAnalysis({
   brief,
   savedAnalyses,
+  lastAiScanAt,
+  systemScanAt,
 }: {
   brief: AiBriefPayload;
   savedAnalyses?: SavedAnalyses;
+  lastAiScanAt?: string | null;
+  systemScanAt?: string | null;
 }) {
   const [signals, setSignals] = useState<Record<Provider, number>>({
     openai: 0,
@@ -299,25 +332,54 @@ export function AiBriefAnalysis({
   const [panelTexts, setPanelTexts] = useState<Partial<Record<Provider, string>>>({});
   const [consensusSignal, setConsensusSignal] = useState(0);
   const [awaitingConsensus, setAwaitingConsensus] = useState(false);
+  const [aiRunInFlight, setAiRunInFlight] = useState(false);
+  const [sessionAiScanAt, setSessionAiScanAt] = useState<string | null>(null);
+  const [cooldownTick, setCooldownTick] = useState(0);
   const completedRef = useRef<Set<Provider>>(new Set());
+  const terminalRef = useRef<Set<Provider>>(new Set());
+
+  useEffect(() => {
+    const id = setInterval(() => setCooldownTick(t => t + 1), 30_000);
+    return () => clearInterval(id);
+  }, []);
+
+  const effectiveLastAiAt = useMemo(() => {
+    const a = lastAiScanAt ?? null;
+    const b = sessionAiScanAt;
+    if (!a) return b;
+    if (!b) return a;
+    return a > b ? a : b;
+  }, [lastAiScanAt, sessionAiScanAt]);
+
+  void cooldownTick;
+  const cooldownMs = msUntilAiScanAllowed(effectiveLastAiAt);
+  const aiScanOnCooldown = cooldownMs > 0;
 
   const handleComplete = useCallback((provider: Provider, text: string) => {
     setPanelTexts(prev => ({ ...prev, [provider]: text }));
     completedRef.current.add(provider);
     if (completedRef.current.size >= 3) {
+      setSessionAiScanAt(new Date().toISOString());
       setConsensusSignal(s => s + 1);
       setAwaitingConsensus(false);
     }
   }, []);
 
-  function trigger(provider: Provider) {
-    setSignals(prev => ({ ...prev, [provider]: prev[provider] + 1 }));
-  }
+  const handleTerminal = useCallback((provider: Provider) => {
+    terminalRef.current.add(provider);
+    if (terminalRef.current.size >= 3) {
+      setAiRunInFlight(false);
+      setAwaitingConsensus(false);
+    }
+  }, []);
 
-  function runAll() {
+  function runAiScan() {
+    if (aiScanOnCooldown || aiRunInFlight) return;
     completedRef.current = new Set();
+    terminalRef.current = new Set();
     setPanelTexts({});
     setAwaitingConsensus(true);
+    setAiRunInFlight(true);
     setSignals(prev => ({
       openai: prev.openai + 1,
       gemini: prev.gemini + 1,
@@ -335,12 +397,75 @@ export function AiBriefAnalysis({
     claude: panelTexts.claude ?? savedAnalyses?.claude,
   };
   const modelCount = PROVIDERS.filter(p => modelTexts[p]?.trim()).length;
-  const hasSaved =
-    savedAnalyses &&
-    Object.keys(savedAnalyses).some(k => k === 'openai' || k === 'gemini' || k === 'claude');
+  const hasAiSaved = PROVIDERS.some(p => !!savedAnalyses?.[p]);
+
+  const aiScanDisabled = aiScanOnCooldown || aiRunInFlight;
+  const aiScanTitle = aiRunInFlight
+    ? 'Running GPT, Gemini, and Claude…'
+    : aiScanOnCooldown
+      ? `Available in ${formatCooldownWait(cooldownMs)} (10 min between full AI scans)`
+      : hasAiSaved
+        ? 'Re-run all three AI models'
+        : 'Run GPT, Gemini, and Claude';
 
   return (
     <div className="mt-4 pt-3 border-t border-border-subtle space-y-4">
+
+      <div className="border border-border-subtle bg-bg-elevated/50 p-3 sm:p-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
+          <div className="flex flex-col gap-1.5 min-w-0">
+            <RescanBriefButton
+              ticker={brief.ticker}
+              earningsDate={brief.earnings_date}
+            />
+            <ScanAgeLabel at={systemScanAt ?? null} neverLabel="Not scanned yet" />
+            <p className="text-[10px] text-fg-dim leading-snug max-w-xs">
+              Quant + options + news (FMP/Alpaca). Same-day news LLM is cached.
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-1.5 min-w-0">
+            <button
+              type="button"
+              onClick={runAiScan}
+              disabled={aiScanDisabled}
+              title={aiScanTitle}
+              className={`${ACTION_BTN} ${
+                aiScanDisabled
+                  ? 'border-border text-fg-dim cursor-not-allowed opacity-60'
+                  : 'border-fg-subtle/30 text-fg-subtle hover:border-fg-subtle hover:text-fg'
+              }`}
+            >
+              {aiRunInFlight ? '⟳ AI SCAN…' : hasAiSaved ? '↻ AI SCAN' : '✦ AI SCAN'}
+            </button>
+            <ScanAgeLabel at={effectiveLastAiAt} neverLabel="Never run" />
+            {aiScanOnCooldown && !aiRunInFlight && (
+              <span className="text-[10px] text-signal-watch font-mono">
+                Wait {formatCooldownWait(cooldownMs)}
+              </span>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-1.5 min-w-0">
+            <button
+              type="button"
+              onClick={synthesizeNow}
+              disabled={modelCount < 2}
+              title={
+                modelCount < 2
+                  ? 'Run AI scan first (need at least 2 model reports)'
+                  : 'Synthesize final GO/NO-GO from system + AI reports'
+              }
+              className="ai-verdict-btn w-full sm:w-auto disabled:opacity-40"
+            >
+              ⚖ FINAL VERDICT
+            </button>
+            <span className="text-[10px] text-fg-dim">
+              Uses system scan + {modelCount}/3 AI reports
+            </span>
+          </div>
+        </div>
+      </div>
 
       <ConsensusVerdict
         brief={brief}
@@ -355,46 +480,6 @@ export function AiBriefAnalysis({
         </p>
       )}
 
-      <div className="flex flex-wrap items-center gap-2">
-        {PROVIDERS.map(p => {
-          const cfg     = CONFIGS[p];
-          const c       = cfg.color;
-          const ran     = signals[p] > 0;
-          const isSaved = !ran && !!savedAnalyses?.[p];
-          return (
-            <button
-              key={p}
-              type="button"
-              onClick={() => trigger(p)}
-              title={isSaved ? `Refresh ${cfg.label}` : ran ? `Re-run ${cfg.label}` : `Run ${cfg.label}`}
-              className={c.btn}
-            >
-              {ran ? `↻ ${cfg.shortLabel}` : `✦ ${cfg.shortLabel}`}
-            </button>
-          );
-        })}
-
-        <span className="text-fg-dim/30 text-xs select-none">|</span>
-
-        <button
-          type="button"
-          onClick={runAll}
-          className="text-xs px-3 py-1.5 border border-fg-subtle/30 text-fg-subtle hover:border-fg-subtle hover:text-fg tracking-widest transition-colors"
-        >
-          {hasSaved ? '↻ REFRESH ALL' : '✦ RUN ALL'}
-        </button>
-
-        <button
-          type="button"
-          onClick={synthesizeNow}
-          disabled={modelCount < 2}
-          title={modelCount < 2 ? 'Run at least 2 AI analyses first' : 'Synthesize final GO/NO-GO verdict'}
-          className="ai-verdict-btn disabled:opacity-40"
-        >
-          ⚖ FINAL VERDICT
-        </button>
-      </div>
-
       {PROVIDERS.map(p => (
         <AnalysisBlock
           key={p}
@@ -403,6 +488,7 @@ export function AiBriefAnalysis({
           runSignal={signals[p]}
           savedText={savedAnalyses?.[p]}
           onComplete={handleComplete}
+          onTerminal={handleTerminal}
         />
       ))}
     </div>

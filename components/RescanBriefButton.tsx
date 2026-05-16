@@ -12,9 +12,11 @@ type State = 'idle' | 'running' | 'done' | 'error';
 export function RescanBriefButton({
   ticker,
   earningsDate,
+  className,
 }: {
   ticker: string;
   earningsDate: string;
+  className?: string;
 }) {
   const [state, setState] = useState<State>('idle');
   const [message, setMessage] = useState('');
@@ -64,20 +66,20 @@ export function RescanBriefButton({
           : 'text-fg-subtle border-border hover:border-signal-watch hover:text-signal-watch';
 
   return (
-    <div className="flex flex-col items-end gap-1.5">
+    <div className={`flex flex-col items-start gap-1.5 ${className ?? ''}`}>
       <div className="flex items-center gap-3">
         <button
           type="button"
           disabled={state === 'running'}
           onClick={handleClick}
-          className={`text-xs px-3 py-1.5 border tracking-widest transition-colors ${colorClass}`}
+          className={`text-xs px-3 py-1.5 border tracking-widest transition-colors w-full sm:w-auto ${colorClass}`}
         >
-          {state === 'running' ? '⟳ SCANNING…' : state === 'done' ? '✓ RE-SCANNED' : state === 'error' ? '✗ RESCAN FAILED' : '↻ RE-SCAN'}
+          {state === 'running' ? '⟳ SYSTEM SCAN…' : state === 'done' ? '✓ SCANNED' : state === 'error' ? '✗ SCAN FAILED' : '↻ SYSTEM SCAN'}
         </button>
       </div>
       {message && (
         <div
-          className={`text-xs font-mono px-2 py-1 border max-w-[28rem] text-right ${
+          className={`text-xs font-mono px-2 py-1 border max-w-[28rem] text-left ${
             state === 'error'
               ? 'text-signal-sell border-signal-sell/40 bg-signal-sell/5'
               : 'text-fg-muted border-border bg-bg-elevated'

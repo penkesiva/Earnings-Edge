@@ -2,6 +2,13 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { SavedAnalyses } from '@/components/AiBriefAnalysis';
 
 const PROVIDERS = ['openai', 'gemini', 'claude', 'consensus'] as const;
+const MODEL_PROVIDERS = ['openai', 'gemini', 'claude'] as const;
+
+export type LoadedBriefAi = {
+  analyses: SavedAnalyses;
+  /** Latest `analyzed_at` across GPT / Gemini / Claude. */
+  lastAiScanAt: string | null;
+};
 
 function normUuid(id: string): string {
   return String(id).replace(/-/g, '').toLowerCase();
@@ -16,12 +23,12 @@ export async function loadBriefAiAnalyses(
   briefId: string,
   ticker: string,
   earningsDate: string
-): Promise<SavedAnalyses> {
+): Promise<LoadedBriefAi> {
   const want = normUuid(briefId);
 
   const { data: direct, error: directErr } = await sb
     .from('brief_ai_analyses')
-    .select('brief_id, provider, analysis_text')
+    .select('brief_id, provider, analysis_text, analyzed_at')
     .eq('brief_id', briefId);
 
   if (directErr) {
@@ -33,7 +40,7 @@ export async function loadBriefAiAnalyses(
   if (rows.length === 0) {
     const { data: all, error: allErr } = await sb
       .from('brief_ai_analyses')
-      .select('brief_id, provider, analysis_text')
+      .select('brief_id, provider, analysis_text, analyzed_at')
       .limit(2000);
 
     if (allErr) {
@@ -55,17 +62,22 @@ export async function loadBriefAiAnalyses(
     if (siblingNorm.size > 0) {
       const { data: all } = await sb
         .from('brief_ai_analyses')
-        .select('brief_id, provider, analysis_text')
+        .select('brief_id, provider, analysis_text, analyzed_at')
         .limit(2000);
       rows = (all ?? []).filter(r => siblingNorm.has(normUuid(r.brief_id)));
     }
   }
 
   const saved: SavedAnalyses = {};
+  let lastAiScanAt: string | null = null;
   for (const row of rows) {
     const p = row.provider as string;
     if ((PROVIDERS as readonly string[]).includes(p)) {
       saved[p as keyof SavedAnalyses] = row.analysis_text as string;
+    }
+    if ((MODEL_PROVIDERS as readonly string[]).includes(p) && row.analyzed_at) {
+      const at = row.analyzed_at as string;
+      if (!lastAiScanAt || at > lastAiScanAt) lastAiScanAt = at;
     }
   }
 
@@ -73,5 +85,5 @@ export async function loadBriefAiAnalyses(
     console.log('[brief-ai] loaded for', briefId, '→', Object.keys(saved).join(', '));
   }
 
-  return saved;
+  return { analyses: saved, lastAiScanAt };
 }
