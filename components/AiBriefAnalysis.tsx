@@ -1,9 +1,12 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import type { NarrativeOverhang } from '@/lib/screamTest';
+import { ConsensusVerdict } from '@/components/ConsensusVerdict';
 
-export type SavedAnalyses = Partial<Record<'openai' | 'gemini' | 'claude', string>>;
+export type SavedAnalyses = Partial<
+  Record<'openai' | 'gemini' | 'claude' | 'consensus', string>
+>;
 
 export type AiBriefPayload = {
   /** DB primary key — used to persist analysis results. */
@@ -122,11 +125,13 @@ function AnalysisBlock({
   brief,
   runSignal,
   savedText,
+  onComplete,
 }: {
   provider: Provider;
   brief: AiBriefPayload;
   runSignal: number;
   savedText?: string;
+  onComplete?: (provider: Provider, text: string) => void;
 }) {
   const [state, setState] = useState<PanelState>('idle');
   const [text, setText]   = useState('');
@@ -194,6 +199,7 @@ function AnalysisBlock({
         }
       }
       setStateSync('done');
+      if (accText) onComplete?.(provider, accText);
 
       // Persist to DB fire-and-forget (don't await — never block UI)
       if (accText) {
@@ -289,12 +295,28 @@ export function AiBriefAnalysis({
     gemini: 0,
     claude: 0,
   });
+  const [panelTexts, setPanelTexts] = useState<Partial<Record<Provider, string>>>({});
+  const [consensusSignal, setConsensusSignal] = useState(0);
+  const [awaitingConsensus, setAwaitingConsensus] = useState(false);
+  const completedRef = useRef<Set<Provider>>(new Set());
+
+  const handleComplete = useCallback((provider: Provider, text: string) => {
+    setPanelTexts(prev => ({ ...prev, [provider]: text }));
+    completedRef.current.add(provider);
+    if (completedRef.current.size >= 3) {
+      setConsensusSignal(s => s + 1);
+      setAwaitingConsensus(false);
+    }
+  }, []);
 
   function trigger(provider: Provider) {
     setSignals(prev => ({ ...prev, [provider]: prev[provider] + 1 }));
   }
 
   function runAll() {
+    completedRef.current = new Set();
+    setPanelTexts({});
+    setAwaitingConsensus(true);
     setSignals(prev => ({
       openai: prev.openai + 1,
       gemini: prev.gemini + 1,
@@ -302,12 +324,36 @@ export function AiBriefAnalysis({
     }));
   }
 
-  const hasSaved = savedAnalyses && Object.keys(savedAnalyses).length > 0;
+  function synthesizeNow() {
+    setConsensusSignal(s => s + 1);
+  }
+
+  const modelTexts: Partial<Record<Provider, string>> = {
+    openai: panelTexts.openai ?? savedAnalyses?.openai,
+    gemini: panelTexts.gemini ?? savedAnalyses?.gemini,
+    claude: panelTexts.claude ?? savedAnalyses?.claude,
+  };
+  const modelCount = PROVIDERS.filter(p => modelTexts[p]?.trim()).length;
+  const hasSaved =
+    savedAnalyses &&
+    Object.keys(savedAnalyses).some(k => k === 'openai' || k === 'gemini' || k === 'claude');
 
   return (
     <div className="mt-4 pt-3 border-t border-border-subtle space-y-4">
 
-      {/* Toolbar — always visible */}
+      <ConsensusVerdict
+        brief={brief}
+        analyses={modelTexts}
+        savedText={savedAnalyses?.consensus}
+        autoRunSignal={consensusSignal}
+      />
+
+      {awaitingConsensus && modelCount < 3 && (
+        <p className="text-[10px] text-fg-dim tracking-widest animate-pulse">
+          Final verdict runs when all 3 models finish…
+        </p>
+      )}
+
       <div className="flex flex-wrap items-center gap-2">
         {PROVIDERS.map(p => {
           const cfg     = CONFIGS[p];
@@ -336,9 +382,18 @@ export function AiBriefAnalysis({
         >
           {hasSaved ? '↻ REFRESH ALL' : '✦ RUN ALL'}
         </button>
+
+        <button
+          type="button"
+          onClick={synthesizeNow}
+          disabled={modelCount < 2}
+          title={modelCount < 2 ? 'Run at least 2 AI analyses first' : 'Synthesize final GO/NO-GO verdict'}
+          className="text-xs px-3 py-1.5 border border-emerald-500/40 text-emerald-400 hover:opacity-90 tracking-widest transition-colors disabled:opacity-40"
+        >
+          ⚖ FINAL VERDICT
+        </button>
       </div>
 
-      {/* Analysis blocks — render below toolbar, stacked */}
       {PROVIDERS.map(p => (
         <AnalysisBlock
           key={p}
@@ -346,6 +401,7 @@ export function AiBriefAnalysis({
           brief={brief}
           runSignal={signals[p]}
           savedText={savedAnalyses?.[p]}
+          onComplete={handleComplete}
         />
       ))}
     </div>

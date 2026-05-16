@@ -1,0 +1,191 @@
+'use client';
+
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { AiBriefPayload } from '@/components/AiBriefAnalysis';
+import {
+  parseSynthesisResponse,
+  type VerdictCall,
+  type Direction,
+} from '@/lib/aiConsensus';
+
+type PanelState = 'idle' | 'loading' | 'done' | 'error';
+
+function verdictCls(v: VerdictCall): string {
+  if (v === 'GO') return 'text-signal-buy';
+  if (v === 'NO-GO') return 'text-signal-sell';
+  return 'text-signal-watch';
+}
+
+function verdictBorder(v: VerdictCall): string {
+  if (v === 'GO') return 'border-signal-buy/50 bg-signal-buy/10';
+  if (v === 'NO-GO') return 'border-signal-sell/50 bg-signal-sell/10';
+  return 'border-signal-watch/50 bg-signal-watch/10';
+}
+
+function directionCls(d: Direction | null): string {
+  if (d === 'UP') return 'text-signal-buy';
+  if (d === 'DOWN') return 'text-signal-sell';
+  return 'text-fg-muted';
+}
+
+export function ConsensusVerdict({
+  brief,
+  analyses,
+  savedText,
+  autoRunSignal,
+}: {
+  brief: AiBriefPayload;
+  analyses: Partial<Record<'openai' | 'gemini' | 'claude', string>>;
+  savedText?: string;
+  autoRunSignal: number;
+}) {
+  const [state, setState] = useState<PanelState>('idle');
+  const [text, setText] = useState('');
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (savedText) {
+      setText(savedText);
+      setState('done');
+    }
+  }, [savedText]);
+
+  const run = useCallback(async () => {
+    const filled = (['openai', 'gemini', 'claude'] as const).filter(p => analyses[p]?.trim());
+    if (filled.length < 2) {
+      setError('Run at least 2 AI analyses first');
+      setState('error');
+      return;
+    }
+
+    setState('loading');
+    setError('');
+
+    try {
+      const res = await fetch('/api/internal/synthesis-analysis', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ brief, analyses }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error ?? `HTTP ${res.status}`);
+        setState('error');
+        return;
+      }
+      const out = data.text as string;
+      setText(out);
+      setState('done');
+
+      fetch('/api/internal/save-ai-analysis', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          brief_id: brief.brief_id,
+          provider: 'consensus',
+          text: out,
+        }),
+      }).catch(() => {});
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Network error');
+      setState('error');
+    }
+  }, [analyses, brief]);
+
+  const lastAutoSignal = useRef(0);
+  useEffect(() => {
+    if (autoRunSignal > lastAutoSignal.current) {
+      lastAutoSignal.current = autoRunSignal;
+      const count = (['openai', 'gemini', 'claude'] as const).filter(p => analyses[p]?.trim()).length;
+      if (count >= 2) run();
+    }
+  }, [autoRunSignal, analyses, run]);
+
+  if (state === 'idle' && !savedText) return null;
+
+  if (state === 'loading') {
+    return (
+      <div className="border border-emerald-500/40 bg-emerald-500/5 px-4 py-3">
+        <p className="text-xs text-emerald-400/80 animate-pulse tracking-widest">
+          SYNTHESIZING FINAL VERDICT…
+        </p>
+      </div>
+    );
+  }
+
+  if (state === 'error') {
+    return (
+      <div className="border border-signal-sell/40 bg-signal-sell/5 px-4 py-3">
+        <p className="text-xs text-signal-sell">{error}</p>
+        <button
+          type="button"
+          onClick={run}
+          className="mt-2 text-[10px] text-fg-dim hover:text-fg tracking-widest"
+        >
+          ↻ RETRY SYNTHESIS
+        </button>
+      </div>
+    );
+  }
+
+  const parsed = text ? parseSynthesisResponse(text) : null;
+  if (!parsed) return null;
+
+  const isSaved = !!savedText && text === savedText;
+
+  return (
+    <div className={`border px-4 py-3 space-y-2 ${verdictBorder(parsed.verdict)}`}>
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <span className="text-[10px] tracking-widest text-emerald-400/80 uppercase">
+          Final verdict
+        </span>
+        <div className="flex items-center gap-2">
+          {isSaved && (
+            <span className="text-[10px] text-fg-dim tracking-widest">SAVED</span>
+          )}
+          <button
+            type="button"
+            onClick={run}
+            className="text-[10px] text-fg-dim hover:text-fg tracking-widest"
+          >
+            ↻ RE-SYNTHESIZE
+          </button>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <span className={`text-lg font-bold tracking-tight ${verdictCls(parsed.verdict)}`}>
+          {parsed.verdict}
+        </span>
+        {parsed.direction && (
+          <>
+            <span className="text-fg-dim">·</span>
+            <span className={`text-lg font-bold ${directionCls(parsed.direction)}`}>
+              {parsed.direction}
+            </span>
+          </>
+        )}
+        {parsed.confidence && (
+          <>
+            <span className="text-fg-dim">·</span>
+            <span className="text-sm text-fg-muted font-mono">{parsed.confidence}</span>
+          </>
+        )}
+      </div>
+
+      {parsed.move && <p className="text-sm font-mono text-fg">{parsed.move}</p>}
+      {parsed.trade && (
+        <p className="text-xs text-fg-muted leading-relaxed">
+          <span className="text-fg-dim tracking-widest text-[10px]">TRADE </span>
+          {parsed.trade}
+        </p>
+      )}
+      {parsed.alignment && (
+        <p className="text-[10px] text-fg-dim font-mono">{parsed.alignment}</p>
+      )}
+      {parsed.why && (
+        <p className="text-xs text-fg-dim italic leading-relaxed">{parsed.why}</p>
+      )}
+    </div>
+  );
+}

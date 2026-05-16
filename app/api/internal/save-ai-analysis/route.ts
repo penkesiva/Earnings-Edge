@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'brief_id, provider, and text are required' }, { status: 400 });
     }
 
-    const VALID_PROVIDERS = ['openai', 'gemini', 'claude'];
+    const VALID_PROVIDERS = ['openai', 'gemini', 'claude', 'consensus'];
     if (!VALID_PROVIDERS.includes(provider)) {
       return NextResponse.json({ error: `Unknown provider: ${provider}` }, { status: 400 });
     }
