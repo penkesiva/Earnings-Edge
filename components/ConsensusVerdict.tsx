@@ -4,25 +4,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AiBriefPayload } from '@/components/AiBriefAnalysis';
 import {
   buildAlignmentChips,
+  finalVerdictPanelBorder,
+  finalVerdictTextCls,
   parseSynthesisResponse,
   type AlignmentChip,
-  type VerdictCall,
   type Direction,
 } from '@/lib/aiConsensus';
 
 type PanelState = 'idle' | 'loading' | 'done' | 'error';
-
-function verdictCls(v: VerdictCall): string {
-  if (v === 'GO') return 'text-signal-buy';
-  if (v === 'NO-GO') return 'text-signal-sell';
-  return 'text-signal-watch';
-}
-
-function verdictBorder(v: VerdictCall): string {
-  if (v === 'GO') return 'border-signal-buy/50 bg-signal-buy/10';
-  if (v === 'NO-GO') return 'border-signal-sell/50 bg-signal-sell/10';
-  return 'border-signal-watch/50 bg-signal-watch/10';
-}
 
 function directionCls(d: Direction | null): string {
   if (d === 'UP') return 'text-signal-buy';
@@ -161,7 +150,7 @@ export function ConsensusVerdict({
   const isSaved = !!savedText && effectiveText === savedText;
 
   return (
-    <div className={`border px-4 py-3 space-y-2 ${verdictBorder(parsed.verdict)}`}>
+    <div className={`border px-4 py-3 space-y-2 ${finalVerdictPanelBorder(parsed.verdict, parsed.direction)}`}>
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <span className="final-verdict-label">Final verdict</span>
         <div className="flex items-center gap-2">
@@ -179,7 +168,9 @@ export function ConsensusVerdict({
       </div>
 
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <span className={`text-lg font-bold tracking-tight ${verdictCls(parsed.verdict)}`}>
+        <span
+          className={`text-lg font-bold tracking-tight ${finalVerdictTextCls(parsed.verdict, parsed.direction)}`}
+        >
           {parsed.verdict}
         </span>
         {parsed.direction && (

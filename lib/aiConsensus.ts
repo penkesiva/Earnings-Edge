@@ -3,6 +3,44 @@ import type { AiBriefPayload } from '@/components/AiBriefAnalysis';
 export type Direction = 'UP' | 'DOWN' | 'NEUTRAL';
 export type VerdictCall = 'GO' | 'NO-GO' | 'WATCH';
 
+/** Tailwind tokens for verdict badges — GO is colored by direction (bearish GO = red). */
+export type VerdictBadgeStyle = { bg: string; text: string; border: string };
+
+export function directionBadgeStyle(direction: Direction | null): VerdictBadgeStyle {
+  if (direction === 'UP') {
+    return { bg: 'bg-signal-buy/10', text: 'text-signal-buy', border: 'border-signal-buy/40' };
+  }
+  if (direction === 'DOWN') {
+    return { bg: 'bg-signal-sell/10', text: 'text-signal-sell', border: 'border-signal-sell/40' };
+  }
+  return { bg: 'bg-bg-elevated', text: 'text-fg-muted', border: 'border-border' };
+}
+
+export function finalVerdictBadgeStyle(
+  verdict: VerdictCall,
+  direction: Direction | null
+): VerdictBadgeStyle {
+  if (verdict === 'NO-GO') return directionBadgeStyle('DOWN');
+  if (verdict === 'WATCH') {
+    return { bg: 'bg-signal-watch/10', text: 'text-signal-watch', border: 'border-signal-watch/40' };
+  }
+  if (verdict === 'GO') {
+    if (direction === 'DOWN') return directionBadgeStyle('DOWN');
+    if (direction === 'UP') return directionBadgeStyle('UP');
+    return { bg: 'bg-signal-watch/10', text: 'text-signal-watch', border: 'border-signal-watch/40' };
+  }
+  return directionBadgeStyle(null);
+}
+
+export function finalVerdictTextCls(verdict: VerdictCall, direction: Direction | null): string {
+  return finalVerdictBadgeStyle(verdict, direction).text;
+}
+
+export function finalVerdictPanelBorder(verdict: VerdictCall, direction: Direction | null): string {
+  const s = finalVerdictBadgeStyle(verdict, direction);
+  return `${s.border} ${s.bg}`;
+}
+
 export interface ParsedVerdict {
   direction: Direction;
   confidence: number | null;
