@@ -30,9 +30,6 @@ export function DashboardResultCell({
   }
 
   return (
-    <div className="flex flex-col gap-1 min-w-0">
-      <span className="text-[9px] text-fg-dim tracking-widest uppercase">Final verdict</span>
-      <FinalVerdictBadge verdict={parsed.verdict} direction={parsed.direction} />
-    </div>
+    <FinalVerdictBadge verdict={parsed.verdict} direction={parsed.direction} />
   );
 }
