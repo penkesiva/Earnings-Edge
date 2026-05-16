@@ -267,6 +267,44 @@ html.light {
   min-height: 2.75rem;
 }
 
+.icon-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.direction-indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.direction-indicator--up {
+  color: rgb(var(--color-signal-buy));
+  background: rgb(var(--color-signal-buy) / 0.12);
+}
+
+.direction-indicator--down {
+  color: rgb(var(--color-signal-sell));
+  background: rgb(var(--color-signal-sell) / 0.12);
+}
+
+.direction-indicator--neutral {
+  color: var(--color-fg-muted);
+  background: var(--color-bg-hover);
+}
+
 .brief-action-bar {
   position: fixed;
   left: 0;

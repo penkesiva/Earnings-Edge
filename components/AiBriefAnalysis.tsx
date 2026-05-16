@@ -4,6 +4,8 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import type { NarrativeOverhang } from '@/lib/screamTest';
 import type { NewsOverallSentiment, RawHeadline } from '@/lib/newsSentiment';
 import { ConsensusVerdict } from '@/components/ConsensusVerdict';
+import { CopyIconButton } from '@/components/CopyIconButton';
+import { DirectionIndicator } from '@/components/DirectionIndicator';
 import { RescanBriefButton } from '@/components/RescanBriefButton';
 import {
   formatCooldownWait,
@@ -250,11 +252,22 @@ function AnalysisBlock({
   const effectiveText = text || savedText || '';
 
   const isFromSave = effectiveState === 'done' && !!savedText && effectiveText === savedText;
+  const copyText = effectiveText
+    ? `${cfg.label}\n${brief.ticker} · ${brief.earnings_date}\n\n${effectiveText}`
+    : '';
+  const showDirection =
+    !!effectiveText &&
+    (effectiveState === 'done' || effectiveState === 'streaming');
 
   return (
     <div className="pt-3 border-t border-border-subtle">
-      <div className="flex items-center gap-3 mb-2">
+      <div className="flex items-center gap-2 mb-2 flex-wrap">
         <span className={c.label}>{cfg.label}</span>
+        {showDirection && <DirectionIndicator text={effectiveText} />}
+        <span className="flex-1 min-w-[0.5rem]" />
+        {effectiveText && (
+          <CopyIconButton text={copyText} label={`Copy ${cfg.shortLabel} analysis`} />
+        )}
         {(effectiveState === 'loading' || effectiveState === 'streaming') && (
           <span className={`text-[10px] font-medium ${c.status} animate-pulse`}>● THINKING…</span>
         )}

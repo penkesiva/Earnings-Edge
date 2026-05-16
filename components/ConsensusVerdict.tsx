@@ -2,10 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AiBriefPayload } from '@/components/AiBriefAnalysis';
+import { CopyIconButton } from '@/components/CopyIconButton';
+import { DirectionIndicator } from '@/components/DirectionIndicator';
 import {
   buildAlignmentChips,
   finalVerdictPanelBorder,
   finalVerdictTextCls,
+  formatConsensusForCopy,
   parseSynthesisResponse,
   resolveVerdictWhy,
   type AlignmentChip,
@@ -150,12 +153,17 @@ export function ConsensusVerdict({
   const whyText = resolveVerdictWhy(parsed, analyses);
 
   const isSaved = !!savedText && effectiveText === savedText;
+  const copyText = formatConsensusForCopy(parsed, whyText, alignSummary, brief.ticker);
 
   return (
     <div className={`border px-4 py-3 space-y-2 ${finalVerdictPanelBorder(parsed.verdict, parsed.direction)}`}>
       <div className="flex items-center justify-between gap-2 flex-wrap">
-        <span className="final-verdict-label">Final verdict</span>
         <div className="flex items-center gap-2">
+          <span className="final-verdict-label">Final verdict</span>
+          {parsed.direction && <DirectionIndicator direction={parsed.direction} />}
+        </div>
+        <div className="flex items-center gap-2">
+          <CopyIconButton text={copyText} label="Copy final verdict" />
           {isSaved && (
             <span className="text-[10px] text-fg-dim tracking-widest">SAVED</span>
           )}

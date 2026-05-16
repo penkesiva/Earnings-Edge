@@ -65,11 +65,20 @@ export function systemDirectionFromBrief(brief: AiBriefPayload): Direction | nul
   return null;
 }
 
+/** UP / DOWN / NEUTRAL from model or synthesis text; null if unknown. */
+export function parseAiDirection(text: string): Direction | null {
+  const fromLine = text.match(/Direction:\s*(UP|DOWN|NEUTRAL)/i)?.[1]?.toUpperCase();
+  if (fromLine === 'UP' || fromLine === 'DOWN' || fromLine === 'NEUTRAL') {
+    return fromLine;
+  }
+  const fromCall = text.match(/moves\s+(UP|DOWN)/i)?.[1]?.toUpperCase();
+  if (fromCall === 'UP' || fromCall === 'DOWN') return fromCall;
+  return null;
+}
+
 export function parseAiVerdict(text: string): ParsedVerdict | null {
-  const direction =
-    text.match(/Direction:\s*(UP|DOWN)/i)?.[1]?.toUpperCase() as Direction | undefined ??
-    text.match(/moves\s+(UP|DOWN)/i)?.[1]?.toUpperCase() as Direction | undefined;
-  if (!direction) return null;
+  const direction = parseAiDirection(text);
+  if (!direction || direction === 'NEUTRAL') return null;
 
   const confMatch = text.match(/Confidence:\s*(\d+)\s*\/\s*10/i);
   const targetMatch =
@@ -281,4 +290,24 @@ export function parseSynthesisResponse(text: string): ParsedSynthesis {
     trade: line('TRADE'),
     raw: text,
   };
+}
+
+/** Plain-text block for clipboard from parsed Final Verdict. */
+export function formatConsensusForCopy(
+  parsed: ParsedSynthesis,
+  why: string | null,
+  alignSummary: string,
+  ticker: string,
+): string {
+  const head = [
+    `${ticker} — Final Verdict`,
+    [parsed.verdict, parsed.direction, parsed.confidence].filter(Boolean).join(' · '),
+  ].join('\n');
+  const body = [
+    parsed.move ? `Move: ${parsed.move}` : null,
+    why ? `Why: ${why}` : null,
+    parsed.trade ? `Trade: ${parsed.trade}` : null,
+    `Alignment: ${alignSummary}`,
+  ].filter(Boolean);
+  return [head, '', ...body].join('\n');
 }
