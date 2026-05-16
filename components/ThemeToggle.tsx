@@ -7,8 +7,7 @@ export function ThemeToggle() {
   const [isLight, setIsLight] = useState(false);
 
   useEffect(() => {
-    const stored = readStoredTheme();
-    const next = stored === 'light' || (stored === null && document.documentElement.classList.contains('light'));
+    const next = readStoredTheme() === 'light';
     applyTheme(next);
     setIsLight(next);
   }, []);

@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { JetBrains_Mono } from 'next/font/google';
 import Script from 'next/script';
 import { cookies } from 'next/headers';
+import { ThemeSync } from '@/components/ThemeSync';
 import { THEME_COOKIE, THEME_INIT_SCRIPT } from '@/lib/theme';
 import './globals.css';
 
@@ -36,6 +37,7 @@ export default function RootLayout({
           strategy="beforeInteractive"
           dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }}
         />
+        <ThemeSync />
         {children}
       </body>
     </html>

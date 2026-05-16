@@ -66,6 +66,15 @@ body::before {
   pointer-events: none;
 }
 
+html.light .scanline::after {
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgba(0,0,0,0.03) 50%,
+    transparent 100%
+  );
+}
+
 @keyframes pulse-dot {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.4; }
