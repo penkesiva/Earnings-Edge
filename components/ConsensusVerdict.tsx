@@ -126,8 +126,8 @@ export function ConsensusVerdict({
 
   if (effectiveState === 'loading') {
     return (
-      <div className="border border-emerald-500/40 bg-emerald-500/5 px-4 py-3">
-        <p className="text-xs text-emerald-400/80 animate-pulse tracking-widest">
+      <div className="px-4 py-3 ai-verdict-box">
+        <p className="text-xs final-verdict-label animate-pulse">
           SYNTHESIZING FINAL VERDICT…
         </p>
       </div>
@@ -163,9 +163,7 @@ export function ConsensusVerdict({
   return (
     <div className={`border px-4 py-3 space-y-2 ${verdictBorder(parsed.verdict)}`}>
       <div className="flex items-center justify-between gap-2 flex-wrap">
-        <span className="text-[10px] tracking-widest text-emerald-400/80 uppercase">
-          Final verdict
-        </span>
+        <span className="final-verdict-label">Final verdict</span>
         <div className="flex items-center gap-2">
           {isSaved && (
             <span className="text-[10px] text-fg-dim tracking-widest">SAVED</span>

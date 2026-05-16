@@ -200,7 +200,12 @@ export default async function BriefPage({ params }: { params: { id: string } }) 
       </div>
 
       {/* ── News Sentiment ─────────────────────────────────────────────────── */}
-      <NewsSentimentSection overhangs={screamUnresolved} />
+      <NewsSentimentSection
+        overhangs={screamUnresolved}
+        rawHeadlines={
+          (brief.raw_headlines as { date: string; title: string; source: string }[] | null) ?? null
+        }
+      />
 
       {/* ── Outcome (if logged) ────────────────────────────────────────────── */}
       {outcome && (
@@ -931,7 +936,14 @@ function BriefInsightStrip({
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-2">
         <InsightCell label="BEAT" value={beatLabel} sub={`${compositeScore}/100`} valueCls={beatCls} />
         <InsightCell label="OPTIONS FLOW" value={flowLabel} sub={flowSub} valueCls={flowCls} />
-        <InsightCell label="NEWS" value={newsLabel} sub={newsSub} valueCls={newsCls} />
+        <InsightCell
+          label="NEWS"
+          value={newsLabel}
+          sub={newsSub}
+          valueCls={newsCls}
+          href="#news-sentiment"
+          linkHint="read headlines ↓"
+        />
         <InsightCell label="IV ENV" value={ivLabel} sub={ivSub} valueCls={ivCls} />
       </div>
 
@@ -942,6 +954,12 @@ function BriefInsightStrip({
           <span className={`font-semibold ${leanCls}`}>{leanLabel}</span>
           <span className="text-fg-dim">  ·  </span>
           <span className={directionCls}>{directionTake}</span>
+          <a
+            href="#news-sentiment"
+            className="ml-2 text-fg-dim hover:text-fg-subtle underline-offset-2 hover:underline"
+          >
+            News ↓
+          </a>
         </div>
         {tensionNote && (
           <div className="text-fg-dim italic">{tensionNote}</div>
@@ -953,17 +971,38 @@ function BriefInsightStrip({
 }
 
 function InsightCell({
-  label, value, sub, valueCls,
+  label, value, sub, valueCls, href, linkHint,
 }: {
-  label: string; value: string; sub?: string; valueCls: string;
+  label: string;
+  value: string;
+  sub?: string;
+  valueCls: string;
+  href?: string;
+  linkHint?: string;
 }) {
-  return (
-    <div>
+  const body = (
+    <>
       <div className="text-[10px] text-fg-dim tracking-widest uppercase mb-0.5">{label}</div>
       <div className={`text-xs font-bold ${valueCls}`}>{value}</div>
       {sub && <div className="text-[10px] text-fg-dim">{sub}</div>}
-    </div>
+      {href && linkHint && (
+        <div className="text-[10px] text-fg-dim mt-0.5 group-hover:text-fg-subtle">{linkHint}</div>
+      )}
+    </>
   );
+
+  if (href) {
+    return (
+      <a
+        href={href}
+        className="block rounded -mx-1 px-1 py-0.5 hover:bg-bg-subtle/60 transition-colors group"
+      >
+        {body}
+      </a>
+    );
+  }
+
+  return <div>{body}</div>;
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -976,9 +1015,17 @@ const CATEGORY_LABELS: Record<string, string> = {
   macro_specific:   'Macro / price action',
 };
 
-function NewsSentimentSection({ overhangs }: { overhangs: NarrativeOverhang[] | null }) {
-  // Compute overall sentiment from unresolved overhangs
+type RawHeadline = { date: string; title: string; source: string };
+
+function NewsSentimentSection({
+  overhangs,
+  rawHeadlines,
+}: {
+  overhangs: NarrativeOverhang[] | null;
+  rawHeadlines: RawHeadline[] | null;
+}) {
   const risks = overhangs ?? [];
+  const headlines = [...(rawHeadlines ?? [])].reverse();
   const maxSeverity = risks.reduce((m, r) => Math.max(m, r.severity ?? 3), 0);
 
   let badge: { label: string; cls: string };
@@ -995,7 +1042,10 @@ function NewsSentimentSection({ overhangs }: { overhangs: NarrativeOverhang[] | 
   }
 
   return (
-    <section className="border border-border bg-bg-elevated p-5 sm:p-6">
+    <section
+      id="news-sentiment"
+      className="border border-border bg-bg-elevated p-5 sm:p-6 scroll-mt-6"
+    >
       <div className="flex items-center gap-3 mb-4">
         <div className="text-xs tracking-widest text-fg-subtle">NEWS SENTIMENT</div>
         <span className={`text-[11px] font-bold px-2 py-0.5 border tracking-widest ${badge.cls}`}>
@@ -1024,11 +1074,41 @@ function NewsSentimentSection({ overhangs }: { overhangs: NarrativeOverhang[] | 
         </div>
       )}
 
-      {risks.length === 0 && (
+      {risks.length === 0 && headlines.length === 0 && (
         <p className="text-xs text-fg-dim">
           Powered by LLM headline analysis (60-day window). No negative signals found.
         </p>
       )}
+
+      <div className="mt-5 pt-4 border-t border-border-subtle">
+        <div className="text-[10px] tracking-widest text-fg-dim mb-3">
+          RAW HEADLINES{headlines.length > 0 ? ` (${headlines.length})` : ''}
+        </div>
+        {headlines.length > 0 ? (
+          <>
+            <div className="max-h-72 overflow-y-auto space-y-2 pr-1">
+              {headlines.map((h, i) => (
+                <div key={i} className="flex items-start gap-3 text-xs">
+                  <span className="shrink-0 tabular-nums text-fg-dim w-[4.5rem]">{h.date}</span>
+                  <span className="text-fg-muted leading-snug">{h.title}</span>
+                  {h.source ? (
+                    <span className="shrink-0 text-fg-dim hidden sm:block max-w-[7rem] truncate" title={h.source}>
+                      {h.source}
+                    </span>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+            <p className="text-[10px] text-fg-dim mt-3">
+              FMP stable news + Gemini search · 60-day window · newest first
+            </p>
+          </>
+        ) : (
+          <p className="text-xs text-fg-dim">
+            No headlines stored for this brief. Re-run scan to load raw news.
+          </p>
+        )}
+      </div>
     </section>
   );
 }

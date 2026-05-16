@@ -46,11 +46,11 @@ interface ProviderConfig {
   endpoint: string;
   parseChunk: (payload: string) => string | null;
   color: {
-    border: string;
-    text: string;
-    textDim: string;
-    bg: string;
-    dotColor: string;
+    label: string;
+    btn: string;
+    box: string;
+    dot: string;
+    status: string;
   };
 }
 
@@ -69,11 +69,11 @@ const CONFIGS: Record<Provider, ProviderConfig> = {
       } catch { return null; }
     },
     color: {
-      border:   'border-violet-500/40',
-      text:     'text-violet-400',
-      textDim:  'text-violet-400/60',
-      bg:       'bg-violet-500/5',
-      dotColor: 'bg-violet-400',
+      label:  'ai-panel-label ai-panel-label--openai',
+      btn:    'ai-panel-btn ai-panel-btn--openai',
+      box:    'ai-panel-box ai-panel-box--openai',
+      dot:    'ai-panel-dot--openai',
+      status: 'ai-panel-status--openai',
     },
   },
   gemini: {
@@ -87,11 +87,11 @@ const CONFIGS: Record<Provider, ProviderConfig> = {
       } catch { return null; }
     },
     color: {
-      border:   'border-blue-500/40',
-      text:     'text-blue-400',
-      textDim:  'text-blue-400/60',
-      bg:       'bg-blue-500/5',
-      dotColor: 'bg-blue-400',
+      label:  'ai-panel-label ai-panel-label--gemini',
+      btn:    'ai-panel-btn ai-panel-btn--gemini',
+      box:    'ai-panel-box ai-panel-box--gemini',
+      dot:    'ai-panel-dot--gemini',
+      status: 'ai-panel-status--gemini',
     },
   },
   claude: {
@@ -109,11 +109,11 @@ const CONFIGS: Record<Provider, ProviderConfig> = {
       } catch { return null; }
     },
     color: {
-      border:   'border-amber-500/40',
-      text:     'text-amber-400',
-      textDim:  'text-amber-400/60',
-      bg:       'bg-amber-500/5',
-      dotColor: 'bg-amber-400',
+      label:  'ai-panel-label ai-panel-label--claude',
+      btn:    'ai-panel-btn ai-panel-btn--claude',
+      box:    'ai-panel-box ai-panel-box--claude',
+      dot:    'ai-panel-dot--claude',
+      status: 'ai-panel-status--claude',
     },
   },
 };
@@ -240,13 +240,11 @@ function AnalysisBlock({
   const isFromSave = effectiveState === 'done' && !!savedText && effectiveText === savedText;
 
   return (
-    <div className={`pt-3 border-t ${c.border}`}>
+    <div className="pt-3 border-t border-border-subtle">
       <div className="flex items-center gap-3 mb-2">
-        <span className={`text-[10px] tracking-widest font-medium uppercase ${c.textDim}`}>
-          {cfg.label}
-        </span>
+        <span className={c.label}>{cfg.label}</span>
         {(effectiveState === 'loading' || effectiveState === 'streaming') && (
-          <span className={`text-[10px] ${c.text} animate-pulse`}>● THINKING…</span>
+          <span className={`text-[10px] font-medium ${c.status} animate-pulse`}>● THINKING…</span>
         )}
         {effectiveState === 'done' && (
           <>
@@ -268,15 +266,15 @@ function AnalysisBlock({
         <p className="text-xs text-signal-sell">{error}</p>
       )}
       {effectiveState === 'loading' && (
-        <p className={`text-xs ${c.textDim} animate-pulse tracking-widest`}>
+        <p className={`text-xs ${c.status} animate-pulse tracking-widest font-medium`}>
           Assembling brief data…
         </p>
       )}
       {(effectiveState === 'streaming' || effectiveState === 'done') && effectiveText && (
-        <div className={`text-xs text-fg-muted leading-relaxed whitespace-pre-wrap font-mono border ${c.border} ${c.bg} px-4 py-3`}>
+        <div className={`text-xs text-fg-muted leading-relaxed whitespace-pre-wrap font-mono ${c.box} px-4 py-3`}>
           {effectiveText}
           {effectiveState === 'streaming' && (
-            <span className={`inline-block w-1.5 h-3 ${c.dotColor} animate-pulse ml-0.5 align-middle`} />
+            <span className={`inline-block w-1.5 h-3 ${c.dot} animate-pulse ml-0.5 align-middle`} />
           )}
         </div>
       )}
@@ -369,7 +367,7 @@ export function AiBriefAnalysis({
               type="button"
               onClick={() => trigger(p)}
               title={isSaved ? `Refresh ${cfg.label}` : ran ? `Re-run ${cfg.label}` : `Run ${cfg.label}`}
-              className={`text-xs px-3 py-1.5 border ${c.border} ${c.text} hover:opacity-90 tracking-widest transition-colors`}
+              className={c.btn}
             >
               {ran ? `↻ ${cfg.shortLabel}` : `✦ ${cfg.shortLabel}`}
             </button>
@@ -391,7 +389,7 @@ export function AiBriefAnalysis({
           onClick={synthesizeNow}
           disabled={modelCount < 2}
           title={modelCount < 2 ? 'Run at least 2 AI analyses first' : 'Synthesize final GO/NO-GO verdict'}
-          className="text-xs px-3 py-1.5 border border-emerald-500/40 text-emerald-400 hover:opacity-90 tracking-widest transition-colors disabled:opacity-40"
+          className="ai-verdict-btn disabled:opacity-40"
         >
           ⚖ FINAL VERDICT
         </button>
