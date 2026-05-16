@@ -139,8 +139,8 @@ export async function FearGreedIndex() {
   return (
     <div className="border border-border bg-bg-elevated px-4 py-3">
       <MoodStrip score={data.score} />
-      <div className="flex items-start justify-between gap-4">
-        <div>
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
+        <div className="min-w-0">
           <div className="text-xs text-fg-muted tracking-widest uppercase">
             CNN Fear &amp; Greed
           </div>

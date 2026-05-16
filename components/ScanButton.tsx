@@ -43,7 +43,7 @@ export function ScanButton({ mode }: Props) {
         type="button"
         onClick={run}
         disabled={pending}
-        className={`px-3 py-1.5 text-xs font-bold tracking-widest border transition-colors ${
+        className={`touch-target px-3 py-2 sm:py-1.5 text-xs font-bold tracking-widest border transition-colors ${
           pending
             ? `${accentActive} animate-pulse cursor-not-allowed`
             : `border-border bg-bg ${accentIdle}`

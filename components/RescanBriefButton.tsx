@@ -72,9 +72,23 @@ export function RescanBriefButton({
           type="button"
           disabled={state === 'running'}
           onClick={handleClick}
-          className={`text-xs px-3 py-1.5 border tracking-widest transition-colors w-full sm:w-auto ${colorClass}`}
+          className={`touch-target text-[11px] md:text-xs px-2 md:px-3 py-2 md:py-1.5 border tracking-widest transition-colors w-full ${colorClass}`}
         >
-          {state === 'running' ? '⟳ SYSTEM SCAN…' : state === 'done' ? '✓ SCANNED' : state === 'error' ? '✗ SCAN FAILED' : '↻ SYSTEM SCAN'}
+          {state === 'running' ? (
+            <>
+              <span className="md:hidden">⟳ SCAN…</span>
+              <span className="hidden md:inline">⟳ SYSTEM SCAN…</span>
+            </>
+          ) : state === 'done' ? (
+            '✓ SCANNED'
+          ) : state === 'error' ? (
+            '✗ FAILED'
+          ) : (
+            <>
+              <span className="md:hidden">↻ SYSTEM</span>
+              <span className="hidden md:inline">↻ SYSTEM SCAN</span>
+            </>
+          )}
         </button>
       </div>
       {message && (

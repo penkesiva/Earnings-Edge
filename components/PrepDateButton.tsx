@@ -74,7 +74,7 @@ export function PrepDateButton({ date }: { date: string }) {
         type="button"
         disabled={state === 'running'}
         onClick={handleClick}
-        className={`text-[11px] font-bold px-2.5 py-1 border tracking-widest ${btnClass}`}
+        className={`touch-target text-[11px] font-bold px-2.5 py-2 sm:py-1 border tracking-widest ${btnClass}`}
       >
         {label}
       </button>

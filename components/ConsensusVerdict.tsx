@@ -205,7 +205,7 @@ export function ConsensusVerdict({
           {parsed.trade}
         </p>
       )}
-      <p className="text-[11px] text-fg font-mono leading-relaxed">
+      <p className="text-[11px] text-fg font-mono leading-relaxed overflow-x-auto pb-1 -mx-1 px-1">
         <span className="font-semibold text-fg-muted">{alignSummary}</span>
         <span className="text-fg-dim"> — </span>
         {chips.map((chip, i) => (

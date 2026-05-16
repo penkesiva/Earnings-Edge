@@ -7,6 +7,7 @@ import { FearGreedIndex, FearGreedIndexSkeleton } from '@/components/FearGreedIn
 import { LastScanned } from '@/components/LastScanned';
 import { PrepDateButton } from '@/components/PrepDateButton';
 import { ScanButton } from '@/components/ScanButton';
+import { SectionHeader } from '@/components/SectionHeader';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -72,23 +73,24 @@ export default async function HomePage() {
   }, {});
 
   return (
-    <div className="space-y-12">
+    <div className="space-y-8 sm:space-y-12">
       <Suspense fallback={<FearGreedIndexSkeleton />}>
         <FearGreedIndex />
       </Suspense>
 
       <section>
-        <div className="flex items-center justify-between mb-4 sm:mb-6">
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
-            <span className="text-fg-subtle">›</span> TODAY
-          </h1>
-          <div className="flex items-center gap-3">
-            <ScanButton mode="today" />
-            <div className="text-xs text-fg-subtle">
-              {todayBriefs?.length ?? 0} BRIEF{todayBriefs?.length === 1 ? '' : 'S'}
-            </div>
-          </div>
-        </div>
+        <SectionHeader
+          title={
+            <h1 className="text-xl sm:text-3xl font-bold tracking-tight">
+              <span className="text-fg-subtle">›</span> TODAY
+            </h1>
+          }
+        >
+          <ScanButton mode="today" />
+          <span className="text-xs text-fg-subtle whitespace-nowrap">
+            {todayBriefs?.length ?? 0} BRIEF{todayBriefs?.length === 1 ? '' : 'S'}
+          </span>
+        </SectionHeader>
 
         {!todayBriefs?.length ? (
           <div className="border border-border bg-bg-elevated p-8 text-center text-fg-subtle text-sm">
@@ -98,7 +100,7 @@ export default async function HomePage() {
           <>
             <div className="md:hidden space-y-2">
               {todayBriefs.map(b => (
-                <Link key={b.id} href={`/briefs/${b.id}`} className="block border border-border bg-bg-elevated p-3 active:opacity-75">
+                <Link key={b.id} href={`/briefs/${b.id}`} className="block border border-border bg-bg-elevated p-3 sm:p-4 active:opacity-75 touch-manipulation">
                   {/* Row 1: Ticker + conviction + score + timestamp */}
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
@@ -112,11 +114,11 @@ export default async function HomePage() {
                     </div>
                   </div>
                   {/* Row 2: Action badge (full width so long labels never overflow) */}
-                  <div className="mb-2">
+                  <div className="mb-2 flex flex-wrap gap-1">
                     <FinalActionBadge action={b.final_action ?? null} />
                   </div>
                   {/* Row 3: Key stats */}
-                  <div className="flex gap-4 text-[11px] text-fg-dim">
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-fg-dim">
                     <span>SPOT <span className="text-fg-muted font-mono">${b.spot_price?.toFixed(2)}</span></span>
                     <span>MOVE <span className="text-fg-muted font-mono">±${b.expected_move_dollar?.toFixed(2)}</span></span>
                     <span>IVR <span className="text-fg-muted font-mono">{b.iv_rank}</span></span>
@@ -170,17 +172,18 @@ export default async function HomePage() {
       </section>
 
       <section>
-        <div className="flex items-center justify-between mb-4 sm:mb-6">
-          <h2 className="text-lg sm:text-xl font-bold tracking-tight">
-            <span className="text-fg-subtle">›</span> TOMORROW PREP
-          </h2>
-          <div className="flex items-center gap-3">
-            <ScanButton mode="tomorrow" />
-            <div className="text-xs text-fg-subtle">
-              {tomorrowBriefs?.length ?? 0} BRIEF{tomorrowBriefs?.length === 1 ? '' : 'S'} · {tomorrow}
-            </div>
-          </div>
-        </div>
+        <SectionHeader
+          title={
+            <h2 className="text-lg sm:text-xl font-bold tracking-tight">
+              <span className="text-fg-subtle">›</span> TOMORROW PREP
+            </h2>
+          }
+        >
+          <ScanButton mode="tomorrow" />
+          <span className="text-xs text-fg-subtle whitespace-nowrap">
+            {tomorrowBriefs?.length ?? 0} BRIEF{tomorrowBriefs?.length === 1 ? '' : 'S'} · {tomorrow}
+          </span>
+        </SectionHeader>
         {!tomorrowBriefs?.length ? (
           <div className="border border-border bg-bg-elevated p-5 text-center text-fg-subtle text-sm">
             No tomorrow briefs yet — hit <span className="text-fg-muted">PREP</span> above.
@@ -189,7 +192,7 @@ export default async function HomePage() {
           <>
             <div className="md:hidden space-y-2">
               {tomorrowBriefs.map(b => (
-                <Link key={b.id} href={`/briefs/${b.id}`} className="block border border-border bg-bg-elevated p-3 active:opacity-75">
+                <Link key={b.id} href={`/briefs/${b.id}`} className="block border border-border bg-bg-elevated p-3 sm:p-4 active:opacity-75 touch-manipulation">
                   {/* Row 1: Ticker + conviction + score + timestamp */}
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
@@ -203,11 +206,11 @@ export default async function HomePage() {
                     </div>
                   </div>
                   {/* Row 2: Action badge */}
-                  <div className="mb-2">
+                  <div className="mb-2 flex flex-wrap gap-1">
                     <FinalActionBadge action={b.final_action ?? null} />
                   </div>
                   {/* Row 3: Key stats */}
-                  <div className="flex gap-4 text-[11px] text-fg-dim">
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-fg-dim">
                     <span>SPOT <span className="text-fg-muted font-mono">${b.spot_price?.toFixed(2)}</span></span>
                     <span>MOVE <span className="text-fg-muted font-mono">±${b.expected_move_dollar?.toFixed(2)}</span></span>
                   </div>
@@ -254,11 +257,13 @@ export default async function HomePage() {
       </section>
 
       <section>
-        <div className="flex items-baseline justify-between mb-4 sm:mb-6">
-          <h2 className="text-xl font-bold tracking-tight">
-            <span className="text-fg-subtle">›</span> NEXT 7 DAYS
-          </h2>
-        </div>
+        <SectionHeader
+          title={
+            <h2 className="text-lg sm:text-xl font-bold tracking-tight">
+              <span className="text-fg-subtle">›</span> NEXT 7 DAYS
+            </h2>
+          }
+        />
 
         {!upcoming?.length ? (
           <div className="text-fg-subtle text-sm">
@@ -271,7 +276,7 @@ export default async function HomePage() {
             {Object.entries(upcomingByDate).map(([date, events]) => (
               <div key={date} className="border border-border">
                 {/* Date header row */}
-                <div className="flex items-center justify-between px-4 py-2 bg-bg-elevated border-b border-border text-xs tracking-widest">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between px-3 sm:px-4 py-2 bg-bg-elevated border-b border-border text-xs tracking-widest">
                   <span className="text-fg font-bold">
                     {new Date(date + 'T12:00:00').toLocaleDateString('en-US', {
                       weekday: 'short', month: 'short', day: 'numeric',
@@ -319,7 +324,8 @@ export default async function HomePage() {
                             )}
                           </div>
                           {brief && (
-                            <div className="flex items-center gap-2 mt-1.5">
+                            <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                              <ScoreCell value={brief.composite_score} />
                               <ConvictionArrows action={brief.final_action ?? null} />
                               <FinalActionBadge action={brief.final_action ?? null} />
                               <LastScanned updatedAt={brief.updated_at ?? brief.generated_at ?? null} />

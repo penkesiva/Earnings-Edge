@@ -90,18 +90,18 @@ export default async function BriefPage({ params }: { params: { id: string } }) 
     structure?.preferredExpiry ?? structure?.legs?.[0]?.expiry ?? null;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 sm:space-y-8 brief-page-pad-bottom">
       <Link href="/" className="text-xs text-fg-subtle hover:text-fg">
         ← BACK
       </Link>
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <div className="border-l-4 border-signal-buy pl-4 sm:pl-6">
+      <div className="border-l-[3px] sm:border-l-4 border-signal-buy pl-3 sm:pl-6">
         <div className="text-xs text-fg-subtle tracking-widest mb-2">
           EARNINGS BRIEF · {brief.earnings_date}
         </div>
         <div className="flex flex-wrap items-baseline gap-3 sm:gap-6 mb-4">
-          <h1 className="text-4xl sm:text-5xl font-bold">{brief.ticker}</h1>
+          <h1 className="text-3xl sm:text-5xl font-bold">{brief.ticker}</h1>
           <div className="flex items-baseline gap-2">
             <div className="text-2xl sm:text-3xl text-fg-muted">
               ${displayPrice?.toFixed(2)}
@@ -114,7 +114,7 @@ export default async function BriefPage({ params }: { params: { id: string } }) 
           </div>
         </div>
         <div>
-          <div className="text-2xl font-bold">
+          <div className="text-xl sm:text-2xl font-bold">
             SCORE <span className={scoreColor(brief.composite_score)}>{brief.composite_score}</span>
             <span className="text-fg-subtle text-base ml-2">/ 100</span>
           </div>
@@ -171,7 +171,7 @@ export default async function BriefPage({ params }: { params: { id: string } }) 
       <ScanDiffBanner ticker={brief.ticker} scans={scanRows} />
 
       {/* ── Final action ───────────────────────────────────────────────────── */}
-      <section className="border border-border bg-bg-elevated p-6">
+      <section className="border border-border bg-bg-elevated p-4 sm:p-6">
         <div className="text-xs tracking-widest text-fg-subtle mb-4">TRADE DECISION</div>
         {legacyFallback ? (
           <div className="text-xs text-fg-dim">
@@ -211,7 +211,7 @@ export default async function BriefPage({ params }: { params: { id: string } }) 
 
       {/* ── Outcome (if logged) ────────────────────────────────────────────── */}
       {outcome && (
-        <section className="border border-border bg-bg-elevated p-6">
+        <section className="border border-border bg-bg-elevated p-4 sm:p-6">
           <h2 className="text-xs tracking-widest text-fg-subtle mb-4">OUTCOME</h2>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
             <div>
@@ -675,7 +675,7 @@ function TradeDecisionCard({
       {/* Primary answer */}
       <div>
         <div className="text-[10px] tracking-widest text-fg-subtle mb-1">DECISION</div>
-        <div className={`text-2xl font-bold tracking-wide ${tradeColor}`}>{tradeLabel}</div>
+        <div className={`text-xl sm:text-2xl font-bold tracking-wide ${tradeColor}`}>{tradeLabel}</div>
       </div>
 
       {/* Three key questions */}
@@ -744,9 +744,9 @@ function TradeDecisionCard({
 
 function Stat({ label, value, sub }: { label: string; value: any; sub?: string }) {
   return (
-    <div className="bg-bg-elevated p-4">
+    <div className="bg-bg-elevated p-3 sm:p-4">
       <div className="text-xs text-fg-subtle tracking-widest mb-1">{label}</div>
-      <div className="text-xl font-bold">{value}</div>
+      <div className="text-lg sm:text-xl font-bold">{value}</div>
       {sub && <div className="text-xs text-fg-muted mt-1">{sub}</div>}
     </div>
   );
@@ -937,7 +937,7 @@ function BriefInsightStrip({
       {/* 4-cell signal grid */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-2">
         <InsightCell label="BEAT" value={beatLabel} sub={`${compositeScore}/100`} valueCls={beatCls} />
-        <InsightCell label="OPTIONS FLOW" value={flowLabel} sub={flowSub} valueCls={flowCls} />
+        <InsightCell label="OPTIONS FLOW" shortLabel="FLOW" value={flowLabel} sub={flowSub} valueCls={flowCls} />
         <InsightCell
           label="NEWS"
           value={newsLabel}
@@ -950,19 +950,18 @@ function BriefInsightStrip({
       </div>
 
       {/* System verdict — single crisp line */}
-      <div className="text-xs border-t border-border-subtle pt-2 space-y-1">
-        <div>
-          <span className="text-fg-dim tracking-widest">System  </span>
+      <div className="text-xs border-t border-border-subtle pt-2 space-y-1.5">
+        <div className="flex flex-wrap items-baseline gap-x-1 gap-y-0.5">
+          <span className="text-fg-dim tracking-widest shrink-0">System</span>
           <span className={`font-semibold ${leanCls}`}>{leanLabel}</span>
-          <span className="text-fg-dim">  ·  </span>
-          <span className={directionCls}>{directionTake}</span>
-          <a
-            href="#news-sentiment"
-            className="ml-2 text-fg-dim hover:text-fg-subtle underline-offset-2 hover:underline"
-          >
-            News ↓
-          </a>
         </div>
+        <p className={`leading-relaxed ${directionCls}`}>{directionTake}</p>
+        <a
+          href="#news-sentiment"
+          className="inline-block text-fg-dim hover:text-fg-subtle underline-offset-2 hover:underline"
+        >
+          News ↓
+        </a>
         {tensionNote && (
           <div className="text-fg-dim italic">{tensionNote}</div>
         )}
@@ -973,9 +972,10 @@ function BriefInsightStrip({
 }
 
 function InsightCell({
-  label, value, sub, valueCls, href, linkHint,
+  label, shortLabel, value, sub, valueCls, href, linkHint,
 }: {
   label: string;
+  shortLabel?: string;
   value: string;
   sub?: string;
   valueCls: string;
@@ -984,7 +984,16 @@ function InsightCell({
 }) {
   const body = (
     <>
-      <div className="text-[10px] text-fg-dim tracking-widest uppercase mb-0.5">{label}</div>
+      <div className="text-[10px] text-fg-dim tracking-widest uppercase mb-0.5">
+        {shortLabel ? (
+          <>
+            <span className="sm:hidden">{shortLabel}</span>
+            <span className="hidden sm:inline">{label}</span>
+          </>
+        ) : (
+          label
+        )}
+      </div>
       <div className={`text-xs font-bold ${valueCls}`}>{value}</div>
       {sub && <div className="text-[10px] text-fg-dim">{sub}</div>}
       {href && linkHint && (
@@ -997,7 +1006,7 @@ function InsightCell({
     return (
       <a
         href={href}
-        className="block rounded -mx-1 px-1 py-0.5 hover:bg-bg-subtle/60 transition-colors group"
+        className="block rounded -mx-1 px-1 py-0.5 hover:bg-bg-hover/60 transition-colors group"
       >
         {body}
       </a>
@@ -1046,9 +1055,9 @@ function NewsSentimentSection({
   return (
     <section
       id="news-sentiment"
-      className="border border-border bg-bg-elevated p-5 sm:p-6 scroll-mt-6"
+      className="border border-border bg-bg-elevated p-4 sm:p-6 scroll-mt-20 md:scroll-mt-6"
     >
-      <div className="flex items-center gap-3 mb-4">
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-4">
         <div className="text-xs tracking-widest text-fg-subtle">NEWS SENTIMENT</div>
         <span className={`text-[11px] font-bold px-2 py-0.5 border tracking-widest ${badge.cls}`}>
           {badge.label}
@@ -1062,14 +1071,16 @@ function NewsSentimentSection({
             const sev = r.severity;
             const sevColor = sev && sev >= 4 ? 'text-signal-sell' : sev && sev >= 3 ? 'text-signal-watch' : 'text-fg-dim';
             return (
-              <div key={i} className="flex items-start gap-3 text-xs">
-                <span className={`shrink-0 font-bold tabular-nums ${sevColor}`}>
-                  {sev ? `S${sev}` : '—'}
-                </span>
-                <span className="text-fg-subtle shrink-0 w-[130px]">
-                  {CATEGORY_LABELS[r.category] ?? r.category}
-                </span>
-                <span className="text-fg-muted">{r.description}</span>
+              <div key={i} className="text-xs border-b border-border-subtle pb-2 last:border-0 last:pb-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className={`shrink-0 font-bold tabular-nums ${sevColor}`}>
+                    {sev ? `S${sev}` : '—'}
+                  </span>
+                  <span className="text-fg-subtle font-medium">
+                    {CATEGORY_LABELS[r.category] ?? r.category}
+                  </span>
+                </div>
+                <p className="text-fg-muted leading-snug pl-6">{r.description}</p>
               </div>
             );
           })}

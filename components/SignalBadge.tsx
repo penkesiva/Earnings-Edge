@@ -100,7 +100,7 @@ export function FinalActionBadge({ action }: { action: string | null }) {
     FINAL_ACTION_STYLES.SKIP;
   return (
     <span
-      className={`inline-block px-2 py-0.5 ${style.bg} ${style.text} text-xs font-bold tracking-widest border border-current/20`}
+      className={`inline-block max-w-full px-2 py-0.5 ${style.bg} ${style.text} text-[10px] sm:text-xs font-bold tracking-widest border border-current/20 leading-snug`}
     >
       {style.label}
     </span>
@@ -138,7 +138,7 @@ export function SignalBadge({
     SIGNAL_STYLES[legacySignalKey(signal, structureAction)] || SIGNAL_STYLES.SKIP;
   return (
     <span
-      className={`inline-block px-2 py-0.5 ${style.bg} ${style.text} text-xs font-bold tracking-widest border border-current/20`}
+      className={`inline-block max-w-full px-2 py-0.5 ${style.bg} ${style.text} text-[10px] sm:text-xs font-bold tracking-widest border border-current/20 leading-snug`}
     >
       {style.label}
     </span>

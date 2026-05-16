@@ -162,7 +162,7 @@ export function ScreamTestCard({
     : 'text-fg-muted';
 
   return (
-    <section className="border border-border bg-bg-elevated p-6">
+    <section className="border border-border bg-bg-elevated p-4 sm:p-6">
       <div className="flex justify-between items-start gap-4 mb-4 flex-wrap">
         <div>
           <h2 className="text-xs tracking-widest text-fg-subtle mb-1">SCREAM TEST</h2>
@@ -197,7 +197,7 @@ export function ScreamTestCard({
                 <span className={iconClass} title={iconTitle}>
                   {icon}
                 </span>
-                <span className="text-fg-subtle w-40 shrink-0">{FILTER_LABELS[key] ?? key}</span>
+                <span className="text-fg-subtle w-full sm:w-36 md:w-40 shrink-0">{FILTER_LABELS[key] ?? key}</span>
                 <span className="flex-1 min-w-0">
                   <span className="text-fg-muted">{f.detail}</span>
                   {isOpposing && (
@@ -208,7 +208,7 @@ export function ScreamTestCard({
                 </span>
               </div>
               {rowTriggers && rowTriggers.length > 0 && (
-                <ul className="pl-6 ml-40 text-fg-dim space-y-0.5">
+                <ul className="pl-6 sm:ml-36 md:ml-40 text-fg-dim space-y-0.5">
                   {rowTriggers.map((t, j) => (
                     <li key={j} className="text-[10px] leading-snug flex gap-1">
                       <span className="text-fg-dim shrink-0">·</span>

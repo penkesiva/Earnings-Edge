@@ -48,10 +48,12 @@ export function ScanDiffBanner({ ticker, scans }: { ticker: string; scans: Brief
     // Full-width banner for decision-relevant flips
     return (
       <div className="border border-signal-sell bg-signal-sell/5 px-4 py-3 space-y-2">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <span className="text-signal-sell font-bold text-sm">⚠ FLIPPED</span>
           <span className="text-signal-sell text-xs font-mono">since {previousTime} scan</span>
-          <span className="text-fg-dim text-[10px] font-mono ml-auto">last scan {latestTime}</span>
+          <span className="text-fg-dim text-[10px] font-mono sm:ml-auto w-full sm:w-auto">
+            last scan {latestTime}
+          </span>
         </div>
         <ul className="space-y-1 font-mono text-xs">
           {flips.map((f, i) => (
