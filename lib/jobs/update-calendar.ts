@@ -5,6 +5,7 @@
 import { supabaseAdmin } from '@/lib/supabase';
 import { getEarningsCalendar } from '@/lib/fmp';
 import { addCalendarDays, earningsSessionDate } from '@/lib/earningsDate';
+import { pruneOrphansNotOnWatchlist } from '@/lib/pruneTickerData';
 
 export type UpdateCalendarJobResult =
   | {
@@ -94,6 +95,9 @@ export async function runUpdateCalendarJob(): Promise<UpdateCalendarJobResult> {
     .lt('earnings_date', today)
     .eq('source', 'FMP')
     .in('ticker', [...tickerSet]);
+
+  // Remove upcoming calendar rows + briefs for tickers no longer on the watchlist.
+  await pruneOrphansNotOnWatchlist(sb, tickerSet, today);
 
   // Find the next upcoming date (>= today) across the newly synced rows
   const upcoming = dedupedRows

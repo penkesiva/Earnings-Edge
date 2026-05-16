@@ -3,6 +3,8 @@
 import { supabaseAdmin } from '@/lib/supabase';
 import { revalidatePath } from 'next/cache';
 import { earningsSessionDate } from '@/lib/earningsDate';
+import { parseBatchLine } from '@/lib/batchImportParse';
+import { pruneTickerFromApp } from '@/lib/pruneTickerData';
 
 export type WatchlistFormState = { error?: string };
 
@@ -49,13 +51,27 @@ export async function deleteTicker(formData: FormData) {
   const id = formData.get('id') as string;
 
   const sb = supabaseAdmin();
+  const { data: row, error: fetchError } = await sb
+    .from('watchlist')
+    .select('ticker')
+    .eq('id', id)
+    .maybeSingle();
+
+  if (fetchError) throw new Error(fetchError.message);
+
   const { error } = await sb.from('watchlist').delete().eq('id', id);
 
   if (error) {
     throw new Error(error.message);
   }
 
+  if (row?.ticker) {
+    await pruneTickerFromApp(sb, row.ticker);
+  }
+
   revalidatePath('/watchlist');
+  revalidatePath('/');
+  revalidatePath('/history');
 }
 
 // ─── Batch import ────────────────────────────────────────────────────────────
@@ -65,66 +81,6 @@ export type BatchImportResult = {
   skipped: string[];
   errors: string[];
 };
-
-/**
- * Fuzzy line parser — handles pipe, tab, comma, or just whitespace as delimiters.
- * Extracts: TICKER, date string ("Mon May 11", "2026-05-11", "May 11", etc.), timing.
- *
- * Returns null for blank / comment lines.
- */
-function parseBatchLine(
-  line: string,
-  year: number
-): { ticker: string; dateIso: string; timing: 'BMO' | 'AMC' | 'UNK' } | null {
-  const trimmed = line.trim();
-  if (!trimmed || trimmed.startsWith('#')) return null;
-
-  // Split on pipe, tab, comma, or 2+ spaces
-  const parts = trimmed.split(/\s*[|,\t]\s*|\s{2,}/).map(s => s.trim()).filter(Boolean);
-  if (parts.length < 2) return null;
-
-  const ticker = parts[0].toUpperCase().replace(/[^A-Z0-9.]/, '');
-  if (!ticker) return null;
-
-  // Detect timing from any part
-  let timing: 'BMO' | 'AMC' | 'UNK' = 'UNK';
-  for (const p of parts) {
-    if (/\bAMC\b/i.test(p)) { timing = 'AMC'; break; }
-    if (/\bBMO\b/i.test(p)) { timing = 'BMO'; break; }
-  }
-
-  // Find the part that looks like a date
-  const MONTH_MAP: Record<string, number> = {
-    jan:1,feb:2,mar:3,apr:4,may:5,jun:6,
-    jul:7,aug:8,sep:9,oct:10,nov:11,dec:12,
-  };
-  let dateIso: string | null = null;
-
-  for (const p of parts) {
-    // Already ISO: 2026-05-11
-    if (/^\d{4}-\d{2}-\d{2}$/.test(p)) { dateIso = p; break; }
-
-    // "Mon May 11", "May 11", "May 11 2026", "11 May", etc.
-    const monthMatch = p.match(/([A-Za-z]{3,})\s+(\d{1,2})(?:\s+(\d{4}))?/)
-      || p.match(/(\d{1,2})\s+([A-Za-z]{3,})(?:\s+(\d{4}))?/);
-    if (monthMatch) {
-      const isNumFirst = /^\d/.test(monthMatch[0]);
-      const monthStr = isNumFirst ? monthMatch[2] : monthMatch[1];
-      const dayStr   = isNumFirst ? monthMatch[1] : monthMatch[2];
-      const yearStr  = monthMatch[3];
-      const month = MONTH_MAP[monthStr.toLowerCase().slice(0, 3)];
-      const day = parseInt(dayStr, 10);
-      const y = yearStr ? parseInt(yearStr, 10) : year;
-      if (month && day >= 1 && day <= 31) {
-        dateIso = `${y}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-        break;
-      }
-    }
-  }
-
-  if (!dateIso) return null;
-  return { ticker, dateIso, timing };
-}
 
 export async function batchImport(
   _prev: { result?: BatchImportResult; error?: string },

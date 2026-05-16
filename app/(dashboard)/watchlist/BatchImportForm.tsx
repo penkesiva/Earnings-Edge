@@ -3,12 +3,9 @@
 import { useFormState, useFormStatus } from 'react-dom';
 import { batchImport, type BatchImportResult } from './actions';
 
-const PLACEHOLDER = `PBR  | Mon May 11 | AMC
-CEG  | Mon May 11 | BMO
-ALC  | Tue May 12 | BMO
-JD   | Tue May 12 | BMO
-CSCO | Wed May 13 | AMC
-AMAT | Thu May 14 | AMC`;
+const PLACEHOLDER = `1. HD  | May 19, 2026 | BMO
+2. TGT | May 20, 2026 | BMO
+3. NVDA | May 20, 2026 | AMC`;
 
 function SubmitBtn() {
   const { pending } = useFormStatus();
@@ -61,7 +58,8 @@ export function BatchImportForm() {
       <form action={formAction} className="border-t border-border-subtle px-4 pb-4 pt-3 space-y-3">
         <p className="text-[11px] text-fg-dim leading-relaxed">
           Paste any format with ticker, date, and optional AMC/BMO — pipe, tab, comma, or
-          multi-space delimiters all work. Tickers are added to watchlist and earnings calendar
+          multi-space delimiters all work. Numbered lists (1. HD, 2) TGT) are fine — the
+          number is stripped automatically. Tickers are added to watchlist and earnings calendar
           in one shot.
         </p>
 
