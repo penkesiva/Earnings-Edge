@@ -141,14 +141,12 @@ function AnalysisBlock({
   const stateRef          = useRef<PanelState>('idle');
   const setStateSync      = (s: PanelState) => { stateRef.current = s; setState(s); };
 
-  // Load saved text after hydration to avoid server/client HTML mismatch
   useEffect(() => {
     if (savedText) {
       setText(savedText);
       setStateSync('done');
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [savedText]);
 
   const cfg = CONFIGS[provider];
   const c   = cfg.color;
@@ -232,9 +230,14 @@ function AnalysisBlock({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [runSignal]);
 
-  if (state === 'idle') return null;
+  // Hide only when nothing saved and never run; show saved text immediately via props
+  if (state === 'idle' && !savedText) return null;
 
-  const isFromSave = state === 'done' && !!savedText && text === savedText;
+  const effectiveState =
+    state === 'idle' && savedText ? 'done' : state;
+  const effectiveText = text || savedText || '';
+
+  const isFromSave = effectiveState === 'done' && !!savedText && effectiveText === savedText;
 
   return (
     <div className={`pt-3 border-t ${c.border}`}>
@@ -242,10 +245,10 @@ function AnalysisBlock({
         <span className={`text-[10px] tracking-widest font-medium uppercase ${c.textDim}`}>
           {cfg.label}
         </span>
-        {(state === 'loading' || state === 'streaming') && (
+        {(effectiveState === 'loading' || effectiveState === 'streaming') && (
           <span className={`text-[10px] ${c.text} animate-pulse`}>● THINKING…</span>
         )}
-        {state === 'done' && (
+        {effectiveState === 'done' && (
           <>
             {isFromSave && (
               <span className="text-[10px] text-fg-dim tracking-widest">SAVED</span>
@@ -261,18 +264,18 @@ function AnalysisBlock({
         )}
       </div>
 
-      {state === 'error' && (
+      {effectiveState === 'error' && (
         <p className="text-xs text-signal-sell">{error}</p>
       )}
-      {state === 'loading' && (
+      {effectiveState === 'loading' && (
         <p className={`text-xs ${c.textDim} animate-pulse tracking-widest`}>
           Assembling brief data…
         </p>
       )}
-      {(state === 'streaming' || state === 'done') && text && (
+      {(effectiveState === 'streaming' || effectiveState === 'done') && effectiveText && (
         <div className={`text-xs text-fg-muted leading-relaxed whitespace-pre-wrap font-mono border ${c.border} ${c.bg} px-4 py-3`}>
-          {text}
-          {state === 'streaming' && (
+          {effectiveText}
+          {effectiveState === 'streaming' && (
             <span className={`inline-block w-1.5 h-3 ${c.dotColor} animate-pulse ml-0.5 align-middle`} />
           )}
         </div>

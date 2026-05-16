@@ -5,7 +5,8 @@ import { FinalActionBadge, SignalBadge } from '@/components/SignalBadge';
 import { ScreamTestCard } from '@/components/ScreamTestCard';
 import { ScanDiffBanner } from '@/components/ScanDiffBanner';
 import { RescanBriefButton } from '@/components/RescanBriefButton';
-import { AiBriefAnalysis, type SavedAnalyses } from '@/components/AiBriefAnalysis';
+import { AiBriefAnalysis } from '@/components/AiBriefAnalysis';
+import { loadBriefAiAnalyses } from '@/lib/loadBriefAiAnalyses';
 import { getStockSnapshot } from '@/lib/alpaca';
 import type { FilterResult, NarrativeOverhang } from '@/lib/screamTest';
 import type { BriefScanRow } from '@/lib/scanDiff';
@@ -38,21 +39,12 @@ export default async function BriefPage({ params }: { params: { id: string } }) 
     .eq('brief_id', params.id)
     .maybeSingle();
 
-  // Fetch all saved AI analyses and filter in JS — PostgREST UUID .eq() filter
-  // returns empty rows on this table despite data existing (schema cache quirk).
-  const { data: allAiRows } = await sb
-    .from('brief_ai_analyses')
-    .select('brief_id, provider, analysis_text');
-
-  const aiRows = (allAiRows ?? []).filter(r => r.brief_id === params.id);
-
-  const savedAnalyses: SavedAnalyses = {};
-  for (const row of aiRows ?? []) {
-    const p = row.provider as string;
-    if (p === 'openai' || p === 'gemini' || p === 'claude' || p === 'consensus') {
-      savedAnalyses[p as keyof SavedAnalyses] = row.analysis_text as string;
-    }
-  }
+  const savedAnalyses = await loadBriefAiAnalyses(
+    sb,
+    params.id,
+    brief.ticker as string,
+    brief.earnings_date as string
+  );
 
   // Two most recent scans for this ticker (for flip detection)
   const { data: scans } = await sb

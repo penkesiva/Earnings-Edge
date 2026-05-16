@@ -101,9 +101,12 @@ export function ConsensusVerdict({
     }
   }, [autoRunSignal, analyses, run]);
 
-  if (state === 'idle' && !savedText) return null;
+  const effectiveState = state === 'idle' && savedText ? 'done' : state;
+  const effectiveText = text || savedText || '';
 
-  if (state === 'loading') {
+  if (effectiveState === 'idle' && !savedText) return null;
+
+  if (effectiveState === 'loading') {
     return (
       <div className="border border-emerald-500/40 bg-emerald-500/5 px-4 py-3">
         <p className="text-xs text-emerald-400/80 animate-pulse tracking-widest">
@@ -113,7 +116,7 @@ export function ConsensusVerdict({
     );
   }
 
-  if (state === 'error') {
+  if (effectiveState === 'error') {
     return (
       <div className="border border-signal-sell/40 bg-signal-sell/5 px-4 py-3">
         <p className="text-xs text-signal-sell">{error}</p>
@@ -128,10 +131,10 @@ export function ConsensusVerdict({
     );
   }
 
-  const parsed = text ? parseSynthesisResponse(text) : null;
+  const parsed = effectiveText ? parseSynthesisResponse(effectiveText) : null;
   if (!parsed) return null;
 
-  const isSaved = !!savedText && text === savedText;
+  const isSaved = !!savedText && effectiveText === savedText;
 
   return (
     <div className={`border px-4 py-3 space-y-2 ${verdictBorder(parsed.verdict)}`}>
