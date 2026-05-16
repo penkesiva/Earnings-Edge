@@ -3,7 +3,7 @@ import { JetBrains_Mono } from 'next/font/google';
 import Script from 'next/script';
 import { cookies } from 'next/headers';
 import { ThemeSync } from '@/components/ThemeSync';
-import { THEME_COOKIE, THEME_INIT_SCRIPT } from '@/lib/theme';
+import { THEME_COOKIE, THEME_INIT_SCRIPT, parseThemePreference } from '@/lib/theme';
 import './globals.css';
 
 const jetbrainsMono = JetBrains_Mono({
@@ -22,8 +22,9 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const themeCookie = cookies().get(THEME_COOKIE)?.value;
-  const isLight = themeCookie === 'light';
+  const preference = parseThemePreference(cookies().get(THEME_COOKIE)?.value);
+  // auto: only the browser knows local PST/EST/etc. — client script sets class before paint
+  const isLight = preference === 'light';
 
   const htmlClass = [jetbrainsMono.variable, isLight ? 'light' : null]
     .filter(Boolean)
