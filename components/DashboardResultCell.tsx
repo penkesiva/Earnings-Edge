@@ -47,17 +47,18 @@ export function DashboardResultCell({
     : null;
 
   if (parsed) {
+    if (compact) {
+      return (
+        <FinalVerdictBadge verdict={parsed.verdict} direction={parsed.direction} />
+      );
+    }
     return (
       <div className="flex flex-col gap-1 min-w-0">
-        {!compact && (
-          <span className="text-[9px] text-fg-dim tracking-widest uppercase">Final verdict</span>
-        )}
+        <span className="text-[9px] text-fg-dim tracking-widest uppercase">Final verdict</span>
         <FinalVerdictBadge verdict={parsed.verdict} direction={parsed.direction} />
         {systemAction && (
           <div className="flex flex-wrap items-center gap-1 min-w-0">
-            {!compact && (
-              <span className="text-[9px] text-fg-dim tracking-widest uppercase w-full">System</span>
-            )}
+            <span className="text-[9px] text-fg-dim tracking-widest uppercase w-full">System</span>
             <ConvictionArrows action={systemAction} />
             <FinalActionBadge action={systemAction} />
           </div>
