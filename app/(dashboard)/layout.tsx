@@ -36,7 +36,7 @@ export default function DashboardLayout({
               href="/"
               className="hover:text-fg transition-colors py-2 px-2 sm:px-0 sm:py-1 shrink-0"
             >
-              TODAY
+              HOME
             </Link>
             <Link
               href="/watchlist"

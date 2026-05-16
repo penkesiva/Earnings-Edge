@@ -2,7 +2,8 @@ import Link from 'next/link';
 import { Suspense } from 'react';
 import { supabaseAdmin } from '@/lib/supabase';
 import { addCalendarDays, earningsSessionDate } from '@/lib/earningsDate';
-import { FinalActionBadge, ConvictionArrows } from '@/components/SignalBadge';
+import { DashboardResultCell } from '@/components/DashboardResultCell';
+import { loadConsensusByBriefIds } from '@/lib/loadDashboardConsensus';
 import { FearGreedIndex, FearGreedIndexSkeleton } from '@/components/FearGreedIndex';
 import { LastScanned } from '@/components/LastScanned';
 import { PrepDateButton } from '@/components/PrepDateButton';
@@ -72,6 +73,14 @@ export default async function HomePage() {
     return acc;
   }, {});
 
+  const allBriefIds = [
+    ...(todayBriefs ?? []).map(b => b.id as string),
+    ...(tomorrowBriefs ?? []).map(b => b.id as string),
+    ...(upcomingBriefs ?? []).map(b => b.id as string),
+  ];
+  const consensusByBriefId = await loadConsensusByBriefIds(sb, allBriefIds);
+  const consensusFor = (briefId: string) => consensusByBriefId.get(briefId) ?? null;
+
   return (
     <div className="space-y-8 sm:space-y-12">
       <Suspense fallback={<FearGreedIndexSkeleton />}>
@@ -82,7 +91,7 @@ export default async function HomePage() {
         <SectionHeader
           title={
             <h1 className="text-xl sm:text-3xl font-bold tracking-tight">
-              <span className="text-fg-subtle">›</span> TODAY
+              <span className="text-fg-subtle">›</span> HOME
             </h1>
           }
         >
@@ -106,7 +115,6 @@ export default async function HomePage() {
                     <div className="flex items-center gap-2">
                       <span className="font-bold text-xl tracking-tight">{b.ticker}</span>
                       <TimingBadge timing={timingToday.get(b.ticker)} />
-                      <ConvictionArrows action={b.final_action ?? null} />
                     </div>
                     <div className="flex items-center gap-2">
                       <ScoreCell value={b.composite_score} />
@@ -114,8 +122,12 @@ export default async function HomePage() {
                     </div>
                   </div>
                   {/* Row 2: Action badge (full width so long labels never overflow) */}
-                  <div className="mb-2 flex flex-wrap gap-1">
-                    <FinalActionBadge action={b.final_action ?? null} />
+                  <div className="mb-2">
+                    <DashboardResultCell
+                      compact
+                      systemAction={b.final_action ?? null}
+                      consensusText={consensusFor(b.id)}
+                    />
                   </div>
                   {/* Row 3: Key stats */}
                   <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-fg-dim">
@@ -131,7 +143,7 @@ export default async function HomePage() {
             <div className="grid grid-cols-12 gap-4 px-4 py-2 bg-bg-elevated text-xs text-fg-subtle uppercase tracking-widest border-b border-border">
               <div className="col-span-1">TKR</div>
               <div className="col-span-1">SCORE</div>
-              <div className="col-span-3">ACTION</div>
+              <div className="col-span-3">RESULT</div>
               <div className="col-span-2">SPOT</div>
               <div className="col-span-2">EXP MOVE</div>
               <div className="col-span-1">IV RANK</div>
@@ -150,9 +162,11 @@ export default async function HomePage() {
                 <div className="col-span-1">
                   <ScoreCell value={b.composite_score} />
                 </div>
-                <div className="col-span-3 flex items-center gap-2">
-                  <ConvictionArrows action={b.final_action ?? null} />
-                  <FinalActionBadge action={b.final_action ?? null} />
+                <div className="col-span-3 flex items-center min-w-0">
+                  <DashboardResultCell
+                    systemAction={b.final_action ?? null}
+                    consensusText={consensusFor(b.id)}
+                  />
                 </div>
                 <div className="col-span-2 text-fg-muted">
                   ${b.spot_price?.toFixed(2)}
@@ -198,16 +212,19 @@ export default async function HomePage() {
                     <div className="flex items-center gap-2">
                       <span className="font-bold text-xl tracking-tight">{b.ticker}</span>
                       <TimingBadge timing={timingTomorrow.get(b.ticker)} />
-                      <ConvictionArrows action={b.final_action ?? null} />
                     </div>
                     <div className="flex items-center gap-2">
                       <ScoreCell value={b.composite_score} />
                       <LastScanned updatedAt={b.updated_at ?? b.generated_at ?? null} />
                     </div>
                   </div>
-                  {/* Row 2: Action badge */}
-                  <div className="mb-2 flex flex-wrap gap-1">
-                    <FinalActionBadge action={b.final_action ?? null} />
+                  {/* Row 2: System / final verdict */}
+                  <div className="mb-2">
+                    <DashboardResultCell
+                      compact
+                      systemAction={b.final_action ?? null}
+                      consensusText={consensusFor(b.id)}
+                    />
                   </div>
                   {/* Row 3: Key stats */}
                   <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-fg-dim">
@@ -222,7 +239,7 @@ export default async function HomePage() {
             <div className="grid grid-cols-12 gap-4 px-4 py-2 bg-bg-elevated text-xs text-fg-subtle uppercase tracking-widest border-b border-border">
               <div className="col-span-2">TKR</div>
               <div className="col-span-2">SCORE</div>
-              <div className="col-span-3">ACTION</div>
+              <div className="col-span-3">RESULT</div>
               <div className="col-span-3">EXP MOVE</div>
               <div className="col-span-2">SCANNED</div>
             </div>
@@ -239,9 +256,11 @@ export default async function HomePage() {
                 <div className="col-span-2">
                   <ScoreCell value={b.composite_score} />
                 </div>
-                <div className="col-span-3 flex items-center gap-2">
-                  <ConvictionArrows action={b.final_action ?? null} />
-                  <FinalActionBadge action={b.final_action ?? null} />
+                <div className="col-span-3 flex items-center min-w-0">
+                  <DashboardResultCell
+                    systemAction={b.final_action ?? null}
+                    consensusText={consensusFor(b.id)}
+                  />
                 </div>
                 <div className="col-span-3 text-fg-muted">
                   ±${b.expected_move_dollar?.toFixed(2)} ({b.expected_move_pct?.toFixed(1)}%)
@@ -289,7 +308,7 @@ export default async function HomePage() {
                 <div className="hidden md:grid grid-cols-12 gap-4 px-4 py-2 text-xs text-fg-subtle uppercase tracking-widest border-b border-border-subtle bg-bg">
                   <div className="col-span-2">TKR</div>
                   <div className="col-span-2">SCORE</div>
-                  <div className="col-span-3">ACTION</div>
+                  <div className="col-span-3">RESULT</div>
                   <div className="col-span-3">EXP MOVE</div>
                   <div className="col-span-2">SCANNED</div>
                 </div>
@@ -324,11 +343,16 @@ export default async function HomePage() {
                             )}
                           </div>
                           {brief && (
-                            <div className="flex flex-wrap items-center gap-2 mt-1.5">
-                              <ScoreCell value={brief.composite_score} />
-                              <ConvictionArrows action={brief.final_action ?? null} />
-                              <FinalActionBadge action={brief.final_action ?? null} />
-                              <LastScanned updatedAt={brief.updated_at ?? brief.generated_at ?? null} />
+                            <div className="mt-1.5 space-y-1.5">
+                              <div className="flex items-center justify-between gap-2">
+                                <ScoreCell value={brief.composite_score} />
+                                <LastScanned updatedAt={brief.updated_at ?? brief.generated_at ?? null} />
+                              </div>
+                              <DashboardResultCell
+                                compact
+                                systemAction={brief.final_action ?? null}
+                                consensusText={consensusFor(brief.id)}
+                              />
                             </div>
                           )}
                         </div>
@@ -342,12 +366,12 @@ export default async function HomePage() {
                           <div className="col-span-2">
                             {brief ? <ScoreCell value={brief.composite_score} /> : <span className="text-fg-dim">—</span>}
                           </div>
-                          <div className="col-span-3 flex items-center gap-2">
+                          <div className="col-span-3 flex items-center min-w-0">
                             {brief ? (
-                              <>
-                                <ConvictionArrows action={brief.final_action ?? null} />
-                                <FinalActionBadge action={brief.final_action ?? null} />
-                              </>
+                              <DashboardResultCell
+                                systemAction={brief.final_action ?? null}
+                                consensusText={consensusFor(brief.id)}
+                              />
                             ) : (
                               <span className="text-xs text-fg-dim tracking-widest">NO BRIEF</span>
                             )}
