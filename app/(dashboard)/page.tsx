@@ -125,7 +125,6 @@ export default async function HomePage() {
                   <div className="mb-2">
                     <DashboardResultCell
                       compact
-                      systemAction={b.final_action ?? null}
                       consensusText={consensusFor(b.id)}
                     />
                   </div>
@@ -143,7 +142,7 @@ export default async function HomePage() {
             <div className="grid grid-cols-12 gap-4 px-4 py-2 bg-bg-elevated text-xs text-fg-subtle uppercase tracking-widest border-b border-border">
               <div className="col-span-1">TKR</div>
               <div className="col-span-1">SCORE</div>
-              <div className="col-span-3">RESULT</div>
+              <div className="col-span-3">VERDICT</div>
               <div className="col-span-2">SPOT</div>
               <div className="col-span-2">EXP MOVE</div>
               <div className="col-span-1">IV RANK</div>
@@ -164,7 +163,6 @@ export default async function HomePage() {
                 </div>
                 <div className="col-span-3 flex items-center min-w-0">
                   <DashboardResultCell
-                    systemAction={b.final_action ?? null}
                     consensusText={consensusFor(b.id)}
                   />
                 </div>
@@ -222,7 +220,6 @@ export default async function HomePage() {
                   <div className="mb-2">
                     <DashboardResultCell
                       compact
-                      systemAction={b.final_action ?? null}
                       consensusText={consensusFor(b.id)}
                     />
                   </div>
@@ -239,7 +236,7 @@ export default async function HomePage() {
             <div className="grid grid-cols-12 gap-4 px-4 py-2 bg-bg-elevated text-xs text-fg-subtle uppercase tracking-widest border-b border-border">
               <div className="col-span-2">TKR</div>
               <div className="col-span-2">SCORE</div>
-              <div className="col-span-3">RESULT</div>
+              <div className="col-span-3">VERDICT</div>
               <div className="col-span-3">EXP MOVE</div>
               <div className="col-span-2">SCANNED</div>
             </div>
@@ -258,7 +255,6 @@ export default async function HomePage() {
                 </div>
                 <div className="col-span-3 flex items-center min-w-0">
                   <DashboardResultCell
-                    systemAction={b.final_action ?? null}
                     consensusText={consensusFor(b.id)}
                   />
                 </div>
@@ -308,7 +304,7 @@ export default async function HomePage() {
                 <div className="hidden md:grid grid-cols-12 gap-4 px-4 py-2 text-xs text-fg-subtle uppercase tracking-widest border-b border-border-subtle bg-bg">
                   <div className="col-span-2">TKR</div>
                   <div className="col-span-2">SCORE</div>
-                  <div className="col-span-3">RESULT</div>
+                  <div className="col-span-3">VERDICT</div>
                   <div className="col-span-3">EXP MOVE</div>
                   <div className="col-span-2">SCANNED</div>
                 </div>
@@ -350,7 +346,6 @@ export default async function HomePage() {
                               </div>
                               <DashboardResultCell
                                 compact
-                                systemAction={brief.final_action ?? null}
                                 consensusText={consensusFor(brief.id)}
                               />
                             </div>
@@ -369,7 +364,6 @@ export default async function HomePage() {
                           <div className="col-span-3 flex items-center min-w-0">
                             {brief ? (
                               <DashboardResultCell
-                                systemAction={brief.final_action ?? null}
                                 consensusText={consensusFor(brief.id)}
                               />
                             ) : (
