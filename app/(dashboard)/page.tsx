@@ -91,7 +91,7 @@ export default async function HomePage() {
         <SectionHeader
           title={
             <h1 className="text-xl sm:text-3xl font-bold tracking-tight">
-              <span className="text-fg-subtle">›</span> HOME
+              <span className="text-fg-subtle">›</span> TODAY
             </h1>
           }
         >
