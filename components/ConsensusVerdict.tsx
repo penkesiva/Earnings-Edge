@@ -35,11 +35,13 @@ function Chip({ chip }: { chip: AlignmentChip }) {
     chip.status === 'yes' ? '✓' :
     chip.status === 'no' ? '✗' : '—';
   const markCls =
-    chip.status === 'yes' ? 'text-signal-buy' :
-    chip.status === 'no' ? 'text-fg-dim' : 'text-fg-dim';
+    chip.status === 'yes' ? 'alignment-mark alignment-mark--yes' :
+    chip.status === 'no' ? 'alignment-mark alignment-mark--no' :
+    'alignment-mark alignment-mark--miss';
   return (
-    <span className="text-[11px] text-fg-muted">
-      {chip.label} <span className={markCls}>{mark}</span>
+    <span className="text-[11px] text-fg-muted font-medium">
+      {chip.label}
+      <span className={markCls} aria-hidden>{mark}</span>
     </span>
   );
 }
@@ -205,8 +207,8 @@ export function ConsensusVerdict({
           {parsed.trade}
         </p>
       )}
-      <p className="text-[11px] text-fg-muted font-mono leading-relaxed">
-        <span className="text-fg-subtle">{alignSummary}</span>
+      <p className="text-[11px] text-fg font-mono leading-relaxed">
+        <span className="font-semibold text-fg-muted">{alignSummary}</span>
         <span className="text-fg-dim"> — </span>
         {chips.map((chip, i) => (
           <span key={chip.label}>
