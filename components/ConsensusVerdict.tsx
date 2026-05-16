@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AiBriefPayload } from '@/components/AiBriefAnalysis';
 import {
+  buildAlignmentChips,
   parseSynthesisResponse,
+  type AlignmentChip,
   type VerdictCall,
   type Direction,
 } from '@/lib/aiConsensus';
@@ -26,6 +28,20 @@ function directionCls(d: Direction | null): string {
   if (d === 'UP') return 'text-signal-buy';
   if (d === 'DOWN') return 'text-signal-sell';
   return 'text-fg-muted';
+}
+
+function Chip({ chip }: { chip: AlignmentChip }) {
+  const mark =
+    chip.status === 'yes' ? '✓' :
+    chip.status === 'no' ? '✗' : '—';
+  const markCls =
+    chip.status === 'yes' ? 'text-signal-buy' :
+    chip.status === 'no' ? 'text-fg-dim' : 'text-fg-dim';
+  return (
+    <span className="text-[11px] text-fg-muted">
+      {chip.label} <span className={markCls}>{mark}</span>
+    </span>
+  );
 }
 
 export function ConsensusVerdict({
@@ -134,6 +150,12 @@ export function ConsensusVerdict({
   const parsed = effectiveText ? parseSynthesisResponse(effectiveText) : null;
   if (!parsed) return null;
 
+  const { summary: alignSummary, chips } = buildAlignmentChips(
+    brief,
+    analyses,
+    parsed.direction
+  );
+
   const isSaved = !!savedText && effectiveText === savedText;
 
   return (
@@ -183,12 +205,16 @@ export function ConsensusVerdict({
           {parsed.trade}
         </p>
       )}
-      {parsed.alignment && (
-        <p className="text-[10px] text-fg-dim font-mono">{parsed.alignment}</p>
-      )}
-      {parsed.why && (
-        <p className="text-xs text-fg-dim italic leading-relaxed">{parsed.why}</p>
-      )}
+      <p className="text-[11px] text-fg-muted font-mono leading-relaxed">
+        <span className="text-fg-subtle">{alignSummary}</span>
+        <span className="text-fg-dim"> — </span>
+        {chips.map((chip, i) => (
+          <span key={chip.label}>
+            {i > 0 && <span className="text-fg-dim"> · </span>}
+            <Chip chip={chip} />
+          </span>
+        ))}
+      </p>
     </div>
   );
 }

@@ -40,9 +40,9 @@ VERDICT: GO | NO-GO | WATCH
 DIRECTION: UP | DOWN | NEUTRAL
 MOVE: [one line: dollar range | % range | target price, e.g. -$7 to -$11 | -9% to -13% | target ~$68]
 CONFIDENCE: N/10
-ALIGNMENT: [e.g. 4/4 bearish | 3/4 bearish system dissent | 2/4 split]
 TRADE: [one sentence — specific structure]
-WHY: [max 2 sentences — what signal dominates]`;
+
+Do not add ALIGNMENT, WHY, or any extra paragraphs.`;
 
 export async function POST(req: NextRequest) {
   const key = process.env.OPENAI_API_KEY;

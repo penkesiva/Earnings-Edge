@@ -134,14 +134,58 @@ export function computeDeterministicConsensus(
   };
 }
 
+export type AlignmentChip = {
+  label: string;
+  status: 'yes' | 'no' | 'missing';
+};
+
+const MODEL_LABELS = { openai: 'GPT', gemini: 'Gemini', claude: 'Claude' } as const;
+
+/** Deterministic alignment row — System + each model tick for the verdict direction. */
+export function buildAlignmentChips(
+  brief: AiBriefPayload,
+  analyses: Partial<Record<'openai' | 'gemini' | 'claude', string>>,
+  consensusDirection: Direction | null
+): { summary: string; chips: AlignmentChip[] } {
+  const chips: AlignmentChip[] = [];
+  const systemDir = systemDirectionFromBrief(brief);
+
+  chips.push({
+    label: 'System',
+    status:
+      systemDir == null ? 'missing' :
+      consensusDirection == null || consensusDirection === 'NEUTRAL' ? 'no' :
+      systemDir === consensusDirection ? 'yes' : 'no',
+  });
+
+  for (const p of ['openai', 'gemini', 'claude'] as const) {
+    const text = analyses[p];
+    if (!text?.trim()) {
+      chips.push({ label: MODEL_LABELS[p], status: 'missing' });
+      continue;
+    }
+    const v = parseAiVerdict(text);
+    chips.push({
+      label: MODEL_LABELS[p],
+      status:
+        !v || !consensusDirection || consensusDirection === 'NEUTRAL' ? 'no' :
+        v.direction === consensusDirection ? 'yes' : 'no',
+    });
+  }
+
+  const dirLabel = consensusDirection?.toLowerCase() ?? 'mixed';
+  const aligned = chips.filter(c => c.status === 'yes').length;
+  const summary = `${aligned}/${chips.length} ${dirLabel}`;
+
+  return { summary, chips };
+}
+
 export interface ParsedSynthesis {
   verdict: VerdictCall;
   direction: Direction | null;
   move: string | null;
   confidence: string | null;
-  alignment: string | null;
   trade: string | null;
-  why: string | null;
   raw: string;
 }
 
@@ -168,9 +212,7 @@ export function parseSynthesisResponse(text: string): ParsedSynthesis {
     direction,
     move: line('MOVE'),
     confidence: line('CONFIDENCE'),
-    alignment: line('ALIGNMENT'),
     trade: line('TRADE'),
-    why: line('WHY'),
     raw: text,
   };
 }
