@@ -32,12 +32,12 @@ const config: Config = {
           subtle: 'var(--color-fg-subtle)',
           dim: 'var(--color-fg-dim)',
         },
-        // Signal colors are intentionally theme-invariant (same green/amber/red on both).
+        // Theme-aware via --color-signal-* RGB channels in globals.css
         signal: {
-          buy: '#22c55e',
-          watch: '#eab308',
-          sell: '#ef4444',
-          neutral: '#6b7280',
+          buy: 'rgb(var(--color-signal-buy) / <alpha-value>)',
+          watch: 'rgb(var(--color-signal-watch) / <alpha-value>)',
+          sell: 'rgb(var(--color-signal-sell) / <alpha-value>)',
+          neutral: 'rgb(var(--color-signal-neutral) / <alpha-value>)',
         },
       },
       letterSpacing: {

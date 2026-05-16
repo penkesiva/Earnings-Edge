@@ -409,7 +409,7 @@ function TimingBadge({ timing }: { timing: string | undefined }) {
     <span className={`text-[10px] font-bold tracking-widest px-1 py-0.5 border ${
       isBmo
         ? 'text-sky-400 border-sky-400/40'
-        : 'text-amber-400 border-amber-400/40'
+        : 'text-signal-watch border-signal-watch/50'
     }`}>
       {timing}
     </span>
