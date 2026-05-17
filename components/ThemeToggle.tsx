@@ -3,32 +3,22 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   applyThemePreference,
-  isDaytimeLocal,
   readResolvedIsLight,
   readThemePreference,
   type ThemePreference,
 } from '@/lib/theme';
 
-const CYCLE: ThemePreference[] = ['auto', 'light', 'dark'];
-
-function nextPreference(current: ThemePreference): ThemePreference {
-  const i = CYCLE.indexOf(current);
-  return CYCLE[(i + 1) % CYCLE.length];
+/** Button label = theme you switch to (opposite of current appearance). */
+function label(isLight: boolean): string {
+  return isLight ? '◗ DARK' : '☀ LIGHT';
 }
 
-function label(pref: ThemePreference, isLight: boolean): string {
+function titleFor(pref: ThemePreference, isLight: boolean): string {
+  const target = isLight ? 'dark' : 'light';
   if (pref === 'auto') {
-    return isLight ? '◎ AUTO · DAY' : '◎ AUTO · NIGHT';
+    return `Using auto (7am–7pm light). Click to switch to ${target} theme.`;
   }
-  return pref === 'light' ? '☀ LIGHT' : '◗ DARK';
-}
-
-function titleFor(pref: ThemePreference): string {
-  if (pref === 'auto') {
-    return 'Theme follows your local time (7am–7pm light). Click to lock light, then dark, then auto.';
-  }
-  if (pref === 'light') return 'Locked to light theme. Click for dark, then auto.';
-  return 'Locked to dark theme. Click for auto (time-of-day).';
+  return `Using ${isLight ? 'light' : 'dark'} theme. Click to switch to ${target}.`;
 }
 
 export function ThemeToggle() {
@@ -47,27 +37,22 @@ export function ThemeToggle() {
   }, [sync]);
 
   function toggle() {
-    const pref = readThemePreference();
-    const next = nextPreference(pref);
+    const isLightNow = readResolvedIsLight();
+    const next: ThemePreference = isLightNow ? 'dark' : 'light';
     applyThemePreference(next);
     setPreference(next);
-    setIsLight(resolveIsLightClient(next));
+    setIsLight(!isLightNow);
   }
 
   return (
     <button
       type="button"
       onClick={toggle}
-      title={titleFor(preference)}
+      title={titleFor(preference, isLight)}
       className="text-xs text-fg-subtle hover:text-fg border border-border hover:border-fg-subtle px-2 py-1 transition-colors tracking-widest shrink-0 max-w-[140px] truncate"
     >
-      {label(preference, isLight)}
+      {label(isLight)}
     </button>
   );
 }
 
-function resolveIsLightClient(pref: ThemePreference): boolean {
-  if (pref === 'light') return true;
-  if (pref === 'dark') return false;
-  return isDaytimeLocal();
-}
