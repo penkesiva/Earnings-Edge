@@ -327,10 +327,30 @@ const SECTOR_ETFS: Record<string, string> = {
   'Communication Services': 'XLC',
 };
 
-export async function getSectorEtf(ticker: string): Promise<string> {
+export async function getCompanyProfile(ticker: string): Promise<{
+  companyName: string | null;
+  sector: string | null;
+}> {
   const profile = await fmp(`profile?symbol=${encodeURIComponent(ticker)}`);
   const row = Array.isArray(profile) ? profile[0] : null;
-  const sector = typeof row?.sector === 'string' ? row.sector : '';
+  const rawName = row?.companyName ?? row?.name;
+  const companyName =
+    typeof rawName === 'string' && rawName.trim() ? rawName.trim() : null;
+  const sector = typeof row?.sector === 'string' ? row.sector : null;
+  return { companyName, sector };
+}
+
+export async function getCompanyName(ticker: string): Promise<string | null> {
+  try {
+    const { companyName } = await getCompanyProfile(ticker);
+    return companyName;
+  } catch {
+    return null;
+  }
+}
+
+export async function getSectorEtf(ticker: string): Promise<string> {
+  const { sector } = await getCompanyProfile(ticker);
   return (sector && SECTOR_ETFS[sector]) || 'SPY';
 }
 

@@ -255,7 +255,7 @@ export async function detectOverhangs(opts: {
 
     let llmClassification: Awaited<ReturnType<typeof classifyHeadlines>> | null = null;
 
-    if (hasLlmProvider()) {
+    if (hasLlmProvider() && allArticles.length > 0) {
       // ── LLM path — one call: risks + per-headline sentiment + overall bias ──
       const headlines = allArticles.map((a, i) => ({ i, date: a.date, title: a.title }));
       llmClassification = await classifyHeadlines(ticker, headlines, end);
@@ -352,7 +352,6 @@ export async function detectOverhangs(opts: {
       source: a.site || a.url || 'fmp',
     }));
 
-    let newsOverall: NewsOverallSentiment | null = llmClassification?.overall ?? null;
     let rawHeadlines = baseHeadlines;
     if (llmClassification) {
       rawHeadlines = mergeSentimentsIntoHeadlines(
@@ -360,6 +359,8 @@ export async function detectOverhangs(opts: {
         llmClassification.sentiments,
       );
     }
+    const newsOverall: NewsOverallSentiment | null =
+      baseHeadlines.length > 0 && llmClassification ? llmClassification.overall : null;
 
     return { overhangs, rawHeadlines, newsOverall };
   } catch {
