@@ -1,8 +1,7 @@
 import Link from 'next/link';
-import { formatDayHeader } from '@/lib/earningsDate';
+import { DayPrepHeader } from '@/components/DayPrepHeader';
 import { DashboardResultCell } from '@/components/DashboardResultCell';
 import { LastScanned } from '@/components/LastScanned';
-import { PrepDateButton } from '@/components/PrepDateButton';
 
 type EarningsEvent = {
   id: string;
@@ -116,10 +115,7 @@ export function UpcomingWeekList({
     <div className="space-y-6 md:space-y-4">
       {Object.entries(upcomingByDate).map(([date, events]) => (
         <section key={date} className="space-y-2">
-          <div className="flex items-center justify-between gap-3 px-0.5">
-            <h3 className="text-sm font-bold tracking-wide text-fg">{formatDayHeader(date)}</h3>
-            <PrepDateButton date={date} />
-          </div>
+          <DayPrepHeader date={date} />
 
           <div className="md:hidden space-y-2">
             {(events ?? []).map(e => {

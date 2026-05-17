@@ -2,11 +2,11 @@ import Link from 'next/link';
 import { Suspense } from 'react';
 import { supabaseAdmin } from '@/lib/supabase';
 import { addCalendarDays, earningsSessionDate } from '@/lib/earningsDate';
+import { DayPrepHeader } from '@/components/DayPrepHeader';
 import { DashboardResultCell } from '@/components/DashboardResultCell';
 import { loadConsensusByBriefIds } from '@/lib/loadDashboardConsensus';
 import { FearGreedIndex, FearGreedIndexSkeleton } from '@/components/FearGreedIndex';
 import { LastScanned } from '@/components/LastScanned';
-import { ScanButton } from '@/components/ScanButton';
 import { SectionHeader } from '@/components/SectionHeader';
 import { UpcomingWeekList } from '@/components/UpcomingWeekList';
 
@@ -87,19 +87,8 @@ export default async function HomePage() {
         <FearGreedIndex />
       </Suspense>
 
-      <section>
-        <SectionHeader
-          title={
-            <h2 className="text-lg sm:text-xl font-bold tracking-tight">
-              <span className="text-fg-subtle">›</span> TODAY
-            </h2>
-          }
-        >
-          <ScanButton mode="today" />
-          <span className="text-xs text-fg-subtle whitespace-nowrap">
-            {todayBriefs?.length ?? 0} BRIEF{todayBriefs?.length === 1 ? '' : 'S'} · {today}
-          </span>
-        </SectionHeader>
+      <section className="space-y-2">
+        <DayPrepHeader date={today} />
 
         {!todayBriefs?.length ? (
           <div className="border border-border bg-bg-elevated p-8 text-center text-fg-subtle text-sm">
@@ -183,19 +172,9 @@ export default async function HomePage() {
         )}
       </section>
 
-      <section>
-        <SectionHeader
-          title={
-            <h2 className="text-lg sm:text-xl font-bold tracking-tight">
-              <span className="text-fg-subtle">›</span> TOMORROW
-            </h2>
-          }
-        >
-          <ScanButton mode="tomorrow" />
-          <span className="text-xs text-fg-subtle whitespace-nowrap">
-            {tomorrowBriefs?.length ?? 0} BRIEF{tomorrowBriefs?.length === 1 ? '' : 'S'} · {tomorrow}
-          </span>
-        </SectionHeader>
+      <section className="space-y-2">
+        <DayPrepHeader date={tomorrow} />
+
         {!tomorrowBriefs?.length ? (
           <div className="border border-border bg-bg-elevated p-5 text-center text-fg-subtle text-sm">
             No tomorrow briefs yet — hit <span className="text-fg-muted">PREP</span> above.
