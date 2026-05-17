@@ -26,7 +26,7 @@ export function DashboardRefresh() {
             <summary className="list-none cursor-pointer select-none text-[10px] px-1.5 py-0.5 border border-border-subtle text-fg-subtle hover:text-fg hover:border-fg-subtle tracking-widest">
               INFO
             </summary>
-            <div className="absolute left-0 top-full mt-2 max-w-[min(18rem,calc(100vw-2rem))] border border-border-subtle bg-bg-elevated px-2.5 py-2 text-xs text-fg-muted leading-relaxed z-10 shadow-md">
+            <div className="absolute left-0 top-full z-20 mt-2 w-[min(18rem,calc(100vw-2rem))] border border-border-subtle bg-bg-elevated px-3 py-2.5 text-xs text-fg-muted leading-relaxed shadow-md">
               Pulls upcoming earnings dates for all active watchlist tickers from FMP (30-day
               window). Run this after adding new tickers or when dates look stale on the dashboard.
             </div>
