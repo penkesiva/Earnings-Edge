@@ -32,7 +32,19 @@ const COMPONENT_LABELS: Record<string, string> = {
   insider_score: 'Insider Buying (90d)',
 };
 
-export default async function BriefPage({ params }: { params: { id: string } }) {
+function backHref(from: string | undefined): string {
+  if (from === 'history') return '/history';
+  if (from === 'watchlist') return '/watchlist';
+  return '/';
+}
+
+export default async function BriefPage({
+  params,
+  searchParams,
+}: {
+  params: { id: string };
+  searchParams?: { from?: string };
+}) {
   const sb = supabaseAdmin();
   const { data: brief } = await sb
     .from('earnings_briefs')
@@ -111,7 +123,7 @@ export default async function BriefPage({ params }: { params: { id: string } }) 
 
   return (
     <div className="space-y-6 sm:space-y-8 brief-page-pad-bottom">
-      <Link href="/" className="text-xs text-fg-subtle hover:text-fg">
+      <Link href={backHref(searchParams?.from)} className="text-xs text-fg-subtle hover:text-fg">
         ← BACK
       </Link>
 

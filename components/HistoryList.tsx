@@ -44,7 +44,7 @@ function HitCell({
 function HistoryMobileCard({ r }: { r: HistoryRow }) {
   return (
     <Link
-      href={`/briefs/${r.brief_id}`}
+      href={`/briefs/${r.brief_id}?from=history`}
       className="block border border-border bg-bg-elevated p-3 active:opacity-75 touch-manipulation"
     >
       <div className="flex items-center justify-between gap-2 mb-2">
@@ -144,7 +144,7 @@ export function HistoryList({ rows }: { rows: HistoryRow[] }) {
         {rows.map(r => (
           <Link
             key={r.brief_id}
-            href={`/briefs/${r.brief_id}`}
+            href={`/briefs/${r.brief_id}?from=history`}
             className="terminal-row grid grid-cols-12 gap-4 px-4 py-3 text-sm border-b border-border-subtle"
           >
             <div className="col-span-1 text-fg-muted text-xs">{r.earnings_date}</div>
