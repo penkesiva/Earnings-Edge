@@ -66,16 +66,15 @@ export function RescanBriefButton({
           : 'text-fg-subtle border-border hover:border-signal-watch hover:text-signal-watch';
 
   return (
-    <div className={`flex flex-col items-start gap-1.5 ${className ?? ''}`}>
-      <div className="flex items-center gap-3">
-        <button
-          type="button"
+    <div className={`flex flex-col items-stretch gap-1.5 min-w-0 ${className ?? ''}`}>
+      <button
+        type="button"
           disabled={state === 'running'}
           onClick={handleClick}
           aria-label={
             state === 'running' ? 'System scan in progress' : 'Run system scan'
           }
-          className={`touch-target text-[11px] md:text-xs px-2 md:px-3 py-2 md:py-1.5 border tracking-widest transition-colors w-full ${colorClass}`}
+          className={`brief-scan-btn touch-target text-[11px] md:text-xs px-2 md:px-3 py-2 md:py-1.5 border tracking-widest transition-colors ${colorClass}`}
         >
           {state === 'running' ? (
             <>
@@ -99,7 +98,6 @@ export function RescanBriefButton({
             </>
           )}
         </button>
-      </div>
       {message && (
         <div
           className={`text-xs font-mono px-2 py-1 border max-w-[28rem] text-left ${

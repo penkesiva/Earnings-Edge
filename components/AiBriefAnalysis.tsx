@@ -324,8 +324,8 @@ function ScanAgeLabel({ at, neverLabel }: { at: string | null; neverLabel: strin
   );
 }
 
-const ACTION_BTN =
-  'touch-target text-[11px] sm:text-xs px-2 sm:px-3 py-2 sm:py-1.5 border tracking-widest transition-colors w-full';
+const SCAN_BTN =
+  'brief-scan-btn touch-target text-[11px] sm:text-xs px-2 sm:px-3 py-2 sm:py-1.5 border tracking-widest transition-colors';
 
 // ── Container ─────────────────────────────────────────────────────────────────
 
@@ -428,28 +428,18 @@ export function AiBriefAnalysis({
     <div className="mt-4 pt-3 border-t border-border-subtle space-y-4">
 
       <div className="brief-action-bar border border-border-subtle md:rounded-sm">
-        <div className="flex gap-2 md:gap-4 items-stretch">
-          <div className="flex flex-col gap-2 flex-1 min-w-0 md:flex-row md:gap-6">
-          <div className="flex flex-col gap-0.5 md:gap-1.5 min-w-0 md:flex-1">
+        <div className="brief-toolbar">
+          <div className="brief-toolbar-scans">
             <RescanBriefButton
               ticker={brief.ticker}
               earningsDate={brief.earnings_date}
             />
-            <span className="hidden md:block">
-              <ScanAgeLabel at={systemScanAt ?? null} neverLabel="Not scanned yet" />
-            </span>
-            <p className="hidden md:block text-[10px] text-fg-dim leading-snug max-w-xs">
-              Quant + options + news (FMP/Alpaca). Same-day news LLM is cached.
-            </p>
-          </div>
-
-          <div className="flex flex-col gap-0.5 md:gap-1.5 min-w-0 md:flex-1">
             <button
               type="button"
               onClick={runAiScan}
               disabled={aiScanDisabled}
               title={aiScanTitle}
-              className={`${ACTION_BTN} ${
+              className={`${SCAN_BTN} ${
                 aiScanDisabled
                   ? 'border-border text-fg-dim cursor-not-allowed opacity-60'
                   : 'border-fg-subtle/30 text-fg-subtle hover:border-fg-subtle hover:text-fg'
@@ -457,18 +447,14 @@ export function AiBriefAnalysis({
             >
               {aiRunInFlight ? '⟳ AI SCAN…' : hasAiSaved ? '↻ AI SCAN' : '✦ AI SCAN'}
             </button>
-            <span className="hidden md:block">
-              <ScanAgeLabel at={effectiveLastAiAt} neverLabel="Never run" />
-            </span>
             {aiScanOnCooldown && !aiRunInFlight && (
-              <span className="text-[10px] text-signal-watch font-mono text-center md:text-left">
+              <span className="brief-scan-meta text-[10px] text-signal-watch font-mono md:hidden">
                 Wait {formatCooldownWait(cooldownMs)}
               </span>
             )}
           </div>
-          </div>
 
-          <div className="flex flex-col gap-0.5 md:gap-1.5 shrink-0 w-[30%] min-w-[5.5rem] sm:min-w-[6rem] md:w-44 lg:w-48">
+          <div className="brief-toolbar-verdict">
             <button
               type="button"
               onClick={synthesizeNow}
@@ -478,7 +464,7 @@ export function AiBriefAnalysis({
                   ? 'Run AI scan first (need at least 2 model reports)'
                   : 'Synthesize final GO/NO-GO from system + AI reports'
               }
-              className="ai-verdict-btn touch-target w-full flex-1 min-h-[2.75rem] md:min-h-0 flex flex-col items-center justify-center disabled:opacity-40 text-[11px] md:text-xs leading-[1.15]"
+              className="ai-verdict-btn touch-target flex flex-col items-center justify-center disabled:opacity-40 text-[11px] md:text-xs leading-[1.15] whitespace-nowrap"
             >
               <span className="md:hidden flex flex-col items-center text-[10px]">
                 <span>⚖ FINAL</span>
@@ -486,13 +472,18 @@ export function AiBriefAnalysis({
               </span>
               <span className="hidden md:inline">⚖ FINAL VERDICT</span>
             </button>
-            <span className="hidden md:inline text-[10px] text-fg-dim">
+            <span className="hidden md:inline text-[10px] text-fg-dim text-right">
               Uses system scan + {modelCount}/3 AI reports
             </span>
-            <span className="md:hidden text-[10px] text-fg-dim font-mono tabular-nums text-center">
+            <span className="md:hidden text-[10px] text-fg-dim font-mono tabular-nums">
               {modelCount}/3 AI
             </span>
           </div>
+        </div>
+
+        <div className="hidden md:grid md:grid-cols-2 md:gap-2 md:mt-2 md:w-max text-[10px] text-fg-dim">
+          <ScanAgeLabel at={systemScanAt ?? null} neverLabel="Not scanned yet" />
+          <ScanAgeLabel at={effectiveLastAiAt} neverLabel="Never run" />
         </div>
       </div>
 
