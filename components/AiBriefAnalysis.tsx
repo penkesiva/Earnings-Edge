@@ -279,7 +279,7 @@ function AnalysisBlock({
             <button
               type="button"
               onClick={run}
-              className="text-[10px] text-fg-dim hover:text-fg tracking-widest transition-colors"
+              className={`brief-action-btn brief-action-btn--${provider}`}
             >
               ↻ RE-RUN
             </button>
@@ -428,8 +428,9 @@ export function AiBriefAnalysis({
     <div className="mt-4 pt-3 border-t border-border-subtle space-y-4">
 
       <div className="brief-action-bar border border-border-subtle md:rounded-sm">
-        <div className="grid grid-cols-3 gap-2 md:gap-6">
-          <div className="flex flex-col gap-0.5 md:gap-1.5 min-w-0">
+        <div className="flex gap-2 md:gap-4 items-stretch">
+          <div className="flex flex-col gap-2 flex-1 min-w-0 md:flex-row md:gap-6">
+          <div className="flex flex-col gap-0.5 md:gap-1.5 min-w-0 md:flex-1">
             <RescanBriefButton
               ticker={brief.ticker}
               earningsDate={brief.earnings_date}
@@ -442,7 +443,7 @@ export function AiBriefAnalysis({
             </p>
           </div>
 
-          <div className="flex flex-col gap-0.5 md:gap-1.5 min-w-0">
+          <div className="flex flex-col gap-0.5 md:gap-1.5 min-w-0 md:flex-1">
             <button
               type="button"
               onClick={runAiScan}
@@ -465,8 +466,9 @@ export function AiBriefAnalysis({
               </span>
             )}
           </div>
+          </div>
 
-          <div className="flex flex-col gap-0.5 md:gap-1.5 min-w-0">
+          <div className="flex flex-col gap-0.5 md:gap-1.5 shrink-0 w-[30%] min-w-[5.5rem] sm:min-w-[6rem] md:w-44 lg:w-48">
             <button
               type="button"
               onClick={synthesizeNow}
@@ -476,15 +478,18 @@ export function AiBriefAnalysis({
                   ? 'Run AI scan first (need at least 2 model reports)'
                   : 'Synthesize final GO/NO-GO from system + AI reports'
               }
-              className="ai-verdict-btn touch-target w-full disabled:opacity-40 text-[11px] md:text-xs"
+              className="ai-verdict-btn touch-target w-full flex-1 min-h-[2.75rem] md:min-h-0 flex flex-col items-center justify-center disabled:opacity-40 text-[11px] md:text-xs leading-[1.15]"
             >
-              <span className="md:hidden">⚖ VERDICT</span>
+              <span className="md:hidden flex flex-col items-center text-[10px]">
+                <span>⚖ FINAL</span>
+                <span>VERDICT</span>
+              </span>
               <span className="hidden md:inline">⚖ FINAL VERDICT</span>
             </button>
             <span className="hidden md:inline text-[10px] text-fg-dim">
               Uses system scan + {modelCount}/3 AI reports
             </span>
-            <span className="md:hidden text-[10px] text-fg-dim font-mono tabular-nums">
+            <span className="md:hidden text-[10px] text-fg-dim font-mono tabular-nums text-center">
               {modelCount}/3 AI
             </span>
           </div>

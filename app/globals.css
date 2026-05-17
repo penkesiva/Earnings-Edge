@@ -242,14 +242,77 @@ html.light {
   letter-spacing: 0.1em;
   border: 1px solid var(--ai-verdict-border);
   color: var(--ai-verdict-accent);
-  background: transparent;
-  transition: opacity 120ms ease, background 120ms ease;
+  background: color-mix(in srgb, var(--ai-verdict-accent) 10%, transparent);
+  transition: opacity 120ms ease, background 120ms ease, border-color 120ms ease;
 }
 .ai-verdict-btn:hover:not(:disabled) {
-  opacity: 0.9;
-  background: var(--color-bg-hover);
+  background: color-mix(in srgb, var(--ai-verdict-accent) 16%, transparent);
+  border-color: var(--ai-verdict-accent);
 }
 .ai-verdict-btn:disabled { opacity: 0.4; }
+
+/* Secondary actions on brief/watchlist — visible at rest, stronger on hover */
+.brief-action-btn {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  padding: 0.35rem 0.55rem;
+  border: 1px solid var(--color-border);
+  color: var(--color-fg-muted);
+  background: var(--color-bg-elevated);
+  transition: border-color 120ms ease, color 120ms ease, background 120ms ease;
+}
+.brief-action-btn:hover:not(:disabled) {
+  color: var(--color-fg);
+  border-color: var(--color-fg-subtle);
+  background: var(--color-bg-hover);
+}
+.brief-action-btn--verdict {
+  color: var(--ai-verdict-accent);
+  border-color: var(--ai-verdict-border);
+  background: color-mix(in srgb, var(--ai-verdict-accent) 10%, transparent);
+}
+.brief-action-btn--verdict:hover:not(:disabled) {
+  color: var(--ai-verdict-accent);
+  border-color: var(--ai-verdict-accent);
+  background: color-mix(in srgb, var(--ai-verdict-accent) 16%, transparent);
+}
+.brief-action-btn--openai {
+  color: var(--ai-openai);
+  border-color: var(--ai-openai-border);
+  background: var(--ai-openai-bg);
+}
+.brief-action-btn--openai:hover:not(:disabled) {
+  color: var(--ai-openai);
+  border-color: var(--ai-openai);
+}
+.brief-action-btn--gemini {
+  color: var(--ai-gemini);
+  border-color: var(--ai-gemini-border);
+  background: var(--ai-gemini-bg);
+}
+.brief-action-btn--gemini:hover:not(:disabled) {
+  color: var(--ai-gemini);
+  border-color: var(--ai-gemini);
+}
+.brief-action-btn--claude {
+  color: var(--ai-claude);
+  border-color: var(--ai-claude-border);
+  background: var(--ai-claude-bg);
+}
+.brief-action-btn--claude:hover:not(:disabled) {
+  color: var(--ai-claude);
+  border-color: var(--ai-claude);
+}
+.brief-action-btn--save {
+  color: var(--color-fg);
+  border-color: var(--color-border-subtle);
+  background: var(--color-bg-elevated);
+}
+.brief-action-btn--save:hover:not(:disabled) {
+  border-color: var(--color-signal-buy);
+  color: var(--color-signal-buy);
+}
 
 .ai-verdict-box {
   border: 1px solid var(--ai-verdict-border);

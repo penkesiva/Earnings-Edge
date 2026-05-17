@@ -110,8 +110,8 @@ export function ScreamTestCard({
       <section className="border border-border bg-bg-elevated p-6 border-dashed">
         <h2 className="text-xs tracking-widest text-fg-subtle mb-2">SCREAM TEST</h2>
         <p className="text-xs text-fg-muted">
-          No scream test snapshot for this brief. Re-run{' '}
-          <span className="text-fg-subtle font-bold">daily scan</span> to populate scream fields.
+          No scream test snapshot for this brief. Use{' '}
+          <span className="text-fg-subtle font-bold">↻ SYSTEM SCAN</span> to populate scream fields.
         </p>
       </section>
     );

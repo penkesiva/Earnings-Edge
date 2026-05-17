@@ -134,7 +134,7 @@ export function ConsensusVerdict({
         <button
           type="button"
           onClick={run}
-          className="mt-2 text-[10px] text-fg-dim hover:text-fg tracking-widest"
+          className="brief-action-btn brief-action-btn--verdict mt-2"
         >
           ↻ RETRY SYNTHESIS
         </button>
@@ -170,7 +170,7 @@ export function ConsensusVerdict({
           <button
             type="button"
             onClick={run}
-            className="text-[10px] text-fg-dim hover:text-fg tracking-widest"
+            className="brief-action-btn brief-action-btn--verdict"
           >
             ↻ RE-SYNTHESIZE
           </button>

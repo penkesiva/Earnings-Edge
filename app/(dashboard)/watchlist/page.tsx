@@ -60,7 +60,7 @@ export default async function WatchlistPage() {
                 <option value="AMC">AMC</option>
                 <option value="UNK">UNK</option>
               </select>
-              <button className="text-[10px] text-fg-subtle hover:text-fg tracking-widest">
+              <button type="submit" className="brief-action-btn brief-action-btn--save">
                 SAVE
               </button>
             </form>
@@ -121,7 +121,7 @@ export default async function WatchlistPage() {
                   <option value="AMC">AMC</option>
                   <option value="UNK">UNK</option>
                 </select>
-                <button className="text-[10px] text-fg-subtle hover:text-fg tracking-widest">
+                <button type="submit" className="brief-action-btn brief-action-btn--save">
                   SAVE
                 </button>
               </form>

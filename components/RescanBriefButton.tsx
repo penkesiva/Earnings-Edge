@@ -72,11 +72,17 @@ export function RescanBriefButton({
           type="button"
           disabled={state === 'running'}
           onClick={handleClick}
+          aria-label={
+            state === 'running' ? 'System scan in progress' : 'Run system scan'
+          }
           className={`touch-target text-[11px] md:text-xs px-2 md:px-3 py-2 md:py-1.5 border tracking-widest transition-colors w-full ${colorClass}`}
         >
           {state === 'running' ? (
             <>
-              <span className="md:hidden">⟳ SCAN…</span>
+              <span className="md:hidden flex flex-col items-center leading-[1.15] text-[10px]">
+                <span>⟳ SYSTEM</span>
+                <span>SCAN…</span>
+              </span>
               <span className="hidden md:inline">⟳ SYSTEM SCAN…</span>
             </>
           ) : state === 'done' ? (
@@ -85,7 +91,10 @@ export function RescanBriefButton({
             '✗ FAILED'
           ) : (
             <>
-              <span className="md:hidden">↻ SYSTEM</span>
+              <span className="md:hidden flex flex-col items-center leading-[1.15] text-[10px]">
+                <span>↻ SYSTEM</span>
+                <span>SCAN</span>
+              </span>
               <span className="hidden md:inline">↻ SYSTEM SCAN</span>
             </>
           )}

@@ -76,18 +76,18 @@ export function getNewsSentimentDisplay(
       return {
         badge: { label: 'NO NEWS DATA', cls: 'bg-bg text-fg-dim border-border-subtle' },
         summary:
-          'No headlines returned from FMP or Gemini search in the 60-day window. Re-run system scan and verify FMP_API_KEY.',
+          'No headlines returned from FMP or Gemini search in the 60-day window. Use ↻ SYSTEM SCAN on this brief and verify FMP_API_KEY.',
       };
     }
     if (riskCount <= 2 && maxSeverity <= 3) {
       return {
         badge: { label: 'NO NEWS DATA', cls: 'bg-bg text-fg-dim border-border-subtle' },
-        summary: `${riskCount} price/news risk${riskCount > 1 ? 's' : ''} flagged, but headline sentiment was not loaded. Re-run system scan.`,
+        summary: `${riskCount} price/news risk${riskCount > 1 ? 's' : ''} flagged, but headline sentiment was not loaded. Use ↻ SYSTEM SCAN on this brief.`,
       };
     }
     return {
       badge: { label: 'NO NEWS DATA', cls: 'bg-bg text-fg-dim border-border-subtle' },
-      summary: `${riskCount} risks flagged (incl. price action) — headline feed empty. Re-run system scan.`,
+      summary: `${riskCount} risks flagged (incl. price action) — headline feed empty. Use ↻ SYSTEM SCAN on this brief.`,
     };
   }
 
@@ -111,7 +111,7 @@ export function getNewsSentimentDisplay(
   if (riskCount === 0) {
     return {
       badge: { label: 'CLEAN', cls: 'bg-signal-buy/10 text-signal-buy border-signal-buy/20' },
-      summary: 'Headlines loaded; no material risk signals at scan time. Re-run scan for sentiment tags.',
+      summary: 'Headlines loaded; no sentiment tags yet. Use ↻ SYSTEM SCAN on this brief.',
     };
   }
   if (riskCount <= 2 && maxSeverity <= 3) {

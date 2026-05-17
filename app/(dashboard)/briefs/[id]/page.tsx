@@ -203,7 +203,7 @@ export default async function BriefPage({ params }: { params: { id: string } }) 
         <div className="text-xs tracking-widest text-fg-subtle mb-4">TRADE DECISION</div>
         {legacyFallback ? (
           <div className="text-xs text-fg-dim">
-            Re-run scan to generate a reconciled action for this brief.
+            Use ↻ SYSTEM SCAN to generate a reconciled action for this brief.
           </div>
         ) : (
           <TradeDecisionCard
@@ -1148,7 +1148,7 @@ function NewsSentimentSection({
           </>
         ) : (
           <p className="text-xs text-fg-dim">
-            No headlines stored for this brief. Re-run scan to load raw news.
+            No headlines stored for this brief. Use ↻ SYSTEM SCAN to load news and sentiment tags.
           </p>
         )}
       </div>
