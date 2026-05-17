@@ -3,7 +3,7 @@
 import { useState } from 'react';
 
 type Props = {
-  /** 'today' triggers the daily scan; 'tomorrow' triggers the prep scan. */
+  /** 'today' = prep briefs reporting today; 'tomorrow' = prep tomorrow's names. */
   mode: 'today' | 'tomorrow';
 };
 
@@ -49,9 +49,7 @@ export function ScanButton({ mode }: Props) {
             : `border-border bg-bg ${accentIdle}`
         }`}
       >
-        {pending
-          ? mode === 'today' ? 'SCANNING…' : 'PREPPING…'
-          : mode === 'today' ? 'RUN SCAN'  : 'PREP'}
+        {pending ? 'PREPPING…' : 'PREP'}
       </button>
       {error && (
         <span

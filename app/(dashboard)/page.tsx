@@ -97,13 +97,13 @@ export default async function HomePage() {
         >
           <ScanButton mode="today" />
           <span className="text-xs text-fg-subtle whitespace-nowrap">
-            {todayBriefs?.length ?? 0} BRIEF{todayBriefs?.length === 1 ? '' : 'S'}
+            {todayBriefs?.length ?? 0} BRIEF{todayBriefs?.length === 1 ? '' : 'S'} · {today}
           </span>
         </SectionHeader>
 
         {!todayBriefs?.length ? (
           <div className="border border-border bg-bg-elevated p-8 text-center text-fg-subtle text-sm">
-            No briefs yet — hit <span className="text-fg-muted">RUN SCAN</span> when a watchlist name reports today. If dates look stale, go to <span className="text-fg-muted">WATCHLIST → SYNC CALENDAR</span>.
+            No briefs yet — hit <span className="text-fg-muted">PREP</span> when a watchlist name reports today. If dates look stale, go to <span className="text-fg-muted">WATCHLIST → SYNC CALENDAR</span>.
           </div>
         ) : (
           <>
