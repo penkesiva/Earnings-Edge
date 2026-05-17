@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { Suspense } from 'react';
 import { supabaseAdmin } from '@/lib/supabase';
 import { addCalendarDays, earningsSessionDate } from '@/lib/earningsDate';
+import { getUpcomingSessionDays, isTradingDay } from '@/lib/usMarketCalendar';
 import { DayPrepHeader } from '@/components/DayPrepHeader';
 import { DashboardResultCell } from '@/components/DashboardResultCell';
 import { loadConsensusByBriefIds } from '@/lib/loadDashboardConsensus';
@@ -45,31 +46,32 @@ export default async function HomePage() {
   const timingToday    = new Map((todayEvents    ?? []).map(e => [e.ticker, e.timing as string]));
   const timingTomorrow = new Map((tomorrowEvents ?? []).map(e => [e.ticker, e.timing as string]));
 
-  // Upcoming events (next 7 days, excluding today/tomorrow which have their own sections)
-  const in7 = addCalendarDays(today, 7);
-  const { data: upcoming } = await sb
-    .from('earnings_events')
-    .select('*')
-    .gt('earnings_date', tomorrow)
-    .lte('earnings_date', in7)
-    .order('earnings_date', { ascending: true });
+  // Next 5 NYSE sessions after tomorrow (weekends hidden; weekday holidays greyed out)
+  const upcomingSessions = getUpcomingSessionDays(tomorrow, 5);
+  const sessionDates = upcomingSessions.map(s => s.date);
 
-  // Existing briefs for the same window (so we can show links + badge + staleness)
-  const { data: upcomingBriefs } = await sb
-    .from('earnings_briefs')
-    .select('id, ticker, earnings_date, final_action, composite_score, updated_at, generated_at, expected_move_dollar, expected_move_pct')
-    .gt('earnings_date', tomorrow)
-    .lte('earnings_date', in7)
-    .order('composite_score', { ascending: false });
+  const { data: upcoming } = sessionDates.length
+    ? await sb
+        .from('earnings_events')
+        .select('*')
+        .in('earnings_date', sessionDates)
+        .order('earnings_date', { ascending: true })
+    : { data: [] as never[] };
 
-  // Index briefs by date+ticker for quick lookup
+  const { data: upcomingBriefs } = sessionDates.length
+    ? await sb
+        .from('earnings_briefs')
+        .select('id, ticker, earnings_date, final_action, composite_score, updated_at, generated_at, expected_move_dollar, expected_move_pct')
+        .in('earnings_date', sessionDates)
+        .order('composite_score', { ascending: false })
+    : { data: [] as never[] };
+
   const briefByKey = new Map(
     (upcomingBriefs ?? []).map(b => [`${b.earnings_date}:${b.ticker}`, b])
   );
 
-  // Group upcoming events by date
-  const upcomingByDate = (upcoming ?? []).reduce<Record<string, typeof upcoming>>((acc, e) => {
-    (acc[e.earnings_date] ??= []).push(e);
+  const upcomingByDate = sessionDates.reduce<Record<string, typeof upcoming>>((acc, date) => {
+    acc[date] = (upcoming ?? []).filter(e => e.earnings_date === date);
     return acc;
   }, {});
 
@@ -88,7 +90,7 @@ export default async function HomePage() {
       </Suspense>
 
       <section className="space-y-2">
-        <DayPrepHeader date={today} />
+        <DayPrepHeader date={today} marketOpen={isTradingDay(today)} />
 
         {!todayBriefs?.length ? (
           <div className="border border-border bg-bg-elevated p-8 text-center text-fg-subtle text-sm">
@@ -173,7 +175,7 @@ export default async function HomePage() {
       </section>
 
       <section className="space-y-2">
-        <DayPrepHeader date={tomorrow} />
+        <DayPrepHeader date={tomorrow} marketOpen={isTradingDay(tomorrow)} />
 
         {!tomorrowBriefs?.length ? (
           <div className="border border-border bg-bg-elevated p-5 text-center text-fg-subtle text-sm">
@@ -254,24 +256,17 @@ export default async function HomePage() {
         <SectionHeader
           title={
             <h2 className="text-lg sm:text-xl font-bold tracking-tight">
-              <span className="text-fg-subtle">›</span> NEXT 7 DAYS
+              <span className="text-fg-subtle">›</span> NEXT 5 SESSIONS
             </h2>
           }
         />
 
-        {!upcoming?.length ? (
-          <div className="text-fg-subtle text-sm">
-            No earnings dates in range — go to{' '}
-            <span className="text-fg-muted">WATCHLIST</span> and hit{' '}
-            <span className="text-fg-muted">SYNC CALENDAR</span> to pull dates from FMP.
-          </div>
-        ) : (
-          <UpcomingWeekList
-            upcomingByDate={upcomingByDate}
-            briefByKey={briefByKey}
-            consensusFor={consensusFor}
-          />
-        )}
+        <UpcomingWeekList
+          sessions={upcomingSessions}
+          upcomingByDate={upcomingByDate}
+          briefByKey={briefByKey}
+          consensusFor={consensusFor}
+        />
       </section>
     </div>
   );

@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { DayPrepHeader } from '@/components/DayPrepHeader';
 import { DashboardResultCell } from '@/components/DashboardResultCell';
 import { LastScanned } from '@/components/LastScanned';
+import type { UpcomingSession } from '@/lib/usMarketCalendar';
 
 type EarningsEvent = {
   id: string;
@@ -103,91 +104,100 @@ function UpcomingMobileCard({
 }
 
 export function UpcomingWeekList({
+  sessions,
   upcomingByDate,
   briefByKey,
   consensusFor,
 }: {
+  sessions: UpcomingSession[];
   upcomingByDate: Record<string, EarningsEvent[] | null | undefined>;
   briefByKey: Map<string, BriefRow | undefined>;
   consensusFor: (briefId: string) => string | null;
 }) {
   return (
     <div className="space-y-6 md:space-y-4">
-      {Object.entries(upcomingByDate).map(([date, events]) => (
-        <section key={date} className="space-y-2">
-          <DayPrepHeader date={date} />
+      {sessions.map(({ date, marketOpen }) => {
+        const events = upcomingByDate[date] ?? [];
+        return (
+          <section key={date} className="space-y-2">
+            <DayPrepHeader date={date} marketOpen={marketOpen} />
 
-          <div className="md:hidden space-y-2">
-            {(events ?? []).map(e => {
-              const brief = briefByKey.get(`${date}:${e.ticker}`);
-              return (
-                <UpcomingMobileCard
-                  key={e.id}
-                  event={e}
-                  brief={brief}
-                  consensusText={brief ? consensusFor(brief.id) : null}
-                />
-              );
-            })}
-          </div>
+            {marketOpen ? (
+              <>
+                <div className="md:hidden space-y-2">
+                  {events.map(e => {
+                    const brief = briefByKey.get(`${date}:${e.ticker}`);
+                    return (
+                      <UpcomingMobileCard
+                        key={e.id}
+                        event={e}
+                        brief={brief}
+                        consensusText={brief ? consensusFor(brief.id) : null}
+                      />
+                    );
+                  })}
+                </div>
 
-          <div className="hidden md:block border border-border">
-            <div className="grid grid-cols-12 gap-4 px-4 py-2 text-xs text-fg-subtle uppercase tracking-widest border-b border-border-subtle bg-bg">
-              <div className="col-span-2">TKR</div>
-              <div className="col-span-2">SCORE</div>
-              <div className="col-span-3">VERDICT</div>
-              <div className="col-span-3">EXP MOVE</div>
-              <div className="col-span-2">SCANNED</div>
-            </div>
-            <div className="divide-y divide-border-subtle">
-              {(events ?? []).map(e => {
-                const brief = briefByKey.get(`${date}:${e.ticker}`);
-                const inner = (
-                  <div className="grid grid-cols-12 gap-4 px-4 py-3 text-sm items-center">
-                    <div className="col-span-2 font-bold flex items-center gap-1.5">
-                      {e.ticker}
-                      <TimingBadge timing={e.timing} />
-                    </div>
-                    <div className="col-span-2">
-                      {brief ? (
-                        <ScoreCell value={brief.composite_score} />
-                      ) : (
-                        <span className="text-fg-dim">—</span>
-                      )}
-                    </div>
-                    <div className="col-span-3 flex items-center min-w-0">
-                      {brief ? (
-                        <DashboardResultCell consensusText={consensusFor(brief.id)} />
-                      ) : (
-                        <span className="text-xs text-fg-dim tracking-widest">NO BRIEF</span>
-                      )}
-                    </div>
-                    <div className="col-span-3 text-fg-muted">
-                      {brief?.expected_move_dollar != null
-                        ? `±$${brief.expected_move_dollar.toFixed(2)} (${brief.expected_move_pct?.toFixed(1) ?? '—'}%)`
-                        : '—'}
-                    </div>
-                    <div className="col-span-2">
-                      {brief ? (
-                        <LastScanned updatedAt={brief.updated_at ?? brief.generated_at} />
-                      ) : (
-                        <span className="text-fg-dim">—</span>
-                      )}
-                    </div>
+                <div className="hidden md:block border border-border">
+                  <div className="grid grid-cols-12 gap-4 px-4 py-2 text-xs text-fg-subtle uppercase tracking-widest border-b border-border-subtle bg-bg">
+                    <div className="col-span-2">TKR</div>
+                    <div className="col-span-2">SCORE</div>
+                    <div className="col-span-3">VERDICT</div>
+                    <div className="col-span-3">EXP MOVE</div>
+                    <div className="col-span-2">SCANNED</div>
                   </div>
-                );
-                return brief ? (
-                  <Link key={e.id} href={`/briefs/${brief.id}`} className="block terminal-row">
-                    {inner}
-                  </Link>
-                ) : (
-                  <div key={e.id}>{inner}</div>
-                );
-              })}
-            </div>
-          </div>
-        </section>
-      ))}
+                  <div className="divide-y divide-border-subtle">
+                    {events.map(e => {
+                      const brief = briefByKey.get(`${date}:${e.ticker}`);
+                      const inner = (
+                        <div className="grid grid-cols-12 gap-4 px-4 py-3 text-sm items-center">
+                          <div className="col-span-2 font-bold flex items-center gap-1.5">
+                            {e.ticker}
+                            <TimingBadge timing={e.timing} />
+                          </div>
+                          <div className="col-span-2">
+                            {brief ? (
+                              <ScoreCell value={brief.composite_score} />
+                            ) : (
+                              <span className="text-fg-dim">—</span>
+                            )}
+                          </div>
+                          <div className="col-span-3 flex items-center min-w-0">
+                            {brief ? (
+                              <DashboardResultCell consensusText={consensusFor(brief.id)} />
+                            ) : (
+                              <span className="text-xs text-fg-dim tracking-widest">NO BRIEF</span>
+                            )}
+                          </div>
+                          <div className="col-span-3 text-fg-muted">
+                            {brief?.expected_move_dollar != null
+                              ? `±$${brief.expected_move_dollar.toFixed(2)} (${brief.expected_move_pct?.toFixed(1) ?? '—'}%)`
+                              : '—'}
+                          </div>
+                          <div className="col-span-2">
+                            {brief ? (
+                              <LastScanned updatedAt={brief.updated_at ?? brief.generated_at} />
+                            ) : (
+                              <span className="text-fg-dim">—</span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                      return brief ? (
+                        <Link key={e.id} href={`/briefs/${brief.id}`} className="block terminal-row">
+                          {inner}
+                        </Link>
+                      ) : (
+                        <div key={e.id}>{inner}</div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </>
+            ) : null}
+          </section>
+        );
+      })}
     </div>
   );
 }
