@@ -1,4 +1,4 @@
-import { addCalendarDays } from '@/lib/earningsDate';
+import { addCalendarDays, dashboardSessionDate } from '@/lib/earningsDate';
 
 export type UpcomingSession = {
   date: string;
@@ -68,16 +68,16 @@ const holidayByYear = new Map<number, Set<string>>();
 function nyseHolidaysForYear(year: number): Set<string> {
   const set = new Set<string>();
   set.add(observeHoliday(year, 1, 1));
-  set.add(nthWeekdayOfMonth(year, 1, 1, 3)); // MLK — 3rd Monday
-  set.add(nthWeekdayOfMonth(year, 2, 1, 3)); // Presidents — 3rd Monday
+  set.add(nthWeekdayOfMonth(year, 1, 1, 3));
+  set.add(nthWeekdayOfMonth(year, 2, 1, 3));
   const easter = easterSunday(year);
-  set.add(addCalendarDays(isoFromParts(year, easter.month, easter.day), -2)); // Good Friday
-  set.add(lastWeekdayOfMonth(year, 5, 1)); // Memorial — last Monday
-  set.add(observeHoliday(year, 6, 19)); // Juneteenth
-  set.add(observeHoliday(year, 7, 4)); // Independence Day
-  set.add(nthWeekdayOfMonth(year, 9, 1, 1)); // Labor — 1st Monday
-  set.add(nthWeekdayOfMonth(year, 11, 4, 4)); // Thanksgiving — 4th Thursday
-  set.add(observeHoliday(year, 12, 25)); // Christmas
+  set.add(addCalendarDays(isoFromParts(year, easter.month, easter.day), -2));
+  set.add(lastWeekdayOfMonth(year, 5, 1));
+  set.add(observeHoliday(year, 6, 19));
+  set.add(observeHoliday(year, 7, 4));
+  set.add(nthWeekdayOfMonth(year, 9, 1, 1));
+  set.add(nthWeekdayOfMonth(year, 11, 4, 4));
+  set.add(observeHoliday(year, 12, 25));
   return set;
 }
 
@@ -105,29 +105,31 @@ export function isTradingDay(iso: string): boolean {
 }
 
 /**
- * Walk calendar days after `afterDate`: skip weekends, grey-out NYSE holidays,
- * until `openDayCount` regular sessions are collected.
+ * Next `count` weekdays for the home dashboard (Pacific day boundary).
+ * Sat/Sun are never listed. On weekend PT, the window starts Monday (Mon–Fri).
+ * On a weekday, starts today (e.g. Tue → Tue, Wed, Thu, Fri, Mon).
+ * NYSE holidays appear in the five but are marked market closed (grey).
  */
-export function getUpcomingSessionDays(
-  afterDate: string,
-  openDayCount = 5,
-  maxSteps = 45,
+export function getHomeWeekdaySlots(
+  count = 5,
+  now = new Date(),
 ): UpcomingSession[] {
-  const result: UpcomingSession[] = [];
-  let openCount = 0;
-  let cursor = afterDate;
-  let steps = 0;
+  let cursor = dashboardSessionDate(now);
+  while (isWeekend(cursor)) {
+    cursor = addCalendarDays(cursor, 1);
+  }
 
-  while (openCount < openDayCount && steps < maxSteps) {
+  const result: UpcomingSession[] = [];
+  let steps = 0;
+  while (result.length < count && steps < 20) {
+    if (!isWeekend(cursor)) {
+      result.push({
+        date: cursor,
+        marketOpen: isTradingDay(cursor),
+      });
+    }
     cursor = addCalendarDays(cursor, 1);
     steps++;
-    if (isWeekend(cursor)) continue;
-    if (isNyseHoliday(cursor)) {
-      result.push({ date: cursor, marketOpen: false });
-      continue;
-    }
-    result.push({ date: cursor, marketOpen: true });
-    openCount++;
   }
 
   return result;

@@ -123,6 +123,12 @@ export function UpcomingWeekList({
             <DayPrepHeader date={date} marketOpen={marketOpen} />
 
             {marketOpen ? (
+              events.length === 0 ? (
+                <p className="text-xs text-fg-dim tracking-wide px-0.5">
+                  No watchlist earnings — hit <span className="text-fg-muted">PREP</span> or{' '}
+                  <span className="text-fg-muted">SYNC CALENDAR</span> on watchlist.
+                </p>
+              ) : (
               <>
                 <div className="md:hidden space-y-2">
                   {events.map(e => {
@@ -194,6 +200,7 @@ export function UpcomingWeekList({
                   </div>
                 </div>
               </>
+              )
             ) : null}
           </section>
         );
