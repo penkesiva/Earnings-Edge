@@ -90,9 +90,9 @@ export default async function HomePage() {
       <section>
         <SectionHeader
           title={
-            <h1 className="text-xl sm:text-3xl font-bold tracking-tight">
+            <h2 className="text-lg sm:text-xl font-bold tracking-tight">
               <span className="text-fg-subtle">›</span> TODAY
-            </h1>
+            </h2>
           }
         >
           <ScanButton mode="today" />
@@ -187,7 +187,7 @@ export default async function HomePage() {
         <SectionHeader
           title={
             <h2 className="text-lg sm:text-xl font-bold tracking-tight">
-              <span className="text-fg-subtle">›</span> TOMORROW PREP
+              <span className="text-fg-subtle">›</span> TOMORROW
             </h2>
           }
         >
@@ -352,7 +352,7 @@ export default async function HomePage() {
                           )}
                         </div>
 
-                        {/* ── Desktop: aligned grid columns (mirrors TOMORROW PREP) ── */}
+                        {/* ── Desktop: aligned grid columns (mirrors TOMORROW) ── */}
                         <div className="hidden md:grid grid-cols-12 gap-4 px-4 py-3 text-sm items-center">
                           <div className="col-span-2 font-bold flex items-center gap-1.5">
                             {e.ticker}
