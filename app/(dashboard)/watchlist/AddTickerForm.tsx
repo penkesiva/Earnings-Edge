@@ -22,22 +22,14 @@ export function AddTickerForm() {
 
   return (
     <form action={formAction} className="border border-border bg-bg-elevated p-3 sm:p-4 space-y-3">
-      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
-        <div className="w-full sm:flex-1 sm:min-w-[7rem] sm:max-w-[10rem]">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+        <div className="w-full min-w-0 sm:flex-1 sm:max-w-xs">
           <label className="text-xs text-fg-subtle tracking-widest block mb-1">TICKER</label>
           <input
             name="ticker"
             placeholder="NVDA"
             required
             className="w-full bg-bg border border-border px-3 py-2 text-sm font-mono uppercase focus:outline-none focus:border-signal-buy"
-          />
-        </div>
-        <div className="w-full min-w-0 sm:flex-[3]">
-          <label className="text-xs text-fg-subtle tracking-widest block mb-1">THESIS</label>
-          <input
-            name="thesis"
-            placeholder="NVDA optics partner — locked-in supply"
-            className="w-full bg-bg border border-border px-3 py-2 text-sm focus:outline-none focus:border-signal-buy"
           />
         </div>
         <div className="w-full sm:w-auto shrink-0">

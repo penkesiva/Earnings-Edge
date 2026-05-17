@@ -13,8 +13,6 @@ export async function addTicker(
   formData: FormData
 ): Promise<WatchlistFormState> {
   const ticker = (formData.get('ticker') as string)?.toUpperCase().trim();
-  const thesisRaw = formData.get('thesis') as string | null;
-  const thesis = thesisRaw?.trim() || null;
 
   if (!ticker) {
     return { error: 'Ticker is required' };
@@ -23,7 +21,7 @@ export async function addTicker(
   const sb = supabaseAdmin();
   const { error } = await sb
     .from('watchlist')
-    .upsert({ ticker, thesis, active: true }, { onConflict: 'ticker' });
+    .upsert({ ticker, active: true }, { onConflict: 'ticker' });
 
   if (error) {
     return { error: error.message };

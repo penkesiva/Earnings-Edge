@@ -41,7 +41,6 @@ export default async function WatchlistPage() {
                 {t.active ? '● ACTIVE' : '○ PAUSED'}
               </span>
             </div>
-            <div className="text-fg-muted text-xs mt-1">{t.thesis || '—'}</div>
             <form action={setManualEarnings} className="mt-3 space-y-2">
               <input type="hidden" name="id" value={t.id} />
               <div className="flex flex-wrap gap-2 items-center">
@@ -97,17 +96,15 @@ export default async function WatchlistPage() {
 
       <div className="hidden md:block border border-border">
         <div className="grid grid-cols-12 gap-4 px-4 py-2 bg-bg-elevated text-xs text-fg-subtle uppercase tracking-widest border-b border-border">
-          <div className="col-span-1">TKR</div>
-          <div className="col-span-4">THESIS</div>
-          <div className="col-span-3">MANUAL ER (OPT)</div>
+          <div className="col-span-2">TKR</div>
+          <div className="col-span-5">MANUAL ER (OPT)</div>
           <div className="col-span-2">STATUS</div>
-          <div className="col-span-2 text-right">ACTIONS</div>
+          <div className="col-span-3 text-right">ACTIONS</div>
         </div>
         {tickers?.map(t => (
           <div key={t.id} className="grid grid-cols-12 gap-4 px-4 py-3 text-sm border-b border-border-subtle items-center">
-            <div className="col-span-1 font-bold">{t.ticker}</div>
-            <div className="col-span-4 text-fg-muted text-xs">{t.thesis || '—'}</div>
-            <div className="col-span-3">
+            <div className="col-span-2 font-bold">{t.ticker}</div>
+            <div className="col-span-5">
               <form action={setManualEarnings} className="flex gap-1 items-center">
                 <input type="hidden" name="id" value={t.id} />
                 <input
@@ -138,7 +135,7 @@ export default async function WatchlistPage() {
                 {t.active ? '● ACTIVE' : '○ PAUSED'}
               </span>
             </div>
-            <div className="col-span-2 text-right flex gap-2 justify-end">
+            <div className="col-span-3 text-right flex gap-2 justify-end">
               <form action={toggleTicker}>
                 <input type="hidden" name="id" value={t.id} />
                 <input type="hidden" name="active" value={t.active.toString()} />
