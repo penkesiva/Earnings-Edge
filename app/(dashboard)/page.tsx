@@ -6,9 +6,9 @@ import { DashboardResultCell } from '@/components/DashboardResultCell';
 import { loadConsensusByBriefIds } from '@/lib/loadDashboardConsensus';
 import { FearGreedIndex, FearGreedIndexSkeleton } from '@/components/FearGreedIndex';
 import { LastScanned } from '@/components/LastScanned';
-import { PrepDateButton } from '@/components/PrepDateButton';
 import { ScanButton } from '@/components/ScanButton';
 import { SectionHeader } from '@/components/SectionHeader';
+import { UpcomingWeekList } from '@/components/UpcomingWeekList';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -287,109 +287,11 @@ export default async function HomePage() {
             <span className="text-fg-muted">SYNC CALENDAR</span> to pull dates from FMP.
           </div>
         ) : (
-          <div className="space-y-4">
-            {Object.entries(upcomingByDate).map(([date, events]) => (
-              <div key={date} className="border border-border">
-                {/* Date header row */}
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between px-3 sm:px-4 py-2 bg-bg-elevated border-b border-border text-xs tracking-widest">
-                  <span className="text-fg font-bold">
-                    {new Date(date + 'T12:00:00').toLocaleDateString('en-US', {
-                      weekday: 'short', month: 'short', day: 'numeric',
-                    }).toUpperCase()}
-                  </span>
-                  <PrepDateButton date={date} />
-                </div>
-
-                {/* Column header — desktop only */}
-                <div className="hidden md:grid grid-cols-12 gap-4 px-4 py-2 text-xs text-fg-subtle uppercase tracking-widest border-b border-border-subtle bg-bg">
-                  <div className="col-span-2">TKR</div>
-                  <div className="col-span-2">SCORE</div>
-                  <div className="col-span-3">VERDICT</div>
-                  <div className="col-span-3">EXP MOVE</div>
-                  <div className="col-span-2">SCANNED</div>
-                </div>
-
-                {/* Ticker rows */}
-                <div className="divide-y divide-border-subtle">
-                  {events!.map(e => {
-                    const brief = briefByKey.get(`${date}:${e.ticker}`);
-                    const RowWrapper = brief
-                      ? ({ children }: { children: React.ReactNode }) => (
-                          <Link href={`/briefs/${brief.id}`} className="block terminal-row">
-                            {children}
-                          </Link>
-                        )
-                      : ({ children }: { children: React.ReactNode }) => (
-                          <div>{children}</div>
-                        );
-
-                    return (
-                      <RowWrapper key={e.id}>
-                        {/* ── Mobile: 2-line layout ── */}
-                        <div className="md:hidden px-4 py-2.5 text-sm">
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-2 min-w-0">
-                              <span className="font-bold shrink-0">{e.ticker}</span>
-                              <TimingBadge timing={e.timing} />
-                            </div>
-                            {brief ? (
-                              <span className="text-[10px] text-fg-subtle tracking-widest shrink-0">VIEW →</span>
-                            ) : (
-                              <span className="text-[10px] text-fg-dim tracking-widest shrink-0">NO BRIEF</span>
-                            )}
-                          </div>
-                          {brief && (
-                            <div className="mt-1.5 space-y-1.5">
-                              <div className="flex items-center justify-between gap-2">
-                                <ScoreCell value={brief.composite_score} />
-                                <LastScanned updatedAt={brief.updated_at ?? brief.generated_at ?? null} />
-                              </div>
-                              <DashboardResultCell
-                                compact
-                                consensusText={consensusFor(brief.id)}
-                              />
-                            </div>
-                          )}
-                        </div>
-
-                        {/* ── Desktop: aligned grid columns (mirrors TOMORROW) ── */}
-                        <div className="hidden md:grid grid-cols-12 gap-4 px-4 py-3 text-sm items-center">
-                          <div className="col-span-2 font-bold flex items-center gap-1.5">
-                            {e.ticker}
-                            <TimingBadge timing={e.timing} />
-                          </div>
-                          <div className="col-span-2">
-                            {brief ? <ScoreCell value={brief.composite_score} /> : <span className="text-fg-dim">—</span>}
-                          </div>
-                          <div className="col-span-3 flex items-center min-w-0">
-                            {brief ? (
-                              <DashboardResultCell
-                                consensusText={consensusFor(brief.id)}
-                              />
-                            ) : (
-                              <span className="text-xs text-fg-dim tracking-widest">NO BRIEF</span>
-                            )}
-                          </div>
-                          <div className="col-span-3 text-fg-muted">
-                            {brief?.expected_move_dollar != null
-                              ? `±$${(brief.expected_move_dollar as number).toFixed(2)} (${(brief.expected_move_pct as number).toFixed(1)}%)`
-                              : <span className="text-fg-dim">—</span>}
-                          </div>
-                          <div className="col-span-2">
-                            {brief ? (
-                              <LastScanned updatedAt={brief.updated_at ?? brief.generated_at ?? null} />
-                            ) : (
-                              <span className="text-fg-dim">—</span>
-                            )}
-                          </div>
-                        </div>
-                      </RowWrapper>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
-          </div>
+          <UpcomingWeekList
+            upcomingByDate={upcomingByDate}
+            briefByKey={briefByKey}
+            consensusFor={consensusFor}
+          />
         )}
       </section>
     </div>

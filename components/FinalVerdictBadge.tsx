@@ -12,9 +12,12 @@ import {
 export function FinalVerdictBadge({
   verdict,
   direction,
+  fullWidth,
 }: {
   verdict: VerdictCall;
   direction: Direction | null;
+  /** Stretch badge on mobile dashboard cards. */
+  fullWidth?: boolean;
 }) {
   const panel = finalVerdictBadgeStyle(verdict, direction);
   const dirCls =
@@ -26,7 +29,9 @@ export function FinalVerdictBadge({
 
   return (
     <span
-      className={`inline-block max-w-full px-2 py-0.5 ${panel.bg} text-[10px] sm:text-xs font-bold tracking-widest border ${panel.border}`}
+      className={`max-w-full px-2 py-1 sm:py-0.5 ${panel.bg} text-[10px] sm:text-xs font-bold tracking-widest border ${
+        fullWidth ? 'flex w-full justify-center' : 'inline-block'
+      } ${panel.border}`}
     >
       <span className={finalVerdictTextCls(verdict, direction)}>{verdict}</span>
       {direction ? (

@@ -11,6 +11,15 @@ export function earningsSessionDate(d = new Date()): string {
 }
 
 /** Add calendar days to a YYYY-MM-DD string (for FMP ranges, upcoming windows). */
+/** e.g. "MON, MAY 18" for dashboard day headers. */
+export function formatDayHeader(isoDate: string): string {
+  return new Date(`${isoDate}T12:00:00`).toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  }).toUpperCase();
+}
+
 export function addCalendarDays(isoDate: string, days: number): string {
   const [y, m, day] = isoDate.split('-').map(Number);
   const t = new Date(Date.UTC(y, m - 1, day));

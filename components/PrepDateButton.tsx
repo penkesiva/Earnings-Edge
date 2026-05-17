@@ -63,7 +63,7 @@ export function PrepDateButton({ date }: { date: string }) {
           : 'border-border text-fg-subtle hover:border-signal-watch hover:text-signal-watch transition-colors';
 
   const label =
-    state === 'running' ? 'SCANNING…' :
+    state === 'running' ? 'PREPPING…' :
     state === 'done'    ? '✓ PREPPED'  :
     state === 'error'   ? 'ERROR'      :
     'PREP';

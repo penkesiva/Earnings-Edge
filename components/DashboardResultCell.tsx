@@ -25,7 +25,11 @@ export function DashboardResultCell({
 
   if (compact) {
     return (
-      <FinalVerdictBadge verdict={parsed.verdict} direction={parsed.direction} />
+      <FinalVerdictBadge
+        verdict={parsed.verdict}
+        direction={parsed.direction}
+        fullWidth
+      />
     );
   }
 
