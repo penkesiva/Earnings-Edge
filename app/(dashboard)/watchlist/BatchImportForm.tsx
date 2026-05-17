@@ -13,7 +13,7 @@ function SubmitBtn() {
     <button
       type="submit"
       disabled={pending}
-      className="bg-fg text-bg px-4 py-2 text-xs font-bold tracking-widest hover:bg-signal-buy transition-colors disabled:opacity-50"
+      className="w-full sm:w-auto touch-target bg-fg text-bg px-4 py-2 text-xs font-bold tracking-widest hover:bg-signal-buy transition-colors disabled:opacity-50"
     >
       {pending ? 'IMPORTING…' : 'IMPORT ALL'}
     </button>
@@ -50,8 +50,8 @@ export function BatchImportForm() {
 
   return (
     <details className="group border border-border bg-bg-elevated">
-      <summary className="cursor-pointer px-4 py-3 text-xs tracking-widest text-fg-subtle flex items-center justify-between select-none">
-        <span>BATCH IMPORT — paste a schedule</span>
+      <summary className="cursor-pointer px-3 sm:px-4 py-3 text-xs tracking-widest text-fg-subtle flex items-center justify-between gap-2 select-none min-w-0">
+        <span className="min-w-0 leading-snug">BATCH IMPORT — paste a schedule</span>
         <span className="text-fg-dim group-open:rotate-180 transition-transform">▾</span>
       </summary>
 
@@ -71,10 +71,10 @@ export function BatchImportForm() {
           className="w-full bg-bg border border-border px-3 py-2 text-sm font-mono focus:outline-none focus:border-signal-buy resize-y"
         />
 
-        <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
           <SubmitBtn />
           {state.error && (
-            <p className="text-xs text-signal-sell whitespace-pre-wrap">{state.error}</p>
+            <p className="text-xs text-signal-sell whitespace-pre-wrap min-w-0">{state.error}</p>
           )}
         </div>
 

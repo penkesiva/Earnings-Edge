@@ -15,16 +15,18 @@ export default async function WatchlistPage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight mb-2">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+        <div className="min-w-0">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight mb-2">
             <span className="text-fg-subtle">›</span> WATCHLIST
           </h1>
           <p className="text-sm text-fg-subtle">
             {tickers?.filter(t => t.active).length ?? 0} active · {tickers?.length ?? 0} total
           </p>
         </div>
-        <DashboardRefresh />
+        <div className="w-full sm:max-w-sm shrink-0">
+          <DashboardRefresh />
+        </div>
       </div>
 
       <AddTickerForm />
@@ -40,27 +42,32 @@ export default async function WatchlistPage() {
               </span>
             </div>
             <div className="text-fg-muted text-xs mt-1">{t.thesis || '—'}</div>
-            <form action={setManualEarnings} className="flex gap-1 items-center mt-3">
+            <form action={setManualEarnings} className="mt-3 space-y-2">
               <input type="hidden" name="id" value={t.id} />
-              <input
-                type="date"
-                name="manual_earnings_date"
-                defaultValue={t.manual_earnings_date ?? ''}
-                key={t.manual_earnings_date ?? 'no-date'}
-                className="flex-1 bg-bg border border-border px-2 py-1 text-xs focus:outline-none focus:border-signal-buy"
-              />
-              <select
-                name="manual_timing"
-                defaultValue={t.manual_timing ?? ''}
-                key={t.manual_timing ?? 'no-timing'}
-                className="bg-bg border border-border px-1.5 py-1 text-xs focus:outline-none focus:border-signal-buy"
+              <div className="flex flex-wrap gap-2 items-center">
+                <input
+                  type="date"
+                  name="manual_earnings_date"
+                  defaultValue={t.manual_earnings_date ?? ''}
+                  key={t.manual_earnings_date ?? 'no-date'}
+                  className="min-w-0 flex-1 basis-[9rem] bg-bg border border-border px-2 py-1.5 text-xs focus:outline-none focus:border-signal-buy"
+                />
+                <select
+                  name="manual_timing"
+                  defaultValue={t.manual_timing ?? ''}
+                  key={t.manual_timing ?? 'no-timing'}
+                  className="shrink-0 bg-bg border border-border px-1.5 py-1.5 text-xs focus:outline-none focus:border-signal-buy"
+                >
+                  <option value="">--</option>
+                  <option value="BMO">BMO</option>
+                  <option value="AMC">AMC</option>
+                  <option value="UNK">UNK</option>
+                </select>
+              </div>
+              <button
+                type="submit"
+                className="brief-action-btn brief-action-btn--save w-full sm:w-auto"
               >
-                <option value="">--</option>
-                <option value="BMO">BMO</option>
-                <option value="AMC">AMC</option>
-                <option value="UNK">UNK</option>
-              </select>
-              <button type="submit" className="brief-action-btn brief-action-btn--save">
                 SAVE
               </button>
             </form>

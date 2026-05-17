@@ -10,7 +10,7 @@ function SubmitButton() {
     <button
       type="submit"
       disabled={pending}
-      className="bg-fg text-bg px-4 py-2 text-sm font-bold tracking-widest hover:bg-signal-buy transition-colors disabled:opacity-50 disabled:pointer-events-none"
+      className="w-full sm:w-auto bg-fg text-bg px-4 py-2 text-sm font-bold tracking-widest hover:bg-signal-buy transition-colors disabled:opacity-50 disabled:pointer-events-none touch-target"
     >
       {pending ? 'ADDING…' : 'ADD'}
     </button>
@@ -21,9 +21,9 @@ export function AddTickerForm() {
   const [state, formAction] = useFormState(addTicker, {});
 
   return (
-    <form action={formAction} className="border border-border bg-bg-elevated p-4 space-y-3">
-      <div className="flex gap-3 items-end flex-wrap">
-        <div className="flex-1 min-w-[120px]">
+    <form action={formAction} className="border border-border bg-bg-elevated p-3 sm:p-4 space-y-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+        <div className="w-full sm:flex-1 sm:min-w-[7rem] sm:max-w-[10rem]">
           <label className="text-xs text-fg-subtle tracking-widest block mb-1">TICKER</label>
           <input
             name="ticker"
@@ -32,7 +32,7 @@ export function AddTickerForm() {
             className="w-full bg-bg border border-border px-3 py-2 text-sm font-mono uppercase focus:outline-none focus:border-signal-buy"
           />
         </div>
-        <div className="flex-[3] min-w-[200px]">
+        <div className="w-full min-w-0 sm:flex-[3]">
           <label className="text-xs text-fg-subtle tracking-widest block mb-1">THESIS</label>
           <input
             name="thesis"
@@ -40,7 +40,9 @@ export function AddTickerForm() {
             className="w-full bg-bg border border-border px-3 py-2 text-sm focus:outline-none focus:border-signal-buy"
           />
         </div>
-        <SubmitButton />
+        <div className="w-full sm:w-auto shrink-0">
+          <SubmitButton />
+        </div>
       </div>
       {state?.error ? (
         <p className="text-xs text-signal-sell" role="alert">
