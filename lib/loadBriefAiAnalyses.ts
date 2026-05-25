@@ -8,6 +8,8 @@ export type LoadedBriefAi = {
   analyses: SavedAnalyses;
   /** Latest `analyzed_at` across GPT / Gemini / Claude. */
   lastAiScanAt: string | null;
+  /** When final verdict (consensus) was last synthesized. */
+  lastConsensusAt: string | null;
 };
 
 function normUuid(id: string): string {
@@ -70,6 +72,7 @@ export async function loadBriefAiAnalyses(
 
   const saved: SavedAnalyses = {};
   let lastAiScanAt: string | null = null;
+  let lastConsensusAt: string | null = null;
   for (const row of rows) {
     const p = row.provider as string;
     if ((PROVIDERS as readonly string[]).includes(p)) {
@@ -79,11 +82,14 @@ export async function loadBriefAiAnalyses(
       const at = row.analyzed_at as string;
       if (!lastAiScanAt || at > lastAiScanAt) lastAiScanAt = at;
     }
+    if (p === 'consensus' && row.analyzed_at) {
+      lastConsensusAt = row.analyzed_at as string;
+    }
   }
 
   if (Object.keys(saved).length > 0) {
     console.log('[brief-ai] loaded for', briefId, '→', Object.keys(saved).join(', '));
   }
 
-  return { analyses: saved, lastAiScanAt };
+  return { analyses: saved, lastAiScanAt, lastConsensusAt };
 }

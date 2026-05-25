@@ -44,11 +44,14 @@ export function ConsensusVerdict({
   analyses,
   savedText,
   autoRunSignal,
+  onComplete,
 }: {
   brief: AiBriefPayload;
   analyses: Partial<Record<'openai' | 'gemini' | 'claude', string>>;
   savedText?: string;
   autoRunSignal: number;
+  /** Called when synthesis finishes successfully (ISO timestamp). */
+  onComplete?: (at: string) => void;
 }) {
   const [state, setState] = useState<PanelState>('idle');
   const [text, setText] = useState('');
@@ -87,6 +90,7 @@ export function ConsensusVerdict({
       const out = data.text as string;
       setText(out);
       setState('done');
+      onComplete?.(new Date().toISOString());
 
       fetch('/api/internal/save-ai-analysis', {
         method: 'POST',
@@ -101,7 +105,7 @@ export function ConsensusVerdict({
       setError(e instanceof Error ? e.message : 'Network error');
       setState('error');
     }
-  }, [analyses, brief]);
+  }, [analyses, brief, onComplete]);
 
   const lastAutoSignal = useRef(0);
   useEffect(() => {

@@ -60,7 +60,7 @@ export default async function BriefPage({
     .eq('brief_id', params.id)
     .maybeSingle();
 
-  const { analyses: savedAnalyses, lastAiScanAt } = await loadBriefAiAnalyses(
+  const { analyses: savedAnalyses, lastAiScanAt, lastConsensusAt } = await loadBriefAiAnalyses(
     sb,
     params.id,
     brief.ticker as string,
@@ -176,6 +176,7 @@ export default async function BriefPage({
           <AiBriefAnalysis
             savedAnalyses={savedAnalyses}
             lastAiScanAt={lastAiScanAt}
+            lastConsensusAt={lastConsensusAt}
             systemScanAt={systemScanAt}
             brief={{
             brief_id:                 brief.id,

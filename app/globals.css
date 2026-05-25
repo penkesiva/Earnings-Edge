@@ -251,52 +251,60 @@ html.light {
 }
 .ai-verdict-btn:disabled { opacity: 0.4; }
 
-/* Brief page fixed toolbar — equal scan buttons left, verdict right */
+/* Brief page action toolbar — three stacked columns: system / AI / verdict */
 .brief-toolbar {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+  align-items: start;
+}
+
+@media (min-width: 640px) {
+  .brief-toolbar {
+    grid-template-columns: repeat(3, minmax(5.75rem, 1fr));
+    gap: 0.5rem;
+  }
+}
+
+.brief-toolbar-col {
   display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 0.5rem 0.75rem;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.25rem;
+  min-width: 0;
 }
 
-.brief-toolbar-scans {
-  display: inline-grid;
-  grid-template-columns: repeat(2, minmax(5.75rem, 1fr));
-  gap: 0.5rem;
-  justify-items: stretch;
-  max-width: 100%;
-}
-
-.brief-toolbar-scans .brief-scan-btn {
+.brief-toolbar-col .brief-scan-btn {
   width: 100%;
   min-width: 0;
   white-space: nowrap;
 }
 
-.brief-toolbar-scans .brief-scan-meta {
-  grid-column: 1 / -1;
+.brief-toolbar-col--verdict {
+  align-items: stretch;
 }
 
-.brief-toolbar-verdict {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 0.25rem;
-  margin-left: auto;
-  flex-shrink: 0;
+@media (min-width: 640px) {
+  .brief-toolbar-col--verdict {
+    align-items: flex-end;
+  }
+
+  .brief-toolbar-col--verdict .ai-verdict-btn {
+    width: auto;
+  }
 }
 
-.brief-toolbar-verdict .ai-verdict-btn {
-  width: auto;
+.brief-toolbar-col--verdict .ai-verdict-btn {
   min-height: 2.75rem;
 }
 
 @media (min-width: 768px) {
-  .brief-toolbar-verdict .ai-verdict-btn {
+  .brief-toolbar-col--verdict .ai-verdict-btn {
     min-height: 0;
   }
 }
+
+.brief-toolbar-col--verdict .ai-verdict-btn:disabled { opacity: 0.4; }
 
 /* Secondary actions on brief/watchlist — visible at rest, stronger on hover */
 .brief-action-btn {

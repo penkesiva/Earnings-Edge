@@ -309,16 +309,29 @@ function AnalysisBlock({
 
 // ── Scan age label (re-renders for relative time) ─────────────────────────────
 
-function ScanAgeLabel({ at, neverLabel }: { at: string | null; neverLabel: string }) {
+function ScanAgeLabel({
+  at,
+  neverLabel,
+  align = 'center',
+}: {
+  at: string | null;
+  neverLabel: string;
+  align?: 'center' | 'end';
+}) {
   const [, tick] = useState(0);
   useEffect(() => {
     const id = setInterval(() => tick(n => n + 1), 30_000);
     return () => clearInterval(id);
   }, []);
-  if (!at) return <span className="text-[10px] text-fg-dim">{neverLabel}</span>;
+  const alignCls = align === 'end' ? 'text-right' : 'text-center';
+  if (!at) {
+    return (
+      <span className={`text-[10px] text-fg-dim ${alignCls} block`}>{neverLabel}</span>
+    );
+  }
   void tick;
   return (
-    <span className="text-[10px] text-fg-dim font-mono tabular-nums">
+    <span className={`text-[10px] text-fg-dim font-mono tabular-nums ${alignCls} block`}>
       Last: {formatScanAge(at)}
     </span>
   );
@@ -333,11 +346,13 @@ export function AiBriefAnalysis({
   brief,
   savedAnalyses,
   lastAiScanAt,
+  lastConsensusAt,
   systemScanAt,
 }: {
   brief: AiBriefPayload;
   savedAnalyses?: SavedAnalyses;
   lastAiScanAt?: string | null;
+  lastConsensusAt?: string | null;
   systemScanAt?: string | null;
 }) {
   const [signals, setSignals] = useState<Record<Provider, number>>({
@@ -350,6 +365,7 @@ export function AiBriefAnalysis({
   const [awaitingConsensus, setAwaitingConsensus] = useState(false);
   const [aiRunInFlight, setAiRunInFlight] = useState(false);
   const [sessionAiScanAt, setSessionAiScanAt] = useState<string | null>(null);
+  const [sessionConsensusAt, setSessionConsensusAt] = useState<string | null>(null);
   const [cooldownTick, setCooldownTick] = useState(0);
   const completedRef = useRef<Set<Provider>>(new Set());
   const terminalRef = useRef<Set<Provider>>(new Set());
@@ -366,6 +382,14 @@ export function AiBriefAnalysis({
     if (!b) return a;
     return a > b ? a : b;
   }, [lastAiScanAt, sessionAiScanAt]);
+
+  const effectiveLastConsensusAt = useMemo(() => {
+    const a = lastConsensusAt ?? null;
+    const b = sessionConsensusAt;
+    if (!a) return b;
+    if (!b) return a;
+    return a > b ? a : b;
+  }, [lastConsensusAt, sessionConsensusAt]);
 
   void cooldownTick;
   const cooldownMs = msUntilAiScanAllowed(effectiveLastAiAt);
@@ -427,13 +451,17 @@ export function AiBriefAnalysis({
   return (
     <div className="mt-4 pt-3 border-t border-border-subtle space-y-4">
 
-      <div className="brief-action-bar border border-border-subtle md:rounded-sm">
+      <div className="brief-action-bar border border-border-subtle md:rounded-sm p-2 sm:p-3">
         <div className="brief-toolbar">
-          <div className="brief-toolbar-scans">
+          <div className="brief-toolbar-col">
             <RescanBriefButton
               ticker={brief.ticker}
               earningsDate={brief.earnings_date}
             />
+            <ScanAgeLabel at={systemScanAt ?? null} neverLabel="Not scanned yet" />
+          </div>
+
+          <div className="brief-toolbar-col">
             <button
               type="button"
               onClick={runAiScan}
@@ -447,14 +475,15 @@ export function AiBriefAnalysis({
             >
               {aiRunInFlight ? '⟳ AI SCAN…' : hasAiSaved ? '↻ AI SCAN' : '✦ AI SCAN'}
             </button>
+            <ScanAgeLabel at={effectiveLastAiAt} neverLabel="Never run" />
             {aiScanOnCooldown && !aiRunInFlight && (
-              <span className="brief-scan-meta text-[10px] text-signal-watch font-mono md:hidden">
+              <span className="text-[10px] text-signal-watch font-mono text-center block">
                 Wait {formatCooldownWait(cooldownMs)}
               </span>
             )}
           </div>
 
-          <div className="brief-toolbar-verdict">
+          <div className="brief-toolbar-col brief-toolbar-col--verdict">
             <button
               type="button"
               onClick={synthesizeNow}
@@ -464,26 +493,22 @@ export function AiBriefAnalysis({
                   ? 'Run AI scan first (need at least 2 model reports)'
                   : 'Synthesize final GO/NO-GO from system + AI reports'
               }
-              className="ai-verdict-btn touch-target flex flex-col items-center justify-center disabled:opacity-40 text-[11px] md:text-xs leading-[1.15] whitespace-nowrap"
+              className="ai-verdict-btn touch-target w-full sm:w-auto flex flex-col items-center justify-center disabled:opacity-40 text-[11px] md:text-xs leading-[1.15] whitespace-nowrap"
             >
-              <span className="md:hidden flex flex-col items-center text-[10px]">
+              <span className="sm:hidden flex flex-col items-center text-[10px]">
                 <span>⚖ FINAL</span>
                 <span>VERDICT</span>
               </span>
-              <span className="hidden md:inline">⚖ FINAL VERDICT</span>
+              <span className="hidden sm:inline">⚖ FINAL VERDICT</span>
             </button>
-            <span className="hidden md:inline text-[10px] text-fg-dim text-right">
-              Uses system scan + {modelCount}/3 AI reports
-            </span>
-            <span className="md:hidden text-[10px] text-fg-dim font-mono tabular-nums">
-              {modelCount}/3 AI
+            <ScanAgeLabel
+              at={effectiveLastConsensusAt}
+              neverLabel="Not run yet"
+            />
+            <span className="text-[10px] text-fg-dim text-center sm:text-right block tabular-nums">
+              {modelCount}/3 AI reports
             </span>
           </div>
-        </div>
-
-        <div className="hidden md:grid md:grid-cols-2 md:gap-2 md:mt-2 md:w-max text-[10px] text-fg-dim">
-          <ScanAgeLabel at={systemScanAt ?? null} neverLabel="Not scanned yet" />
-          <ScanAgeLabel at={effectiveLastAiAt} neverLabel="Never run" />
         </div>
       </div>
 
@@ -492,6 +517,7 @@ export function AiBriefAnalysis({
         analyses={modelTexts}
         savedText={savedAnalyses?.consensus}
         autoRunSignal={consensusSignal}
+        onComplete={setSessionConsensusAt}
       />
 
       {awaitingConsensus && modelCount < 3 && (
