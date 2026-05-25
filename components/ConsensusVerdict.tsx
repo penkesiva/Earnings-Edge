@@ -259,7 +259,7 @@ export function ConsensusVerdict({
 
       {parsed.move && <p className="text-sm font-mono text-fg">{parsed.move}</p>}
       {whyText && (
-        <p className="text-xs text-fg-muted leading-snug border-l-2 border-border-subtle pl-3 max-w-prose">
+        <p className="text-xs text-fg-muted leading-snug border-l-2 border-border-subtle pl-3 w-full">
           {whyText}
         </p>
       )}
