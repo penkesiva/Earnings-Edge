@@ -163,7 +163,7 @@ function AiAnalysisBody({
 
   if (!finalCall) {
     return (
-      <div className={`text-xs text-fg-muted leading-relaxed whitespace-pre-wrap font-mono overflow-x-auto ${boxClass}`}>
+      <div className={`text-sm text-fg-muted leading-relaxed whitespace-pre-wrap overflow-x-auto ${boxClass}`}>
         {text}
         {streaming && (
           <span className={`inline-block w-1.5 h-3 ${dotClass} animate-pulse ml-0.5 align-middle`} />
@@ -174,7 +174,7 @@ function AiAnalysisBody({
 
   return (
     <div className={`overflow-x-auto ${boxClass}`}>
-      <p className="text-sm text-fg leading-snug font-medium">
+      <p className="text-base leading-relaxed text-fg-muted">
         {finalCall}
         {streaming && !rest && (
           <span className={`inline-block w-1.5 h-3 ${dotClass} animate-pulse ml-0.5 align-middle`} />
