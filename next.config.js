@@ -1,5 +1,12 @@
 /** @type {import('next').NextConfig} */
+const pkg = require('./package.json');
+
 const nextConfig = {
+  env: {
+    APP_VERSION: pkg.version,
+    BUILD_TIME: new Date().toISOString(),
+    GIT_SHA: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) || 'local',
+  },
   experimental: {
     serverActions: {
       allowedOrigins: ['localhost:3000', '*.vercel.app'],

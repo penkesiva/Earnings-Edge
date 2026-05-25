@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { BuildStamp } from '@/components/BuildStamp';
 
 export default function DashboardLayout({
   children,
@@ -60,8 +61,9 @@ export default function DashboardLayout({
 
       <main>{children}</main>
 
-      <footer className="mt-10 sm:mt-16 pt-4 border-t border-border-subtle text-xs text-fg-dim">
-        Decision support, not advice. Sizing is yours.
+      <footer className="mt-10 sm:mt-16 pt-4 border-t border-border-subtle text-xs text-fg-dim flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        <span>Decision support, not advice. Sizing is yours.</span>
+        <BuildStamp />
       </footer>
     </div>
   );
