@@ -437,6 +437,8 @@ export function AiBriefAnalysis({
   const [scanError, setScanError] = useState('');
   const [scanRunId, setScanRunId] = useState<string | null>(null);
   const [serverLockUntil, setServerLockUntil] = useState<string | null>(null);
+  const [peerWaitActive, setPeerWaitActive] = useState(false);
+  const [peerNotice, setPeerNotice] = useState<string | null>(null);
   const [sessionScanAllAt, setSessionScanAllAt] = useState<string | null>(null);
   const [sessionAiScanAt, setSessionAiScanAt] = useState<string | null>(null);
   const [sessionConsensusAt, setSessionConsensusAt] = useState<string | null>(null);
@@ -444,6 +446,8 @@ export function AiBriefAnalysis({
   const completedRef = useRef<Set<Provider>>(new Set());
   const terminalRef = useRef<Set<Provider>>(new Set());
   const scanAllPipelineRef = useRef(false);
+  const waitBaselineRef = useRef<string | null>(null);
+  const peerAutoDetectRef = useRef(false);
   const router = useRouter();
 
   const refreshLockStatus = useCallback(async () => {
@@ -505,6 +509,85 @@ export function AiBriefAnalysis({
   const serverCooldownMs = msUntilIso(serverLockUntil);
   const cooldownMs = Math.max(legacyCooldownMs, serverCooldownMs);
   const scanOnCooldown = cooldownMs > 0;
+
+  // Auto-detect an in-progress peer scan when opening the brief mid-run.
+  useEffect(() => {
+    if (peerAutoDetectRef.current || scanRunId || scanInFlight) return;
+    peerAutoDetectRef.current = true;
+
+    let cancelled = false;
+    (async () => {
+      const q = new URLSearchParams({
+        brief_id: brief.brief_id,
+        ticker: brief.ticker,
+        earnings_date: brief.earnings_date,
+      });
+      const res = await fetch(`/api/internal/brief-scan-status?${q}`);
+      if (!res.ok || cancelled) return;
+      const data = await res.json();
+      if (cancelled || !data.isLocked || data.scanCompleteForLock) return;
+
+      setServerLockUntil(data.lockedUntil as string);
+      setPeerWaitActive(true);
+      setPeerNotice(
+        `${brief.ticker} scan in progress — results will appear automatically…`,
+      );
+      waitBaselineRef.current = effectiveLastScanAllAt;
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    brief.brief_id,
+    brief.ticker,
+    brief.earnings_date,
+    effectiveLastScanAllAt,
+    scanInFlight,
+    scanRunId,
+  ]);
+
+  // Poll while someone else is scanning — refresh UI when results land.
+  useEffect(() => {
+    if (!peerWaitActive || scanInFlight) return;
+
+    const poll = async () => {
+      const q = new URLSearchParams({
+        brief_id: brief.brief_id,
+        ticker: brief.ticker,
+        earnings_date: brief.earnings_date,
+      });
+      const res = await fetch(`/api/internal/brief-scan-status?${q}`);
+      if (!res.ok) return;
+      const data = await res.json();
+
+      setServerLockUntil(data.isLocked ? (data.lockedUntil as string) : null);
+
+      const baseline = waitBaselineRef.current ?? effectiveLastScanAllAt;
+      const latest = (data.latestResultsAt as string | null) ?? null;
+      const complete = data.scanCompleteForLock as boolean;
+
+      if (complete || (latest && (!baseline || latest > baseline))) {
+        setPeerWaitActive(false);
+        setPeerNotice(`${brief.ticker} scan complete — results updated`);
+        waitBaselineRef.current = latest ?? baseline;
+        router.refresh();
+        window.setTimeout(() => setPeerNotice(null), 6000);
+      }
+    };
+
+    poll();
+    const id = window.setInterval(poll, 4000);
+    return () => window.clearInterval(id);
+  }, [
+    peerWaitActive,
+    scanInFlight,
+    brief.brief_id,
+    brief.ticker,
+    brief.earnings_date,
+    router,
+    effectiveLastScanAllAt,
+  ]);
 
   const finishScanAll = useCallback(() => {
     scanAllPipelineRef.current = false;
@@ -579,10 +662,11 @@ export function AiBriefAnalysis({
       const lockData = await lockRes.json().catch(() => ({}));
       if (!lockRes.ok) {
         if (lockData.lockedUntil) setServerLockUntil(lockData.lockedUntil as string);
-        setScanError(
+        waitBaselineRef.current = effectiveLastScanAllAt;
+        setPeerWaitActive(true);
+        setPeerNotice(
           (lockData.message as string) ??
-            (lockData.error as string) ??
-            `${activeBrief.ticker} scan in progress — wait and refresh for results.`,
+            `${activeBrief.ticker} scan in progress — results will appear automatically…`,
         );
         return;
       }
@@ -702,11 +786,16 @@ export function AiBriefAnalysis({
               neverLabel="Not scanned yet"
               align="end"
             />
-            {scanOnCooldown && !scanInFlight && (
+            {scanOnCooldown && !scanInFlight && !peerWaitActive && (
               <span className="text-[10px] text-signal-watch font-mono block sm:text-right">
                 {serverLockUntil && serverCooldownMs > legacyCooldownMs
                   ? `${activeBrief.ticker} scan locked · wait ${formatCooldownWait(cooldownMs)}`
                   : `Wait ${formatCooldownWait(cooldownMs)}`}
+              </span>
+            )}
+            {peerWaitActive && (
+              <span className="text-[10px] text-signal-watch font-mono block sm:text-right animate-pulse">
+                Waiting for scan to finish…
               </span>
             )}
             {phaseLabel && (
@@ -719,6 +808,18 @@ export function AiBriefAnalysis({
 
         <ScanSignalStrip chips={signalChips} />
       </div>
+
+      {peerNotice && (
+        <p
+          className={`text-xs px-3 py-2 border ${
+            peerWaitActive
+              ? 'text-signal-watch border-signal-watch/40 bg-signal-watch/5'
+              : 'text-signal-buy border-signal-buy/40 bg-signal-buy/5'
+          }`}
+        >
+          {peerNotice}
+        </p>
+      )}
 
       {scanError && (
         <p className="text-xs text-signal-sell border border-signal-sell/40 bg-signal-sell/5 px-3 py-2">

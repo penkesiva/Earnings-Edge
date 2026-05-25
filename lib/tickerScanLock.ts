@@ -6,6 +6,7 @@ export type TickerScanLockStatus = {
   ticker: string;
   isLocked: boolean;
   lockedUntil: string | null;
+  lockStartedAt: string | null;
   runId: string | null;
   waitMs: number;
 };
@@ -22,7 +23,7 @@ export async function getTickerScanLock(
   const normalized = ticker.trim().toUpperCase();
   const { data } = await sb
     .from('ticker_scan_locks')
-    .select('run_id, locked_until')
+    .select('run_id, locked_until, started_at')
     .eq('ticker', normalized)
     .maybeSingle();
 
@@ -34,6 +35,7 @@ export async function getTickerScanLock(
     ticker: normalized,
     isLocked,
     lockedUntil: isLocked ? lockedUntil : null,
+    lockStartedAt: isLocked ? ((data?.started_at as string | undefined) ?? null) : null,
     runId: isLocked ? ((data?.run_id as string | undefined) ?? null) : null,
     waitMs,
   };
