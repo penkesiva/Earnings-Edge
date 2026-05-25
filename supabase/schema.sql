@@ -206,6 +206,19 @@ grant all on brief_ai_analyses to postgres, anon, authenticated, service_role;
 grant usage, select on sequence brief_ai_analyses_id_seq to postgres, anon, authenticated, service_role;
 
 -- =============================================================================
+-- Per-ticker Scan All lock (one run per ticker, ~10 min cooldown)
+-- =============================================================================
+create table if not exists ticker_scan_locks (
+  ticker text primary key,
+  run_id uuid not null,
+  locked_until timestamptz not null,
+  started_at timestamptz not null default now(),
+  brief_id uuid references earnings_briefs (id) on delete set null
+);
+
+grant all on ticker_scan_locks to postgres, anon, authenticated, service_role;
+
+-- =============================================================================
 -- Web push subscriptions
 -- =============================================================================
 create table if not exists push_subscriptions (

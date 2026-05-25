@@ -10,6 +10,9 @@ import {
   buildSystemSummary,
   computeDeterministicConsensus,
 } from '@/lib/aiConsensus';
+import { parseScanRequestBody } from '@/lib/parseScanRequest';
+import { assertScanRunAllowed } from '@/lib/tickerScanLock';
+import { supabaseAdmin } from '@/lib/supabase';
 
 export const maxDuration = 60;
 
@@ -66,6 +69,7 @@ export async function POST(req: NextRequest) {
   let body: {
     brief?: AiBriefPayload;
     analyses?: Partial<Record<'openai' | 'gemini' | 'claude', string>>;
+    scan_run_id?: string;
   };
   try {
     body = await req.json();
@@ -73,10 +77,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
-  const { brief, analyses } = body;
+  const parsed = body.brief
+    ? { brief: body.brief, scan_run_id: body.scan_run_id }
+    : parseScanRequestBody(body);
+  if ('error' in parsed) {
+    return NextResponse.json({ error: parsed.error }, { status: 400 });
+  }
+
+  const { brief, scan_run_id: scanRunId } = parsed;
+  const { analyses } = body;
   if (!brief?.ticker || !analyses) {
     return NextResponse.json({ error: 'brief and analyses required' }, { status: 400 });
   }
+
+  const denied = await assertScanRunAllowed(supabaseAdmin(), brief.ticker, scanRunId);
+  if (denied) return denied;
 
   const filled = (['openai', 'gemini', 'claude'] as const).filter(p => analyses[p]?.trim());
   if (filled.length < 2) {

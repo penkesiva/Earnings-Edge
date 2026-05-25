@@ -98,6 +98,7 @@ export function ConsensusVerdict({
   analyses,
   savedText,
   autoRunSignal,
+  scanRunId,
   onComplete,
   onError,
   hideManualControls = false,
@@ -106,6 +107,7 @@ export function ConsensusVerdict({
   analyses: Partial<Record<'openai' | 'gemini' | 'claude', string>>;
   savedText?: string;
   autoRunSignal: number;
+  scanRunId?: string | null;
   /** Called when synthesis finishes successfully (ISO timestamp). */
   onComplete?: (at: string) => void;
   onError?: (message: string) => void;
@@ -139,7 +141,11 @@ export function ConsensusVerdict({
       const res = await fetch('/api/internal/synthesis-analysis', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ brief, analyses }),
+        body: JSON.stringify({
+          brief,
+          analyses,
+          ...(scanRunId ? { scan_run_id: scanRunId } : {}),
+        }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -169,7 +175,7 @@ export function ConsensusVerdict({
       setState('error');
       onError?.(errMsg);
     }
-  }, [analyses, brief, onComplete, onError]);
+  }, [analyses, brief, onComplete, onError, scanRunId]);
 
   const lastAutoSignal = useRef(0);
   useEffect(() => {

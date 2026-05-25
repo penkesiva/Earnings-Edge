@@ -16,6 +16,7 @@ import {
 } from '@/lib/aiScanCooldown';
 import { buildScanSignalStrip } from '@/lib/scanSignalStrip';
 import { splitAiFinalCall } from '@/lib/aiAnalysisDisplay';
+import { msUntilIso } from '@/lib/tickerScanLock';
 
 export type SavedAnalyses = Partial<
   Record<'openai' | 'gemini' | 'claude' | 'consensus', string>
@@ -202,6 +203,7 @@ function AnalysisBlock({
   provider,
   brief,
   runSignal,
+  scanRunId,
   savedText,
   onComplete,
   onTerminal,
@@ -209,6 +211,7 @@ function AnalysisBlock({
   provider: Provider;
   brief: AiBriefPayload;
   runSignal: number;
+  scanRunId: string | null;
   savedText?: string;
   onComplete?: (provider: Provider, text: string) => void;
   onTerminal?: (provider: Provider) => void;
@@ -243,7 +246,10 @@ function AnalysisBlock({
       const res = await fetch(cfg.endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(brief),
+        body: JSON.stringify({
+          brief,
+          ...(scanRunId ? { scan_run_id: scanRunId } : {}),
+        }),
       });
 
       if (!res.ok) {
@@ -429,6 +435,8 @@ export function AiBriefAnalysis({
   const [scanPhase, setScanPhase] = useState<ScanPhase>('idle');
   const [scanInFlight, setScanInFlight] = useState(false);
   const [scanError, setScanError] = useState('');
+  const [scanRunId, setScanRunId] = useState<string | null>(null);
+  const [serverLockUntil, setServerLockUntil] = useState<string | null>(null);
   const [sessionScanAllAt, setSessionScanAllAt] = useState<string | null>(null);
   const [sessionAiScanAt, setSessionAiScanAt] = useState<string | null>(null);
   const [sessionConsensusAt, setSessionConsensusAt] = useState<string | null>(null);
@@ -437,6 +445,28 @@ export function AiBriefAnalysis({
   const terminalRef = useRef<Set<Provider>>(new Set());
   const scanAllPipelineRef = useRef(false);
   const router = useRouter();
+
+  const refreshLockStatus = useCallback(async () => {
+    try {
+      const res = await fetch(
+        `/api/internal/scan-all-lock?ticker=${encodeURIComponent(brief.ticker)}`,
+      );
+      if (!res.ok) return;
+      const data = await res.json();
+      setServerLockUntil(data.isLocked ? (data.lockedUntil as string) : null);
+    } catch {
+      // Non-fatal — fall back to client timestamps.
+    }
+  }, [brief.ticker]);
+
+  useEffect(() => {
+    refreshLockStatus();
+  }, [refreshLockStatus]);
+
+  useEffect(() => {
+    const id = setInterval(refreshLockStatus, 30_000);
+    return () => clearInterval(id);
+  }, [refreshLockStatus]);
 
   useEffect(() => {
     const id = setInterval(() => setCooldownTick(t => t + 1), 30_000);
@@ -471,7 +501,9 @@ export function AiBriefAnalysis({
   );
 
   void cooldownTick;
-  const cooldownMs = msUntilAiScanAllowed(effectiveLastScanAllAt);
+  const legacyCooldownMs = msUntilAiScanAllowed(effectiveLastScanAllAt);
+  const serverCooldownMs = msUntilIso(serverLockUntil);
+  const cooldownMs = Math.max(legacyCooldownMs, serverCooldownMs);
   const scanOnCooldown = cooldownMs > 0;
 
   const finishScanAll = useCallback(() => {
@@ -480,7 +512,8 @@ export function AiBriefAnalysis({
     setScanPhase('idle');
     setSessionScanAllAt(new Date().toISOString());
     router.refresh();
-  }, [router]);
+    refreshLockStatus();
+  }, [router, refreshLockStatus]);
 
   const failScanAll = useCallback((message: string) => {
     scanAllPipelineRef.current = false;
@@ -533,20 +566,46 @@ export function AiBriefAnalysis({
     if (scanOnCooldown || scanInFlight) return;
 
     setScanError('');
-    setScanInFlight(true);
-    setScanPhase('system');
-    scanAllPipelineRef.current = true;
-    completedRef.current = new Set();
-    terminalRef.current = new Set();
-    setPanelTexts({});
 
     try {
+      const lockRes = await fetch('/api/internal/scan-all-lock', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ticker: activeBrief.ticker,
+          brief_id: activeBrief.brief_id,
+        }),
+      });
+      const lockData = await lockRes.json().catch(() => ({}));
+      if (!lockRes.ok) {
+        if (lockData.lockedUntil) setServerLockUntil(lockData.lockedUntil as string);
+        setScanError(
+          (lockData.message as string) ??
+            (lockData.error as string) ??
+            `${activeBrief.ticker} scan in progress — wait and refresh for results.`,
+        );
+        return;
+      }
+
+      const runId = lockData.runId as string;
+      const lockedUntil = lockData.lockedUntil as string;
+      setScanRunId(runId);
+      setServerLockUntil(lockedUntil);
+
+      setScanInFlight(true);
+      setScanPhase('system');
+      scanAllPipelineRef.current = true;
+      completedRef.current = new Set();
+      terminalRef.current = new Set();
+      setPanelTexts({});
+
       const scanRes = await fetch('/api/internal/run-scan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           targetDate: activeBrief.earnings_date,
           ticker: activeBrief.ticker,
+          scan_run_id: runId,
         }),
       });
       const scanData = await scanRes.json().catch(() => ({}));
@@ -645,7 +704,9 @@ export function AiBriefAnalysis({
             />
             {scanOnCooldown && !scanInFlight && (
               <span className="text-[10px] text-signal-watch font-mono block sm:text-right">
-                Wait {formatCooldownWait(cooldownMs)}
+                {serverLockUntil && serverCooldownMs > legacyCooldownMs
+                  ? `${activeBrief.ticker} scan locked · wait ${formatCooldownWait(cooldownMs)}`
+                  : `Wait ${formatCooldownWait(cooldownMs)}`}
               </span>
             )}
             {phaseLabel && (
@@ -670,6 +731,7 @@ export function AiBriefAnalysis({
         analyses={modelTexts}
         savedText={scanInFlight ? undefined : savedAnalyses?.consensus}
         autoRunSignal={consensusSignal}
+        scanRunId={scanRunId}
         onComplete={handleConsensusComplete}
         onError={handleConsensusError}
         hideManualControls
@@ -681,6 +743,7 @@ export function AiBriefAnalysis({
           provider={p}
           brief={activeBrief}
           runSignal={signals[p]}
+          scanRunId={scanRunId}
           savedText={scanInFlight ? undefined : savedAnalyses?.[p]}
           onComplete={handleComplete}
           onTerminal={handleTerminal}

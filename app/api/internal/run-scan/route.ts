@@ -7,6 +7,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { runDailyScanJob } from '@/lib/jobs/daily-scan';
 import { addCalendarDays, earningsSessionDate } from '@/lib/earningsDate';
+import { assertScanRunAllowed } from '@/lib/tickerScanLock';
+import { supabaseAdmin } from '@/lib/supabase';
 
 export const maxDuration = 300;
 
@@ -21,6 +23,14 @@ export async function POST(req: NextRequest) {
   // Brief-page re-scan: single ticker only
   const singleTicker: string | undefined =
     typeof body?.ticker === 'string' ? body.ticker : undefined;
+
+  const scanRunId: string | undefined =
+    typeof body?.scan_run_id === 'string' ? body.scan_run_id : undefined;
+
+  if (singleTicker) {
+    const denied = await assertScanRunAllowed(supabaseAdmin(), singleTicker, scanRunId);
+    if (denied) return denied;
+  }
 
   const targetDate = explicitDate ?? (prep ? addCalendarDays(earningsSessionDate(), 1) : undefined);
 

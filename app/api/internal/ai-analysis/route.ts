@@ -9,6 +9,9 @@
 import { NextRequest } from 'next/server';
 import type { AiBriefPayload } from '@/components/AiBriefAnalysis';
 import { buildAiBriefUserMessage } from '@/lib/aiBriefMessage';
+import { parseScanRequestBody } from '@/lib/parseScanRequest';
+import { assertScanRunAllowed } from '@/lib/tickerScanLock';
+import { supabaseAdmin } from '@/lib/supabase';
 
 export const maxDuration = 120;
 
@@ -99,7 +102,25 @@ export async function POST(req: NextRequest) {
 
   let brief: AiBriefPayload;
   try {
-    brief = await req.json();
+    const parsed = parseScanRequestBody(await req.json());
+    if ('error' in parsed) {
+      return new Response(JSON.stringify({ error: parsed.error }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+    const denied = await assertScanRunAllowed(
+      supabaseAdmin(),
+      parsed.brief.ticker,
+      parsed.scan_run_id,
+    );
+    if (denied) {
+      return new Response(JSON.stringify(await denied.json()), {
+        status: denied.status,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+    brief = parsed.brief;
   } catch {
     return new Response('Invalid JSON', { status: 400 });
   }
