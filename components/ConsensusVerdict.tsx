@@ -99,6 +99,8 @@ export function ConsensusVerdict({
   savedText,
   autoRunSignal,
   onComplete,
+  onError,
+  hideManualControls = false,
 }: {
   brief: AiBriefPayload;
   analyses: Partial<Record<'openai' | 'gemini' | 'claude', string>>;
@@ -106,6 +108,8 @@ export function ConsensusVerdict({
   autoRunSignal: number;
   /** Called when synthesis finishes successfully (ISO timestamp). */
   onComplete?: (at: string) => void;
+  onError?: (message: string) => void;
+  hideManualControls?: boolean;
 }) {
   const [state, setState] = useState<PanelState>('idle');
   const [text, setText] = useState('');
@@ -121,8 +125,10 @@ export function ConsensusVerdict({
   const run = useCallback(async () => {
     const filled = (['openai', 'gemini', 'claude'] as const).filter(p => analyses[p]?.trim());
     if (filled.length < 2) {
-      setError('Run at least 2 AI analyses first');
+      const errMsg = 'Run at least 2 AI analyses first';
+      setError(errMsg);
       setState('error');
+      onError?.(errMsg);
       return;
     }
 
@@ -137,8 +143,10 @@ export function ConsensusVerdict({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(data.error ?? `HTTP ${res.status}`);
+        const errMsg = data.error ?? `HTTP ${res.status}`;
+        setError(errMsg);
         setState('error');
+        onError?.(errMsg);
         return;
       }
       const out = data.text as string;
@@ -156,10 +164,12 @@ export function ConsensusVerdict({
         }),
       }).catch(() => {});
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Network error');
+      const errMsg = e instanceof Error ? e.message : 'Network error';
+      setError(errMsg);
       setState('error');
+      onError?.(errMsg);
     }
-  }, [analyses, brief, onComplete]);
+  }, [analyses, brief, onComplete, onError]);
 
   const lastAutoSignal = useRef(0);
   useEffect(() => {
@@ -167,8 +177,9 @@ export function ConsensusVerdict({
       lastAutoSignal.current = autoRunSignal;
       const count = (['openai', 'gemini', 'claude'] as const).filter(p => analyses[p]?.trim()).length;
       if (count >= 2) run();
+      else onError?.('Need at least 2 AI analyses before final verdict');
     }
-  }, [autoRunSignal, analyses, run]);
+  }, [autoRunSignal, analyses, run, onError]);
 
   const effectiveState = state === 'idle' && savedText ? 'done' : state;
   const effectiveText = text || savedText || '';
@@ -189,13 +200,15 @@ export function ConsensusVerdict({
     return (
       <div className="border border-signal-sell/40 bg-signal-sell/5 px-4 py-3">
         <p className="text-xs text-signal-sell">{error}</p>
-        <button
-          type="button"
-          onClick={run}
-          className="brief-action-btn brief-action-btn--verdict mt-2"
-        >
-          ↻ RETRY SYNTHESIS
-        </button>
+        {!hideManualControls && (
+          <button
+            type="button"
+            onClick={run}
+            className="brief-action-btn brief-action-btn--verdict mt-2"
+          >
+            ↻ RETRY SYNTHESIS
+          </button>
+        )}
       </div>
     );
   }
@@ -225,13 +238,15 @@ export function ConsensusVerdict({
           {isSaved && (
             <span className="text-[10px] text-fg-dim tracking-widest">SAVED</span>
           )}
-          <button
-            type="button"
-            onClick={run}
-            className="brief-action-btn brief-action-btn--verdict"
-          >
-            ↻ RE-SYNTHESIZE
-          </button>
+          {!hideManualControls && (
+            <button
+              type="button"
+              onClick={run}
+              className="brief-action-btn brief-action-btn--verdict"
+            >
+              ↻ RE-SYNTHESIZE
+            </button>
+          )}
         </div>
       </div>
 

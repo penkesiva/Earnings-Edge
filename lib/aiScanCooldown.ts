@@ -1,10 +1,22 @@
-/** Minimum gap between full 3-model AI scans on the same brief. */
+/** Minimum gap between full Scan All runs on the same brief. */
 export const AI_SCAN_COOLDOWN_MS = 10 * 60 * 1000;
+/** @deprecated use AI_SCAN_COOLDOWN_MS */
+export const SCAN_ALL_COOLDOWN_MS = AI_SCAN_COOLDOWN_MS;
 
 export function msUntilAiScanAllowed(lastAtIso: string | null, nowMs = Date.now()): number {
   if (!lastAtIso) return 0;
   const elapsed = nowMs - new Date(lastAtIso).getTime();
   return Math.max(0, AI_SCAN_COOLDOWN_MS - elapsed);
+}
+
+/** Latest ISO timestamp from system / AI / verdict scans. */
+export function latestScanTimestamp(...isoTimes: (string | null | undefined)[]): string | null {
+  let latest: string | null = null;
+  for (const t of isoTimes) {
+    if (!t) continue;
+    if (!latest || t > latest) latest = t;
+  }
+  return latest;
 }
 
 export function formatCooldownWait(ms: number): string {

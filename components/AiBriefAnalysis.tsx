@@ -1,17 +1,20 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import type { NarrativeOverhang } from '@/lib/screamTest';
 import type { NewsOverallSentiment, RawHeadline } from '@/lib/newsSentiment';
 import { ConsensusVerdict } from '@/components/ConsensusVerdict';
+import { ScanSignalStrip } from '@/components/ScanSignalStrip';
 import { CopyIconButton } from '@/components/CopyIconButton';
 import { DirectionIndicator } from '@/components/DirectionIndicator';
-import { RescanBriefButton } from '@/components/RescanBriefButton';
 import {
   formatCooldownWait,
   formatScanAge,
+  latestScanTimestamp,
   msUntilAiScanAllowed,
 } from '@/lib/aiScanCooldown';
+import { buildScanSignalStrip } from '@/lib/scanSignalStrip';
 
 export type SavedAnalyses = Partial<
   Record<'openai' | 'gemini' | 'claude' | 'consensus', string>
@@ -163,6 +166,7 @@ function AnalysisBlock({
   const [text, setText]   = useState('');
   const [error, setError] = useState('');
   const runningRef        = useRef(false);
+  const lastRunSignal     = useRef(0);
   // Mirror state in a ref so the runSignal effect can read current state without stale closure
   const stateRef          = useRef<PanelState>('idle');
   const setStateSync      = (s: PanelState) => { stateRef.current = s; setState(s); };
@@ -250,10 +254,10 @@ function AnalysisBlock({
   }
 
   useEffect(() => {
-    // Only auto-trigger if the panel is idle — prevents accidental re-runs
-    // when the toolbar button is clicked on an already-active panel.
-    // Use ↻ RE-RUN in the panel header to intentionally re-run.
-    if (runSignal > 0 && stateRef.current === 'idle') run();
+    if (runSignal > lastRunSignal.current) {
+      lastRunSignal.current = runSignal;
+      run();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [runSignal]);
 
@@ -284,19 +288,8 @@ function AnalysisBlock({
         {(effectiveState === 'loading' || effectiveState === 'streaming') && (
           <span className={`text-[10px] font-medium ${c.status} animate-pulse`}>● THINKING…</span>
         )}
-        {effectiveState === 'done' && (
-          <>
-            {isFromSave && (
-              <span className="text-[10px] text-fg-dim tracking-widest">SAVED</span>
-            )}
-            <button
-              type="button"
-              onClick={run}
-              className={`brief-action-btn brief-action-btn--${provider}`}
-            >
-              ↻ RE-RUN
-            </button>
-          </>
+        {effectiveState === 'done' && isFromSave && (
+          <span className="text-[10px] text-fg-dim tracking-widest">SAVED</span>
         )}
       </div>
 
@@ -350,8 +343,10 @@ function ScanAgeLabel({
   );
 }
 
+type ScanPhase = 'idle' | 'system' | 'ai' | 'verdict' | 'error';
+
 const SCAN_BTN =
-  'brief-scan-btn touch-target text-[11px] sm:text-xs px-2 sm:px-3 py-2 sm:py-1.5 border tracking-widest transition-colors';
+  'brief-scan-btn touch-target text-[11px] sm:text-xs px-3 sm:px-4 py-2 sm:py-1.5 border tracking-widest transition-colors w-full sm:w-auto';
 
 // ── Container ─────────────────────────────────────────────────────────────────
 
@@ -368,6 +363,11 @@ export function AiBriefAnalysis({
   lastConsensusAt?: string | null;
   systemScanAt?: string | null;
 }) {
+  const [activeBrief, setActiveBrief] = useState(brief);
+  useEffect(() => {
+    setActiveBrief(brief);
+  }, [brief]);
+
   const [signals, setSignals] = useState<Record<Provider, number>>({
     openai: 0,
     gemini: 0,
@@ -375,13 +375,17 @@ export function AiBriefAnalysis({
   });
   const [panelTexts, setPanelTexts] = useState<Partial<Record<Provider, string>>>({});
   const [consensusSignal, setConsensusSignal] = useState(0);
-  const [awaitingConsensus, setAwaitingConsensus] = useState(false);
-  const [aiRunInFlight, setAiRunInFlight] = useState(false);
+  const [scanPhase, setScanPhase] = useState<ScanPhase>('idle');
+  const [scanInFlight, setScanInFlight] = useState(false);
+  const [scanError, setScanError] = useState('');
+  const [sessionScanAllAt, setSessionScanAllAt] = useState<string | null>(null);
   const [sessionAiScanAt, setSessionAiScanAt] = useState<string | null>(null);
   const [sessionConsensusAt, setSessionConsensusAt] = useState<string | null>(null);
   const [cooldownTick, setCooldownTick] = useState(0);
   const completedRef = useRef<Set<Provider>>(new Set());
   const terminalRef = useRef<Set<Provider>>(new Set());
+  const scanAllPipelineRef = useRef(false);
+  const router = useRouter();
 
   useEffect(() => {
     const id = setInterval(() => setCooldownTick(t => t + 1), 30_000);
@@ -404,148 +408,229 @@ export function AiBriefAnalysis({
     return a > b ? a : b;
   }, [lastConsensusAt, sessionConsensusAt]);
 
+  const effectiveLastScanAllAt = useMemo(
+    () =>
+      latestScanTimestamp(
+        systemScanAt,
+        effectiveLastAiAt,
+        effectiveLastConsensusAt,
+        sessionScanAllAt,
+      ),
+    [systemScanAt, effectiveLastAiAt, effectiveLastConsensusAt, sessionScanAllAt],
+  );
+
   void cooldownTick;
-  const cooldownMs = msUntilAiScanAllowed(effectiveLastAiAt);
-  const aiScanOnCooldown = cooldownMs > 0;
+  const cooldownMs = msUntilAiScanAllowed(effectiveLastScanAllAt);
+  const scanOnCooldown = cooldownMs > 0;
+
+  const finishScanAll = useCallback(() => {
+    scanAllPipelineRef.current = false;
+    setScanInFlight(false);
+    setScanPhase('idle');
+    setSessionScanAllAt(new Date().toISOString());
+    router.refresh();
+  }, [router]);
+
+  const failScanAll = useCallback((message: string) => {
+    scanAllPipelineRef.current = false;
+    setScanInFlight(false);
+    setScanPhase('error');
+    setScanError(message);
+  }, []);
 
   const handleComplete = useCallback((provider: Provider, text: string) => {
     setPanelTexts(prev => ({ ...prev, [provider]: text }));
     completedRef.current.add(provider);
     if (completedRef.current.size >= 3) {
       setSessionAiScanAt(new Date().toISOString());
+      if (scanAllPipelineRef.current) {
+        setScanPhase('verdict');
+      }
       setConsensusSignal(s => s + 1);
-      setAwaitingConsensus(false);
     }
   }, []);
 
   const handleTerminal = useCallback((provider: Provider) => {
     terminalRef.current.add(provider);
     if (terminalRef.current.size >= 3) {
-      setAiRunInFlight(false);
-      setAwaitingConsensus(false);
+      if (scanAllPipelineRef.current && completedRef.current.size < 3) {
+        failScanAll('One or more AI models failed. Wait for cooldown, then Scan All again.');
+      }
     }
-  }, []);
+  }, [failScanAll]);
 
-  function runAiScan() {
-    if (aiScanOnCooldown || aiRunInFlight) return;
+  const handleConsensusComplete = useCallback(
+    (at: string) => {
+      setSessionConsensusAt(at);
+      if (scanAllPipelineRef.current) {
+        finishScanAll();
+      }
+    },
+    [finishScanAll],
+  );
+
+  const handleConsensusError = useCallback(
+    (message: string) => {
+      if (scanAllPipelineRef.current) {
+        failScanAll(message || 'Final verdict failed. Wait for cooldown, then Scan All again.');
+      }
+    },
+    [failScanAll],
+  );
+
+  async function scanAll() {
+    if (scanOnCooldown || scanInFlight) return;
+
+    setScanError('');
+    setScanInFlight(true);
+    setScanPhase('system');
+    scanAllPipelineRef.current = true;
     completedRef.current = new Set();
     terminalRef.current = new Set();
     setPanelTexts({});
-    setAwaitingConsensus(true);
-    setAiRunInFlight(true);
-    setSignals(prev => ({
-      openai: prev.openai + 1,
-      gemini: prev.gemini + 1,
-      claude: prev.claude + 1,
-    }));
+
+    try {
+      const scanRes = await fetch('/api/internal/run-scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          targetDate: activeBrief.earnings_date,
+          ticker: activeBrief.ticker,
+        }),
+      });
+      const scanData = await scanRes.json().catch(() => ({}));
+      if (!scanRes.ok) {
+        throw new Error(scanData.error ?? `System scan HTTP ${scanRes.status}`);
+      }
+      if (scanData.idleReason) {
+        const msg =
+          scanData.idleReason === 'no_earnings_on_session_date'
+            ? `No watchlist row for ${activeBrief.ticker} on ${activeBrief.earnings_date}`
+            : `System scan skipped: ${scanData.idleReason}`;
+        throw new Error(msg);
+      }
+
+      const payloadRes = await fetch('/api/internal/brief-payload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ brief_id: activeBrief.brief_id }),
+      });
+      const fresh = await payloadRes.json().catch(() => ({}));
+      if (!payloadRes.ok) {
+        throw new Error(fresh.error ?? 'Failed to reload brief after system scan');
+      }
+      setActiveBrief(fresh as AiBriefPayload);
+
+      setScanPhase('ai');
+      setSignals(prev => ({
+        openai: prev.openai + 1,
+        gemini: prev.gemini + 1,
+        claude: prev.claude + 1,
+      }));
+    } catch (e) {
+      failScanAll(e instanceof Error ? e.message : 'Scan All failed');
+    }
   }
 
-  function synthesizeNow() {
-    setConsensusSignal(s => s + 1);
-  }
+  const modelTexts: Partial<Record<Provider, string>> = scanInFlight
+    ? panelTexts
+    : {
+        openai: panelTexts.openai ?? savedAnalyses?.openai,
+        gemini: panelTexts.gemini ?? savedAnalyses?.gemini,
+        claude: panelTexts.claude ?? savedAnalyses?.claude,
+      };
 
-  const modelTexts: Partial<Record<Provider, string>> = {
-    openai: panelTexts.openai ?? savedAnalyses?.openai,
-    gemini: panelTexts.gemini ?? savedAnalyses?.gemini,
-    claude: panelTexts.claude ?? savedAnalyses?.claude,
-  };
-  const modelCount = PROVIDERS.filter(p => modelTexts[p]?.trim()).length;
-  const hasAiSaved = PROVIDERS.some(p => !!savedAnalyses?.[p]);
+  const signalChips = useMemo(
+    () => buildScanSignalStrip(activeBrief, modelTexts),
+    [activeBrief, modelTexts],
+  );
 
-  const aiScanDisabled = aiScanOnCooldown || aiRunInFlight;
-  const aiScanTitle = aiRunInFlight
-    ? 'Running GPT, Gemini, and Claude…'
-    : aiScanOnCooldown
-      ? `Available in ${formatCooldownWait(cooldownMs)} (10 min between full AI scans)`
-      : hasAiSaved
-        ? 'Re-run all three AI models'
-        : 'Run GPT, Gemini, and Claude';
+  const hasAnySaved =
+    !!savedAnalyses?.consensus ||
+    PROVIDERS.some(p => !!savedAnalyses?.[p]) ||
+    !!systemScanAt;
+
+  const scanDisabled = scanOnCooldown || scanInFlight;
+  const scanTitle = scanInFlight
+    ? 'Scan All in progress…'
+    : scanOnCooldown
+      ? `Available in ${formatCooldownWait(cooldownMs)} (10 min between Scan All)`
+      : hasAnySaved
+        ? 'Re-run system scan, all AI models, and final verdict'
+        : 'Run system scan, all AI models, and final verdict';
+
+  const phaseLabel =
+    scanPhase === 'system'
+      ? 'System scan…'
+      : scanPhase === 'ai'
+        ? 'AI scan (GPT · Gemini · Claude)…'
+        : scanPhase === 'verdict'
+          ? 'Final verdict…'
+          : null;
 
   return (
     <div className="mt-4 pt-3 border-t border-border-subtle space-y-4">
 
-      <div className="brief-action-bar border border-border-subtle md:rounded-sm p-2 sm:p-3">
-        <div className="brief-toolbar">
-          <div className="brief-toolbar-col">
-            <RescanBriefButton
-              ticker={brief.ticker}
-              earningsDate={brief.earnings_date}
+      <div className="brief-action-bar border border-border-subtle md:rounded-sm p-2 sm:p-3 space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+          <button
+            type="button"
+            onClick={scanAll}
+            disabled={scanDisabled}
+            title={scanTitle}
+            className={`${SCAN_BTN} ai-verdict-btn flex-shrink-0 ${
+              scanDisabled
+                ? 'opacity-60 cursor-not-allowed'
+                : ''
+            }`}
+          >
+            {scanInFlight ? `⟳ SCAN ALL…` : hasAnySaved ? '↻ SCAN ALL' : '✦ SCAN ALL'}
+          </button>
+          <div className="flex-1 min-w-0 space-y-1">
+            <ScanAgeLabel
+              at={effectiveLastScanAllAt}
+              neverLabel="Not scanned yet"
+              align="end"
             />
-            <ScanAgeLabel at={systemScanAt ?? null} neverLabel="Not scanned yet" />
-          </div>
-
-          <div className="brief-toolbar-col">
-            <button
-              type="button"
-              onClick={runAiScan}
-              disabled={aiScanDisabled}
-              title={aiScanTitle}
-              className={`${SCAN_BTN} ${
-                aiScanDisabled
-                  ? 'border-border text-fg-dim cursor-not-allowed opacity-60'
-                  : 'border-fg-subtle/30 text-fg-subtle hover:border-fg-subtle hover:text-fg'
-              }`}
-            >
-              {aiRunInFlight ? '⟳ AI SCAN…' : hasAiSaved ? '↻ AI SCAN' : '✦ AI SCAN'}
-            </button>
-            <ScanAgeLabel at={effectiveLastAiAt} neverLabel="Never run" />
-            {aiScanOnCooldown && !aiRunInFlight && (
-              <span className="text-[10px] text-signal-watch font-mono text-center block">
+            {scanOnCooldown && !scanInFlight && (
+              <span className="text-[10px] text-signal-watch font-mono block sm:text-right">
                 Wait {formatCooldownWait(cooldownMs)}
               </span>
             )}
-          </div>
-
-          <div className="brief-toolbar-col brief-toolbar-col--verdict">
-            <button
-              type="button"
-              onClick={synthesizeNow}
-              disabled={modelCount < 2}
-              title={
-                modelCount < 2
-                  ? 'Run AI scan first (need at least 2 model reports)'
-                  : 'Synthesize final GO/NO-GO from system + AI reports'
-              }
-              className="ai-verdict-btn touch-target w-full sm:w-auto flex flex-col items-center justify-center disabled:opacity-40 text-[11px] md:text-xs leading-[1.15] whitespace-nowrap"
-            >
-              <span className="sm:hidden flex flex-col items-center text-[10px]">
-                <span>⚖ FINAL</span>
-                <span>VERDICT</span>
+            {phaseLabel && (
+              <span className="text-[10px] text-fg-muted animate-pulse block sm:text-right">
+                {phaseLabel}
               </span>
-              <span className="hidden sm:inline">⚖ FINAL VERDICT</span>
-            </button>
-            <ScanAgeLabel
-              at={effectiveLastConsensusAt}
-              neverLabel="Not run yet"
-            />
-            <span className="text-[10px] text-fg-dim text-center sm:text-right block tabular-nums">
-              {modelCount}/3 AI reports
-            </span>
+            )}
           </div>
         </div>
+
+        <ScanSignalStrip chips={signalChips} />
       </div>
 
-      <ConsensusVerdict
-        brief={brief}
-        analyses={modelTexts}
-        savedText={savedAnalyses?.consensus}
-        autoRunSignal={consensusSignal}
-        onComplete={setSessionConsensusAt}
-      />
-
-      {awaitingConsensus && modelCount < 3 && (
-        <p className="text-[10px] text-fg-dim tracking-widest animate-pulse">
-          Final verdict runs when all 3 models finish…
+      {scanError && (
+        <p className="text-xs text-signal-sell border border-signal-sell/40 bg-signal-sell/5 px-3 py-2">
+          {scanError}
         </p>
       )}
+
+      <ConsensusVerdict
+        brief={activeBrief}
+        analyses={modelTexts}
+        savedText={scanInFlight ? undefined : savedAnalyses?.consensus}
+        autoRunSignal={consensusSignal}
+        onComplete={handleConsensusComplete}
+        onError={handleConsensusError}
+        hideManualControls
+      />
 
       {PROVIDERS.map(p => (
         <AnalysisBlock
           key={p}
           provider={p}
-          brief={brief}
+          brief={activeBrief}
           runSignal={signals[p]}
-          savedText={savedAnalyses?.[p]}
+          savedText={scanInFlight ? undefined : savedAnalyses?.[p]}
           onComplete={handleComplete}
           onTerminal={handleTerminal}
         />

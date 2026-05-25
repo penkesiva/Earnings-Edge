@@ -218,7 +218,7 @@ export default async function BriefPage({
         <div className="text-xs tracking-widest text-fg-subtle mb-4">TRADE DECISION</div>
         {legacyFallback ? (
           <div className="text-xs text-fg-dim">
-            Use ↻ SYSTEM SCAN to generate a reconciled action for this brief.
+            Use ✦ SCAN ALL to generate a reconciled action for this brief.
           </div>
         ) : (
           <TradeDecisionCard
