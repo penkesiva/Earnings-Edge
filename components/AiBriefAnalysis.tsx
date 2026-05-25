@@ -163,7 +163,7 @@ function AiAnalysisBody({
 
   if (!finalCall) {
     return (
-      <div className={`text-sm text-fg-muted leading-relaxed whitespace-pre-wrap overflow-x-auto ${boxClass}`}>
+      <div className={`text-xs text-fg-muted leading-relaxed whitespace-pre-wrap overflow-x-auto ${boxClass}`}>
         {text}
         {streaming && (
           <span className={`inline-block w-1.5 h-3 ${dotClass} animate-pulse ml-0.5 align-middle`} />
@@ -174,7 +174,7 @@ function AiAnalysisBody({
 
   return (
     <div className={`overflow-x-auto ${boxClass}`}>
-      <p className="text-base leading-relaxed text-fg-muted">
+      <p className="text-xs leading-relaxed text-fg-muted">
         {finalCall}
         {streaming && !rest && (
           <span className={`inline-block w-1.5 h-3 ${dotClass} animate-pulse ml-0.5 align-middle`} />
@@ -186,7 +186,7 @@ function AiAnalysisBody({
             <span className="group-open:hidden">+ SHOW DETAILS</span>
             <span className="hidden group-open:inline">− HIDE DETAILS</span>
           </summary>
-          <div className="mt-2 text-xs text-fg-muted leading-relaxed whitespace-pre-wrap font-mono border-t border-border-subtle pt-2">
+          <div className="mt-2 text-[11px] text-fg-dim leading-relaxed whitespace-pre-wrap font-mono border-t border-border-subtle pt-2">
             {rest}
             {streaming && (
               <span className={`inline-block w-1.5 h-3 ${dotClass} animate-pulse ml-0.5 align-middle`} />
