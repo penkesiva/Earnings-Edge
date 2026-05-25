@@ -1,6 +1,8 @@
 import { supabaseAdmin } from '@/lib/supabase';
 import { dashboardSessionDate } from '@/lib/earningsDate';
+import { computeHistoryStats } from '@/lib/historyStats';
 import { HistoryList, type HistoryRow } from '@/components/HistoryList';
+import { HistoryStatsPanel } from '@/components/HistoryStatsPanel';
 import { LogOutcomesButton } from './LogOutcomesButton';
 
 export const dynamic = 'force-dynamic';
@@ -30,30 +32,23 @@ export default async function HistoryPage() {
     hit: r.hit,
   }));
 
-  const withOutcomes = historyRows.filter(r => r.beat_or_miss && r.final_action !== 'SKIP');
-  const hits = withOutcomes.filter(r => r.hit === true);
-  const hitRate = withOutcomes.length ? (hits.length / withOutcomes.length) * 100 : 0;
-  const pending = historyRows.filter(r => !r.beat_or_miss).length;
+  const stats = computeHistoryStats(historyRows);
 
   return (
     <div className="space-y-8">
       <div className="flex items-start justify-between flex-wrap gap-4">
-        <div>
+        <div className="min-w-0">
           <h1 className="text-3xl font-bold tracking-tight mb-2">
             <span className="text-fg-subtle">›</span> HISTORY
           </h1>
           <p className="text-sm text-fg-subtle">
-            {historyRows.length} past briefs · {withOutcomes.length} with outcomes ·{' '}
-            <span className={hitRate >= 55 ? 'text-signal-buy' : hitRate >= 40 ? 'text-signal-watch' : 'text-signal-sell'}>
-              {hitRate.toFixed(0)}% hit rate
-            </span>
-            {pending > 0 && (
-              <span className="ml-2 text-fg-dim">· {pending} pending outcomes</span>
-            )}
+            Outcome tracking for past earnings briefs
           </p>
         </div>
-        <LogOutcomesButton pendingCount={pending} />
+        <LogOutcomesButton pendingCount={stats.pendingEps + stats.awaitingPrice} />
       </div>
+
+      <HistoryStatsPanel rows={historyRows} />
 
       <HistoryList rows={historyRows} />
     </div>

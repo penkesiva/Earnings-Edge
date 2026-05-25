@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { formatDayHeader } from '@/lib/earningsDate';
+import { isScorableStructure } from '@/lib/historyStats';
 import { FinalActionBadge } from '@/components/SignalBadge';
 
 export type HistoryRow = {
@@ -27,18 +28,27 @@ function ScoreCell({ value }: { value: number }) {
 function HitCell({
   finalAction,
   hit,
+  beatOrMiss,
+  nextDayClosePct,
 }: {
   finalAction: string | null;
   hit: boolean | null | undefined;
+  beatOrMiss?: string | null;
+  nextDayClosePct?: number | null;
 }) {
-  if (finalAction === 'SKIP' || hit === null || hit === undefined) {
+  if (!isScorableStructure(finalAction)) {
     return <span className="text-fg-dim text-xs">—</span>;
   }
-  return hit ? (
-    <span className="text-signal-buy font-bold">✓ HIT</span>
-  ) : (
-    <span className="text-signal-sell font-bold">✗ MISS</span>
-  );
+  if (hit === true) {
+    return <span className="text-signal-buy font-bold">✓ HIT</span>;
+  }
+  if (hit === false) {
+    return <span className="text-signal-sell font-bold">✗ MISS</span>;
+  }
+  if (beatOrMiss && nextDayClosePct == null) {
+    return <span className="text-signal-watch text-[10px] tracking-wide">PENDING</span>;
+  }
+  return <span className="text-fg-dim text-xs">—</span>;
 }
 
 function HistoryMobileCard({ r }: { r: HistoryRow }) {
@@ -104,7 +114,12 @@ function HistoryMobileCard({ r }: { r: HistoryRow }) {
           </span>
         )}
         <span>
-          <HitCell finalAction={r.final_action} hit={r.hit} />
+          <HitCell
+            finalAction={r.final_action}
+            hit={r.hit}
+            beatOrMiss={r.beat_or_miss}
+            nextDayClosePct={r.next_day_close_pct}
+          />
         </span>
       </div>
     </Link>
@@ -197,7 +212,12 @@ export function HistoryList({ rows }: { rows: HistoryRow[] }) {
               )}
             </div>
             <div className="col-span-1 text-sm">
-              <HitCell finalAction={r.final_action} hit={r.hit} />
+              <HitCell
+                finalAction={r.final_action}
+                hit={r.hit}
+                beatOrMiss={r.beat_or_miss}
+                nextDayClosePct={r.next_day_close_pct}
+              />
             </div>
           </Link>
         ))}

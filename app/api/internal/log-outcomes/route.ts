@@ -18,6 +18,7 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { getEarningsSurprises } from '@/lib/fmp';
 import { getHistoricalBars } from '@/lib/alpaca';
 import { addCalendarDays, earningsSessionDate } from '@/lib/earningsDate';
+import { isScorableStructure } from '@/lib/historyStats';
 
 export const maxDuration = 120;
 
@@ -25,12 +26,14 @@ export async function POST() {
   const sb = supabaseAdmin();
   const today = earningsSessionDate();
 
-  // 1. Find briefs past earnings day with no outcome row yet
+  // Past briefs missing EPS and/or next-day price (re-run fills gaps as data arrives)
   const { data: briefs, error: briefErr } = await sb
     .from('v_brief_outcomes')
-    .select('brief_id, ticker, earnings_date, final_action, expected_move_pct, beat_or_miss')
+    .select(
+      'brief_id, ticker, earnings_date, final_action, expected_move_pct, beat_or_miss, surprise_pct, next_day_close_pct'
+    )
     .lt('earnings_date', today)
-    .is('beat_or_miss', null)
+    .or('beat_or_miss.is.null,next_day_close_pct.is.null')
     .limit(20);
 
   if (briefErr) return NextResponse.json({ error: briefErr.message }, { status: 500 });
@@ -43,36 +46,35 @@ export async function POST() {
       const earningsDate = brief.earnings_date as string;
       const ticker = brief.ticker as string;
       const finalAction = (brief.final_action ?? 'SKIP') as string;
+      const existingBeat = brief.beat_or_miss as 'BEAT' | 'MISS' | null;
+      let beatOrMiss: 'BEAT' | 'MISS' | null = existingBeat;
+      let surprisePct = (brief.surprise_pct as number | null) ?? null;
 
-      // ── Actual EPS result from FMP ───────────────────────────────────────────
-      // Gracefully handle FMP errors (rate limits, plan restrictions) so that
-      // at minimum the next-day price data still gets saved.
-      // noCache=true: EPS actuals just came out — bypass the 1-hour FMP cache.
-      const surprises = await getEarningsSurprises(ticker, true).catch(() => []);
-      // Sort newest-first, find the row closest to earningsDate within 7 days.
-      // FMP sometimes stamps the report +1 day (AMC timing), so 7-day window
-      // is more resilient than the previous 5-day window.
-      const sorted = surprises.sort(
-        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-      );
-      const match = sorted.reduce<typeof sorted[0] | null>((best, s) => {
-        const diff = Math.abs(
-          new Date(s.date).getTime() - new Date(earningsDate).getTime()
+      if (!existingBeat) {
+        // ── Actual EPS result from FMP ─────────────────────────────────────────
+        const surprises = await getEarningsSurprises(ticker, true).catch(() => []);
+        const sorted = surprises.sort(
+          (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
         );
-        if (diff > 7 * 24 * 60 * 60 * 1000) return best;
-        if (!best) return s;
-        const bestDiff = Math.abs(
-          new Date(best.date).getTime() - new Date(earningsDate).getTime()
-        );
-        return diff < bestDiff ? s : best;
-      }, null);
+        const match = sorted.reduce<typeof sorted[0] | null>((best, s) => {
+          const diff = Math.abs(
+            new Date(s.date).getTime() - new Date(earningsDate).getTime()
+          );
+          if (diff > 7 * 24 * 60 * 60 * 1000) return best;
+          if (!best) return s;
+          const bestDiff = Math.abs(
+            new Date(best.date).getTime() - new Date(earningsDate).getTime()
+          );
+          return diff < bestDiff ? s : best;
+        }, null);
 
-      const beatOrMiss: 'BEAT' | 'MISS' | null = match
-        ? match.actualEarningResult >= match.estimatedEarning ? 'BEAT' : 'MISS'
-        : null;
-      const surprisePct = match && match.estimatedEarning !== 0
-        ? ((match.actualEarningResult - match.estimatedEarning) / Math.abs(match.estimatedEarning)) * 100
-        : null;
+        beatOrMiss = match
+          ? match.actualEarningResult >= match.estimatedEarning ? 'BEAT' : 'MISS'
+          : null;
+        surprisePct = match && match.estimatedEarning !== 0
+          ? ((match.actualEarningResult - match.estimatedEarning) / Math.abs(match.estimatedEarning)) * 100
+          : null;
+      }
 
       // ── Next-day price move from Alpaca ──────────────────────────────────────
       // Fetch 3 trading days after earnings to find the first post-earnings close
@@ -101,7 +103,8 @@ export async function POST() {
       // strikes, with some buffer for the credit collected).
       const SHORT_VOL_BAND = expMove * 1.25;
 
-      if (nextDayClosePct !== null) {
+      // Skip / watch actions → hit stays null (not counted in structure hit rate)
+      if (isScorableStructure(finalAction) && nextDayClosePct !== null) {
         if (finalAction === 'LONG_CALL' || finalAction === 'CALL_DEBIT_SPREAD') {
           hit = nextDayClosePct > 2;
         } else if (finalAction === 'LONG_PUT' || finalAction === 'PUT_DEBIT_SPREAD') {
@@ -113,7 +116,6 @@ export async function POST() {
         } else if (finalAction === 'CALL_CREDIT_SPREAD') {
           hit = nextDayClosePct < SHORT_VOL_BAND;
         }
-        // SKIP / SKIP_* / BEARISH_WATCH / BULLISH_WATCH → hit stays null (not counted)
       }
 
       // ── Upsert outcome row ───────────────────────────────────────────────────
