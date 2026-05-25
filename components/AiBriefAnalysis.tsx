@@ -15,6 +15,7 @@ import {
   msUntilAiScanAllowed,
 } from '@/lib/aiScanCooldown';
 import { buildScanSignalStrip } from '@/lib/scanSignalStrip';
+import { splitAiFinalCall } from '@/lib/aiAnalysisDisplay';
 
 export type SavedAnalyses = Partial<
   Record<'openai' | 'gemini' | 'claude' | 'consensus', string>
@@ -146,6 +147,56 @@ const CONFIGS: Record<Provider, ProviderConfig> = {
 };
 
 // ── Individual analysis output block (no button UI here) ─────────────────────
+
+function AiAnalysisBody({
+  text,
+  streaming,
+  boxClass,
+  dotClass,
+}: {
+  text: string;
+  streaming: boolean;
+  boxClass: string;
+  dotClass: string;
+}) {
+  const { finalCall, rest } = splitAiFinalCall(text);
+
+  if (!finalCall) {
+    return (
+      <div className={`text-xs text-fg-muted leading-relaxed whitespace-pre-wrap font-mono overflow-x-auto ${boxClass}`}>
+        {text}
+        {streaming && (
+          <span className={`inline-block w-1.5 h-3 ${dotClass} animate-pulse ml-0.5 align-middle`} />
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className={`overflow-x-auto ${boxClass}`}>
+      <p className="text-sm text-fg leading-snug font-medium">
+        {finalCall}
+        {streaming && !rest && (
+          <span className={`inline-block w-1.5 h-3 ${dotClass} animate-pulse ml-0.5 align-middle`} />
+        )}
+      </p>
+      {rest && (
+        <details className="mt-2 group">
+          <summary className="text-[10px] text-fg-dim tracking-widest cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden">
+            <span className="group-open:hidden">+ SHOW DETAILS</span>
+            <span className="hidden group-open:inline">− HIDE DETAILS</span>
+          </summary>
+          <div className="mt-2 text-xs text-fg-muted leading-relaxed whitespace-pre-wrap font-mono border-t border-border-subtle pt-2">
+            {rest}
+            {streaming && (
+              <span className={`inline-block w-1.5 h-3 ${dotClass} animate-pulse ml-0.5 align-middle`} />
+            )}
+          </div>
+        </details>
+      )}
+    </div>
+  );
+}
 
 function AnalysisBlock({
   provider,
@@ -302,12 +353,12 @@ function AnalysisBlock({
         </p>
       )}
       {(effectiveState === 'streaming' || effectiveState === 'done') && effectiveText && (
-        <div className={`text-xs text-fg-muted leading-relaxed whitespace-pre-wrap font-mono ${c.box} px-3 py-2.5 sm:px-4 sm:py-3 overflow-x-auto`}>
-          {effectiveText}
-          {effectiveState === 'streaming' && (
-            <span className={`inline-block w-1.5 h-3 ${c.dot} animate-pulse ml-0.5 align-middle`} />
-          )}
-        </div>
+        <AiAnalysisBody
+          text={effectiveText}
+          streaming={effectiveState === 'streaming'}
+          boxClass={`${c.box} px-3 py-2.5 sm:px-4 sm:py-3`}
+          dotClass={c.dot}
+        />
       )}
     </div>
   );
