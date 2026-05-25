@@ -99,6 +99,7 @@ export function buildSystemSummary(brief: AiBriefPayload): string {
 
   const parts = [
     `Ticker ${brief.ticker}, earnings ${brief.earnings_date}`,
+    `Spot (scan): $${brief.spot_price?.toFixed(2) ?? '—'}`,
     `Beat score ${brief.composite_score}/100`,
     `Final action: ${brief.final_action ?? 'none'} (${leanFixed})`,
     `IV rank ${brief.iv_rank ?? '—'} | P/C ratio ${brief.put_call_ratio?.toFixed(2) ?? '—'}`,
@@ -106,6 +107,16 @@ export function buildSystemSummary(brief: AiBriefPayload): string {
     `Scream test: ${brief.scream_score ?? 0}/5 ${brief.scream_direction ?? 'none'}, qualifies=${brief.scream_qualifies}`,
   ];
   if (brief.final_action_rationale) parts.push(`Rationale: ${brief.final_action_rationale}`);
+
+  const structure = brief.suggested_structure;
+  if (structure?.action && structure.action !== 'SKIP') {
+    parts.push(`Suggested structure: ${structure.action.replace(/_/g, ' ')}`);
+    if (structure.preferredExpiry) parts.push(`Preferred expiry: ${structure.preferredExpiry}`);
+    for (const leg of structure.legs ?? []) {
+      parts.push(`  ${leg.side} ${leg.type} $${leg.strike}${leg.expiry ? ` exp ${leg.expiry}` : ''}`);
+    }
+  }
+
   return parts.join('\n');
 }
 
@@ -183,12 +194,13 @@ export function computeDeterministicConsensus(
 
 export type AlignmentChip = {
   label: string;
-  status: 'yes' | 'no' | 'missing';
+  /** UP / DOWN / NEUTRAL from that source; null if no report or unparseable. */
+  direction: Direction | null;
 };
 
 const MODEL_LABELS = { openai: 'GPT', gemini: 'Gemini', claude: 'Claude' } as const;
 
-/** Deterministic alignment row — System + each model tick for the verdict direction. */
+/** Per-source direction row — System + each model's actual lean (not checkmarks). */
 export function buildAlignmentChips(
   brief: AiBriefPayload,
   analyses: Partial<Record<'openai' | 'gemini' | 'claude', string>>,
@@ -197,31 +209,22 @@ export function buildAlignmentChips(
   const chips: AlignmentChip[] = [];
   const systemDir = systemDirectionFromBrief(brief);
 
-  chips.push({
-    label: 'System',
-    status:
-      systemDir == null ? 'missing' :
-      consensusDirection == null || consensusDirection === 'NEUTRAL' ? 'no' :
-      systemDir === consensusDirection ? 'yes' : 'no',
-  });
+  chips.push({ label: 'System', direction: systemDir });
 
   for (const p of ['openai', 'gemini', 'claude'] as const) {
     const text = analyses[p];
     if (!text?.trim()) {
-      chips.push({ label: MODEL_LABELS[p], status: 'missing' });
+      chips.push({ label: MODEL_LABELS[p], direction: null });
       continue;
     }
-    const v = parseAiVerdict(text);
-    chips.push({
-      label: MODEL_LABELS[p],
-      status:
-        !v || !consensusDirection || consensusDirection === 'NEUTRAL' ? 'no' :
-        v.direction === consensusDirection ? 'yes' : 'no',
-    });
+    chips.push({ label: MODEL_LABELS[p], direction: parseAiDirection(text) });
   }
 
   const dirLabel = consensusDirection?.toLowerCase() ?? 'mixed';
-  const aligned = chips.filter(c => c.status === 'yes').length;
+  const aligned =
+    consensusDirection && consensusDirection !== 'NEUTRAL'
+      ? chips.filter(c => c.direction === consensusDirection).length
+      : 0;
   const summary = `${aligned}/${chips.length} ${dirLabel}`;
 
   return { summary, chips };
@@ -233,8 +236,75 @@ export interface ParsedSynthesis {
   move: string | null;
   confidence: string | null;
   why: string | null;
+  /** Legacy single-line TRADE (older saved syntheses). */
   trade: string | null;
+  tradePlan: ParsedTradePlan | null;
   raw: string;
+}
+
+export type TradeLeg = {
+  side: 'BUY' | 'SELL';
+  type: 'CALL' | 'PUT';
+  strike: number;
+};
+
+export type ParsedTradePlan = {
+  type: string | null;
+  expiry: string | null;
+  legs: TradeLeg[];
+  limit: string | null;
+};
+
+export function parseTradeLegLine(raw: string): TradeLeg | null {
+  const cleaned = raw.replace(/^[-—–\s]+/, '').trim();
+  if (!cleaned || cleaned === '—' || cleaned === '-') return null;
+  const m = cleaned.match(/^(BUY|SELL)\s+(CALL|PUT)\s+\$?([\d.]+)/i);
+  if (!m) return null;
+  return {
+    side: m[1].toUpperCase() as TradeLeg['side'],
+    type: m[2].toUpperCase() as TradeLeg['type'],
+    strike: parseFloat(m[3]),
+  };
+}
+
+function parseTradePlan(text: string, line: (key: string) => string | null): ParsedTradePlan | null {
+  const typeRaw = line('TRADE TYPE');
+  if (!typeRaw) return null;
+
+  const type = typeRaw.trim();
+  const none = !type || type === '—' || type === '-' || type.toUpperCase() === 'NONE';
+  if (none) {
+    return { type: 'NONE', expiry: null, legs: [], limit: null };
+  }
+
+  const legs: TradeLeg[] = [];
+  for (const m of text.matchAll(/^TRADE LEG \d+:\s*(.+)$/gim)) {
+    const leg = parseTradeLegLine(m[1]);
+    if (leg) legs.push(leg);
+  }
+
+  const expiryRaw = line('TRADE EXPIRY');
+  const expiry =
+    expiryRaw && expiryRaw !== '—' && expiryRaw !== '-' ? expiryRaw.trim() : null;
+  const limitRaw = line('TRADE LIMIT');
+  const limit =
+    limitRaw && limitRaw !== '—' && limitRaw !== '-' ? limitRaw.trim() : null;
+
+  return { type, expiry, legs, limit };
+}
+
+export function formatTradePlanForCopy(plan: ParsedTradePlan | null): string | null {
+  if (!plan) return null;
+  if (plan.type === 'NONE' || (!plan.legs.length && !plan.limit)) {
+    return plan.type === 'NONE' ? 'None — no trade' : null;
+  }
+  const lines = [plan.type ?? 'Trade'];
+  if (plan.expiry) lines.push(`Expiry: ${plan.expiry}`);
+  for (const leg of plan.legs) {
+    lines.push(`  ${leg.side} ${leg.type} $${leg.strike}`);
+  }
+  if (plan.limit) lines.push(`Limit: ${plan.limit}`);
+  return lines.join('\n');
 }
 
 /** Reasoning after "4. Best trade" from a single-model analysis (saved syntheses may lack WHY). */
@@ -288,6 +358,7 @@ export function parseSynthesisResponse(text: string): ParsedSynthesis {
     confidence: line('CONFIDENCE'),
     why: line('WHY'),
     trade: line('TRADE'),
+    tradePlan: parseTradePlan(text, line),
     raw: text,
   };
 }
@@ -306,7 +377,7 @@ export function formatConsensusForCopy(
   const body = [
     parsed.move ? `Move: ${parsed.move}` : null,
     why ? `Why: ${why}` : null,
-    parsed.trade ? `Trade: ${parsed.trade}` : null,
+    formatTradePlanForCopy(parsed.tradePlan) ?? (parsed.trade ? `Trade: ${parsed.trade}` : null),
     `Alignment: ${alignSummary}`,
   ].filter(Boolean);
   return [head, '', ...body].join('\n');

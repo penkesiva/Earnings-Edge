@@ -13,6 +13,8 @@ import {
   resolveVerdictWhy,
   type AlignmentChip,
   type Direction,
+  type ParsedTradePlan,
+  type TradeLeg,
 } from '@/lib/aiConsensus';
 
 type PanelState = 'idle' | 'loading' | 'done' | 'error';
@@ -23,18 +25,70 @@ function directionCls(d: Direction | null): string {
   return 'text-fg-muted';
 }
 
-function Chip({ chip }: { chip: AlignmentChip }) {
-  const mark =
-    chip.status === 'yes' ? '✓' :
-    chip.status === 'no' ? '✗' : '—';
-  const markCls =
-    chip.status === 'yes' ? 'alignment-mark alignment-mark--yes' :
-    chip.status === 'no' ? 'alignment-mark alignment-mark--no' :
-    'alignment-mark alignment-mark--miss';
+function VerdictTradePlan({ plan }: { plan: ParsedTradePlan }) {
+  if (plan.type === 'NONE') {
+    return (
+      <p className="text-sm text-fg-muted font-mono">
+        <span className="text-fg-dim tracking-widest text-[10px]">TRADE </span>
+        No trade — skip or watch only
+      </p>
+    );
+  }
+
+  if (!plan.legs.length) return null;
+
   return (
-    <span className="text-[11px] text-fg-muted font-medium">
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+        <span className="text-fg-dim tracking-widest text-[10px]">TRADE</span>
+        <span className="text-sm font-bold text-fg">{plan.type}</span>
+        {plan.expiry && (
+          <>
+            <span className="text-fg-dim">·</span>
+            <span className="text-xs text-fg-muted font-mono">exp {plan.expiry}</span>
+          </>
+        )}
+      </div>
+      <div className="border border-border-subtle overflow-x-auto">
+        <div className="grid grid-cols-3 gap-3 px-3 py-1.5 bg-bg text-[10px] text-fg-subtle tracking-widest">
+          <div>SIDE</div>
+          <div>TYPE</div>
+          <div>STRIKE</div>
+        </div>
+        {plan.legs.map((leg: TradeLeg, i: number) => (
+          <div
+            key={`${leg.side}-${leg.type}-${leg.strike}-${i}`}
+            className="grid grid-cols-3 gap-3 px-3 py-2 text-sm border-t border-border-subtle font-mono"
+          >
+            <div className={leg.side === 'BUY' ? 'text-signal-buy font-bold' : 'text-signal-sell font-bold'}>
+              {leg.side}
+            </div>
+            <div className="text-fg">{leg.type}</div>
+            <div className="text-fg font-bold">${leg.strike}</div>
+          </div>
+        ))}
+      </div>
+      {plan.limit && (
+        <p className="text-xs text-fg-muted font-mono">
+          <span className="text-fg-dim tracking-widest text-[10px]">LIMIT </span>
+          {plan.limit}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function Chip({ chip }: { chip: AlignmentChip }) {
+  return (
+    <span className="text-[11px] text-fg-muted font-medium inline-flex items-center gap-1">
       {chip.label}
-      <span className={markCls} aria-hidden>{mark}</span>
+      {chip.direction ? (
+        <DirectionIndicator direction={chip.direction} />
+      ) : (
+        <span className="text-fg-dim font-bold" aria-label="No direction">
+          —
+        </span>
+      )}
     </span>
   );
 }
@@ -205,16 +259,18 @@ export function ConsensusVerdict({
 
       {parsed.move && <p className="text-sm font-mono text-fg">{parsed.move}</p>}
       {whyText && (
-        <p className="text-sm text-fg leading-relaxed border-l-2 border-border-subtle pl-3">
+        <p className="text-xs text-fg-muted leading-snug border-l-2 border-border-subtle pl-3 max-w-prose">
           {whyText}
         </p>
       )}
-      {parsed.trade && (
-        <p className="text-xs text-fg-muted leading-relaxed">
+      {parsed.tradePlan?.legs.length || parsed.tradePlan?.type === 'NONE' ? (
+        <VerdictTradePlan plan={parsed.tradePlan} />
+      ) : parsed.trade ? (
+        <p className="text-sm text-fg font-mono leading-relaxed">
           <span className="text-fg-dim tracking-widest text-[10px]">TRADE </span>
           {parsed.trade}
         </p>
-      )}
+      ) : null}
       <p className="text-[11px] text-fg font-mono leading-relaxed overflow-x-auto pb-1 -mx-1 px-1">
         <span className="font-semibold text-fg-muted">{alignSummary}</span>
         <span className="text-fg-dim"> — </span>

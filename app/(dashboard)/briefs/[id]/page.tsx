@@ -204,6 +204,8 @@ export default async function BriefPage({
             overhangs:                screamUnresolved ?? [],
             raw_headlines:            rawHeadlines,
             news_sentiment:           newsOverall,
+            spot_price:               brief.spot_price ?? null,
+            suggested_structure:      structure ?? null,
           }} />
         </div>
       </div>

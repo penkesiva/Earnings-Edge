@@ -40,8 +40,20 @@ VERDICT: GO | NO-GO | WATCH
 DIRECTION: UP | DOWN | NEUTRAL
 MOVE: [one line: dollar range | % range | target price, e.g. -$7 to -$11 | -9% to -13% | target ~$68]
 CONFIDENCE: N/10
-WHY: [1-2 sentences — dominant thesis for this verdict: what signal wins (skew, IV, positioning, sell-the-news, guidance bar, etc.)]
-TRADE: [one sentence — specific structure]
+WHY: [one short sentence, max 25 words — dominant edge only, no recap of every signal]
+TRADE TYPE: [structure name, e.g. CALL CREDIT SPREAD | PUT DEBIT SPREAD | IRON CONDOR | NONE]
+TRADE EXPIRY: [YYYY-MM-DD from system legs, or —]
+TRADE LEG 1: [BUY|SELL] [CALL|PUT] $[strike]  (or — if no trade)
+TRADE LEG 2: [BUY|SELL] [CALL|PUT] $[strike]  (or —)
+TRADE LEG 3: [optional — condors only, or —]
+TRADE LEG 4: [optional — condors only, or —]
+TRADE LIMIT: [limit price: ~$X.XX credit/debit per spread + max risk, or —]
+
+TRADE rules:
+- Use dollar strikes anchored to spot ± expected move from the system brief. Prefer system suggested_structure legs when they fit the verdict.
+- NO-GO or WATCH → TRADE TYPE: NONE and all legs/limit as —.
+- No prose ("such as", "sized small"). Only executable legs and a limit hint.
+- IV rank ≥ 80: prefer credit spreads / premium sell over naked long options unless unanimous high-confidence directional GO.
 
 Do not add ALIGNMENT or any fields beyond the lines above.`;
 

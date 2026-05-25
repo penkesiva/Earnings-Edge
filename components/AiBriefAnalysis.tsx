@@ -46,6 +46,19 @@ export type AiBriefPayload = {
   raw_headlines: RawHeadline[] | null;
   /** LLM overall news bias from system scan. */
   news_sentiment: NewsOverallSentiment | null;
+  /** Scan-time spot — used for strike anchoring in final verdict. */
+  spot_price?: number | null;
+  /** System-suggested legs from reconcile / structure engine. */
+  suggested_structure?: {
+    action?: string;
+    preferredExpiry?: string;
+    legs?: Array<{
+      side: 'BUY' | 'SELL';
+      type: 'CALL' | 'PUT';
+      strike: number;
+      expiry?: string;
+    }>;
+  } | null;
 };
 
 type PanelState = 'idle' | 'loading' | 'streaming' | 'done' | 'error';
