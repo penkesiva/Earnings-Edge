@@ -1,0 +1,15 @@
+---
+description: After shipping code changes, commit and push to main without waiting for "push".
+alwaysApply: true
+---
+
+# Auto push
+
+When the user asks for a code change and the work is complete:
+
+1. Commit with a clear message (follow git safety protocol).
+2. Push to `origin/main` automatically — do not wait for them to say "push".
+
+Skip auto push only if they say not to push, ask for review first, or the work is intentionally incomplete/WIP.
+
+After push, briefly confirm commit hash and that Vercel will deploy.
