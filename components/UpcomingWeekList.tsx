@@ -1,7 +1,9 @@
 import Link from 'next/link';
 import { DayPrepHeader } from '@/components/DayPrepHeader';
 import { DashboardResultCell } from '@/components/DashboardResultCell';
-import { LastScanned } from '@/components/LastScanned';
+import { HomeBriefLink, HomeScanAllCell } from '@/components/HomeScanAllCell';
+import { ScanAgeLabel } from '@/components/scanAll/ScanAllPipeline';
+import type { DashboardBriefAiMeta } from '@/lib/loadDashboardBriefAi';
 import type { UpcomingSession } from '@/lib/usMarketCalendar';
 
 type EarningsEvent = {
@@ -50,56 +52,65 @@ function ScoreCell({ value }: { value: number }) {
 function UpcomingMobileCard({
   event,
   brief,
-  consensusText,
+  earningsDate,
+  aiMeta,
 }: {
   event: EarningsEvent;
   brief: BriefRow | undefined;
-  consensusText: string | null;
+  earningsDate: string;
+  aiMeta: DashboardBriefAiMeta | null;
 }) {
-  if (!brief) {
-    return (
-      <div className="border border-border-subtle bg-bg px-3 py-3">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="font-bold text-lg tracking-tight">{event.ticker}</span>
+  return (
+    <div className="border border-border bg-bg-elevated p-3 space-y-3">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            {brief ? (
+              <Link
+                href={`/briefs/${brief.id}`}
+                className="font-bold text-lg tracking-tight hover:text-signal-buy"
+              >
+                {event.ticker}
+              </Link>
+            ) : (
+              <span className="font-bold text-lg tracking-tight">{event.ticker}</span>
+            )}
             <TimingBadge timing={event.timing} />
           </div>
-          <span className="text-[10px] text-fg-dim tracking-widest shrink-0">NO BRIEF</span>
+          {brief ? (
+            <div className="flex items-center gap-2 mt-1">
+              <ScoreCell value={brief.composite_score} />
+              {brief.expected_move_dollar != null && (
+                <span className="text-[11px] text-fg-dim font-mono">
+                  ±${brief.expected_move_dollar.toFixed(2)}
+                </span>
+              )}
+            </div>
+          ) : (
+            <span className="text-[10px] text-fg-dim tracking-widest mt-1 block">NO BRIEF YET</span>
+          )}
+        </div>
+        <div className="shrink-0">
+          <DashboardResultCell compact consensusText={aiMeta?.consensusText} />
         </div>
       </div>
-    );
-  }
 
-  return (
-    <Link
-      href={`/briefs/${brief.id}`}
-      className="block border border-border bg-bg-elevated p-3 active:opacity-75 touch-manipulation"
-    >
-      <div className="flex items-center justify-between gap-2 mb-2">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="font-bold text-lg tracking-tight">{event.ticker}</span>
-          <TimingBadge timing={event.timing} />
+      <HomeScanAllCell
+        ticker={event.ticker}
+        earningsDate={earningsDate}
+        briefId={brief?.id}
+        lastAiScanAt={aiMeta?.lastAiScanAt}
+        lastConsensusAt={aiMeta?.lastConsensusAt}
+        consensusText={aiMeta?.consensusText}
+        compact
+      />
+
+      {brief && (
+        <div className="flex justify-end pt-1 border-t border-border-subtle">
+          <HomeBriefLink briefId={brief.id} />
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <ScoreCell value={brief.composite_score} />
-          <LastScanned updatedAt={brief.updated_at ?? brief.generated_at} />
-        </div>
-      </div>
-      <div className="mb-2">
-        <DashboardResultCell compact consensusText={consensusText} />
-      </div>
-      {brief.expected_move_dollar != null && (
-        <p className="text-[11px] text-fg-dim">
-          MOVE{' '}
-          <span className="text-fg-muted font-mono">
-            ±${brief.expected_move_dollar.toFixed(2)}
-            {brief.expected_move_pct != null
-              ? ` (${brief.expected_move_pct.toFixed(1)}%)`
-              : ''}
-          </span>
-        </p>
       )}
-    </Link>
+    </div>
   );
 }
 
@@ -107,12 +118,12 @@ export function UpcomingWeekList({
   sessions,
   upcomingByDate,
   briefByKey,
-  consensusFor,
+  aiMetaFor,
 }: {
   sessions: UpcomingSession[];
   upcomingByDate: Record<string, EarningsEvent[] | null | undefined>;
   briefByKey: Map<string, BriefRow | undefined>;
-  consensusFor: (briefId: string) => string | null;
+  aiMetaFor: (briefId: string | undefined) => DashboardBriefAiMeta | null;
 }) {
   return (
     <div className="space-y-6 md:space-y-4">
@@ -125,81 +136,96 @@ export function UpcomingWeekList({
             {marketOpen ? (
               events.length === 0 ? (
                 <p className="text-xs text-fg-dim tracking-wide px-0.5">
-                  No watchlist earnings — hit <span className="text-fg-muted">PREP</span> or{' '}
-                  <span className="text-fg-muted">SYNC CALENDAR</span> on watchlist.
+                  No watchlist earnings — add tickers on{' '}
+                  <span className="text-fg-muted">WATCHLIST</span> or{' '}
+                  <span className="text-fg-muted">SYNC CALENDAR</span>.
                 </p>
               ) : (
-              <>
-                <div className="md:hidden space-y-2">
-                  {events.map(e => {
-                    const brief = briefByKey.get(`${date}:${e.ticker}`);
-                    return (
-                      <UpcomingMobileCard
-                        key={e.id}
-                        event={e}
-                        brief={brief}
-                        consensusText={brief ? consensusFor(brief.id) : null}
-                      />
-                    );
-                  })}
-                </div>
-
-                <div className="hidden md:block border border-border">
-                  <div className="grid grid-cols-12 gap-4 px-4 py-2 text-xs text-fg-subtle uppercase tracking-widest border-b border-border-subtle bg-bg">
-                    <div className="col-span-2">TKR</div>
-                    <div className="col-span-2">SCORE</div>
-                    <div className="col-span-3">VERDICT</div>
-                    <div className="col-span-3">EXP MOVE</div>
-                    <div className="col-span-2">SCANNED</div>
-                  </div>
-                  <div className="divide-y divide-border-subtle">
+                <>
+                  <div className="md:hidden space-y-2">
                     {events.map(e => {
                       const brief = briefByKey.get(`${date}:${e.ticker}`);
-                      const inner = (
-                        <div className="grid grid-cols-12 gap-4 px-4 py-3 text-sm items-center">
-                          <div className="col-span-2 font-bold flex items-center gap-1.5">
-                            {e.ticker}
-                            <TimingBadge timing={e.timing} />
-                          </div>
-                          <div className="col-span-2">
-                            {brief ? (
-                              <ScoreCell value={brief.composite_score} />
-                            ) : (
-                              <span className="text-fg-dim">—</span>
-                            )}
-                          </div>
-                          <div className="col-span-3 flex items-center min-w-0">
-                            {brief ? (
-                              <DashboardResultCell consensusText={consensusFor(brief.id)} />
-                            ) : (
-                              <span className="text-xs text-fg-dim tracking-widest">NO BRIEF</span>
-                            )}
-                          </div>
-                          <div className="col-span-3 text-fg-muted">
-                            {brief?.expected_move_dollar != null
-                              ? `±$${brief.expected_move_dollar.toFixed(2)} (${brief.expected_move_pct?.toFixed(1) ?? '—'}%)`
-                              : '—'}
-                          </div>
-                          <div className="col-span-2">
-                            {brief ? (
-                              <LastScanned updatedAt={brief.updated_at ?? brief.generated_at} />
-                            ) : (
-                              <span className="text-fg-dim">—</span>
-                            )}
-                          </div>
-                        </div>
-                      );
-                      return brief ? (
-                        <Link key={e.id} href={`/briefs/${brief.id}`} className="block terminal-row">
-                          {inner}
-                        </Link>
-                      ) : (
-                        <div key={e.id}>{inner}</div>
+                      return (
+                        <UpcomingMobileCard
+                          key={e.id}
+                          event={e}
+                          brief={brief}
+                          earningsDate={date}
+                          aiMeta={aiMetaFor(brief?.id)}
+                        />
                       );
                     })}
                   </div>
-                </div>
-              </>
+
+                  <div className="hidden md:block border border-border">
+                    <div className="grid grid-cols-12 gap-3 px-4 py-2 text-xs text-fg-subtle uppercase tracking-widest border-b border-border-subtle bg-bg">
+                      <div className="col-span-2">TKR</div>
+                      <div className="col-span-1">SCORE</div>
+                      <div className="col-span-2">VERDICT</div>
+                      <div className="col-span-2">EXP MOVE</div>
+                      <div className="col-span-3">SCAN ALL</div>
+                      <div className="col-span-2 text-right">SCANNED</div>
+                    </div>
+                    <div className="divide-y divide-border-subtle">
+                      {events.map(e => {
+                        const brief = briefByKey.get(`${date}:${e.ticker}`);
+                        const aiMeta = aiMetaFor(brief?.id);
+                        return (
+                          <div
+                            key={e.id}
+                            className="grid grid-cols-12 gap-3 px-4 py-3 text-sm items-center"
+                          >
+                            <div className="col-span-2 font-bold flex items-center gap-1.5 min-w-0">
+                              {brief ? (
+                                <Link
+                                  href={`/briefs/${brief.id}`}
+                                  className="hover:text-signal-buy truncate"
+                                >
+                                  {e.ticker}
+                                </Link>
+                              ) : (
+                                <span>{e.ticker}</span>
+                              )}
+                              <TimingBadge timing={e.timing} />
+                            </div>
+                            <div className="col-span-1">
+                              {brief ? (
+                                <ScoreCell value={brief.composite_score} />
+                              ) : (
+                                <span className="text-fg-dim">—</span>
+                              )}
+                            </div>
+                            <div className="col-span-2 flex items-center min-w-0">
+                              <DashboardResultCell consensusText={aiMeta?.consensusText} />
+                            </div>
+                            <div className="col-span-2 text-fg-muted text-xs">
+                              {brief?.expected_move_dollar != null
+                                ? `±$${brief.expected_move_dollar.toFixed(2)} (${brief.expected_move_pct?.toFixed(1) ?? '—'}%)`
+                                : '—'}
+                            </div>
+                            <div className="col-span-3 min-w-0">
+                              <HomeScanAllCell
+                                ticker={e.ticker}
+                                earningsDate={date}
+                                briefId={brief?.id}
+                                lastAiScanAt={aiMeta?.lastAiScanAt}
+                                lastConsensusAt={aiMeta?.lastConsensusAt}
+                                consensusText={aiMeta?.consensusText}
+                              />
+                            </div>
+                            <div className="col-span-2 text-right">
+                              <ScanAgeLabel
+                                at={aiMeta?.lastConsensusAt ?? aiMeta?.lastAiScanAt ?? null}
+                                neverLabel="—"
+                                align="end"
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </>
               )
             ) : null}
           </section>

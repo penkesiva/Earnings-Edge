@@ -65,3 +65,29 @@ export async function loadAiBriefPayload(
     newsOverall: (brief.news_sentiment as NewsOverallSentiment | null) ?? null,
   });
 }
+
+export async function loadAiBriefPayloadByTickerDate(
+  sb: SupabaseClient,
+  ticker: string,
+  earningsDate: string,
+): Promise<AiBriefPayload | null> {
+  const { data: brief } = await sb
+    .from('earnings_briefs')
+    .select('*')
+    .eq('ticker', ticker.toUpperCase())
+    .eq('earnings_date', earningsDate)
+    .order('generated_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (!brief) return null;
+
+  const rawFmp = brief.raw_fmp as { screamUnresolvedOverhangs?: NarrativeOverhang[] } | null;
+  const screamUnresolved = rawFmp?.screamUnresolvedOverhangs ?? null;
+
+  return buildAiBriefPayloadFromRow(brief, {
+    overhangs: screamUnresolved ?? [],
+    rawHeadlines: (brief.raw_headlines as RawHeadline[] | null) ?? null,
+    newsOverall: (brief.news_sentiment as NewsOverallSentiment | null) ?? null,
+  });
+}

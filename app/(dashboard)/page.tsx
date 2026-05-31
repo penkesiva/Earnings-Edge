@@ -1,6 +1,6 @@
 import { Suspense } from 'react';
 import { supabaseAdmin } from '@/lib/supabase';
-import { loadConsensusByBriefIds } from '@/lib/loadDashboardConsensus';
+import { loadDashboardBriefAiByIds } from '@/lib/loadDashboardBriefAi';
 import { getHomeWeekdaySlots } from '@/lib/usMarketCalendar';
 import { FearGreedIndex, FearGreedIndexSkeleton } from '@/components/FearGreedIndex';
 import { UpcomingWeekList } from '@/components/UpcomingWeekList';
@@ -97,8 +97,9 @@ export default async function HomePage() {
   );
 
   const allBriefIds = (sessionBriefs ?? []).map(b => b.id);
-  const consensusByBriefId = await loadConsensusByBriefIds(sb, allBriefIds);
-  const consensusFor = (briefId: string) => consensusByBriefId.get(briefId) ?? null;
+  const aiMetaByBriefId = await loadDashboardBriefAiByIds(sb, allBriefIds);
+  const aiMetaFor = (briefId: string | undefined) =>
+    briefId ? aiMetaByBriefId.get(briefId) ?? null : null;
 
   return (
     <div className="space-y-8 sm:space-y-12">
@@ -110,7 +111,7 @@ export default async function HomePage() {
         sessions={sessions}
         upcomingByDate={upcomingByDate}
         briefByKey={briefByKey}
-        consensusFor={consensusFor}
+        aiMetaFor={aiMetaFor}
       />
     </div>
   );

@@ -1,7 +1,6 @@
 import { formatDayHeader } from '@/lib/earningsDate';
-import { PrepDateButton } from '@/components/PrepDateButton';
 
-/** Date label (left) + PREP (right) — shared by home day sections. */
+/** Date label for home day sections — per-row Scan All replaces day PREP. */
 export function DayPrepHeader({
   date,
   marketOpen = true,
@@ -26,8 +25,12 @@ export function DayPrepHeader({
         {!marketOpen && (
           <p className="text-[10px] text-fg-dim tracking-widest mt-0.5">MARKET CLOSED</p>
         )}
+        {marketOpen && (
+          <p className="text-[10px] text-fg-dim tracking-wide mt-0.5 hidden sm:block">
+            Scan All on each row — system + AI + verdict
+          </p>
+        )}
       </div>
-      {marketOpen ? <PrepDateButton date={date} /> : null}
     </div>
   );
 }
