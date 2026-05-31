@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json(status);
 }
 
-/** POST { ticker, brief_id? } — atomic acquire; first caller wins for ~10 minutes. */
+/** POST { ticker, brief_id? } — atomic acquire; first caller wins for ~5 minutes. */
 export async function POST(req: NextRequest) {
   let body: { ticker?: string; brief_id?: string };
   try {
