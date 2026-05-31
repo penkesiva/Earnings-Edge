@@ -214,13 +214,25 @@ export function BriefIntelImages({
         ))}
 
         {items.length < MAX_INTEL_IMAGES && (
-          <button
-            type="button"
-            onClick={() => inputRef.current?.click()}
-            className="w-16 h-16 border border-dashed border-border-subtle text-[10px] text-fg-dim hover:border-fg-subtle hover:text-fg-muted shrink-0"
-          >
-            + ADD
-          </button>
+          items.length === 0 ? (
+            <button
+              type="button"
+              onClick={() => inputRef.current?.click()}
+              className="w-full min-h-[2.75rem] px-4 border border-dashed border-border bg-bg-elevated text-[11px] font-bold tracking-widest text-fg-muted hover:border-signal-buy/60 hover:text-signal-buy hover:bg-bg-hover transition-colors touch-target"
+              aria-label="Add whale or analyst screenshot"
+            >
+              + ADD SCREENSHOT
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => inputRef.current?.click()}
+              className="w-16 h-16 border border-dashed border-border bg-bg-elevated text-[10px] font-bold tracking-widest text-fg-muted hover:border-signal-buy/60 hover:text-signal-buy hover:bg-bg-hover shrink-0 transition-colors"
+              aria-label="Add whale or analyst screenshot"
+            >
+              + ADD
+            </button>
+          )
         )}
 
         <input
