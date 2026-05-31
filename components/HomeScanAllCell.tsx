@@ -66,11 +66,13 @@ export function HomeScanAllCell({
               {c.phaseLabel}
             </span>
           )}
-          <ScanAgeLabel
-            at={c.effectiveLastScanAllAt}
-            neverLabel="Not scanned"
-            align={compact ? 'center' : 'start'}
-          />
+          {compact && (
+            <ScanAgeLabel
+              at={c.effectiveLastScanAllAt}
+              neverLabel="Not scanned"
+              align="center"
+            />
+          )}
           {c.scanError && (
             <p className="text-[10px] text-signal-sell leading-snug">{c.scanError}</p>
           )}
