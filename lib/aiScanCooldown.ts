@@ -1,4 +1,4 @@
-/** Minimum gap between full Scan All runs on the same brief. */
+/** Minimum gap between full Scan All runs (AI + final verdict) on the same brief/ticker. */
 export const AI_SCAN_COOLDOWN_MS = 10 * 60 * 1000;
 /** @deprecated use AI_SCAN_COOLDOWN_MS */
 export const SCAN_ALL_COOLDOWN_MS = AI_SCAN_COOLDOWN_MS;

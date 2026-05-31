@@ -493,15 +493,15 @@ export function AiBriefAnalysis({
     return a > b ? a : b;
   }, [lastConsensusAt, sessionConsensusAt]);
 
+  /** Latest Scan All completion — AI + verdict only (not system PREP). */
   const effectiveLastScanAllAt = useMemo(
     () =>
       latestScanTimestamp(
-        systemScanAt,
         effectiveLastAiAt,
         effectiveLastConsensusAt,
         sessionScanAllAt,
       ),
-    [systemScanAt, effectiveLastAiAt, effectiveLastConsensusAt, sessionScanAllAt],
+    [effectiveLastAiAt, effectiveLastConsensusAt, sessionScanAllAt],
   );
 
   void cooldownTick;
@@ -748,7 +748,7 @@ export function AiBriefAnalysis({
   const scanTitle = scanInFlight
     ? 'Scan All in progress…'
     : scanOnCooldown
-      ? `Available in ${formatCooldownWait(cooldownMs)} (10 min between Scan All)`
+      ? `Available in ${formatCooldownWait(cooldownMs)} (10 min between Scan All — AI + verdict)`
       : hasAnySaved
         ? 'Re-run system scan, all AI models, and final verdict'
         : 'Run system scan, all AI models, and final verdict';
