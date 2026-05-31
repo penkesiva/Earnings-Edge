@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import type { WhaleIntelContext } from '@/lib/intelImages';
 import type { NarrativeOverhang } from '@/lib/screamTest';
 import type { NewsOverallSentiment, RawHeadline } from '@/lib/newsSentiment';
 import { ConsensusVerdict } from '@/components/ConsensusVerdict';
@@ -64,6 +65,8 @@ export type AiBriefPayload = {
       expiry?: string;
     }>;
   } | null;
+  /** Session-only OCR from whale/analyst screenshots (not persisted). */
+  whale_intel?: WhaleIntelContext | null;
 };
 
 type PanelState = 'idle' | 'loading' | 'streaming' | 'done' | 'error';
@@ -413,17 +416,27 @@ export function AiBriefAnalysis({
   lastAiScanAt,
   lastConsensusAt,
   systemScanAt,
+  whaleIntel,
+  intelValidating = false,
 }: {
   brief: AiBriefPayload;
   savedAnalyses?: SavedAnalyses;
   lastAiScanAt?: string | null;
   lastConsensusAt?: string | null;
   systemScanAt?: string | null;
+  whaleIntel?: WhaleIntelContext | null;
+  /** Block Scan All while screenshot OCR/ticker validation is in flight. */
+  intelValidating?: boolean;
 }) {
   const [activeBrief, setActiveBrief] = useState(brief);
   useEffect(() => {
     setActiveBrief(brief);
   }, [brief]);
+
+  const briefForAi = useMemo(
+    () => ({ ...activeBrief, whale_intel: whaleIntel ?? null }),
+    [activeBrief, whaleIntel],
+  );
 
   const [signals, setSignals] = useState<Record<Provider, number>>({
     openai: 0,
@@ -646,7 +659,7 @@ export function AiBriefAnalysis({
   );
 
   async function scanAll() {
-    if (scanOnCooldown || scanInFlight) return;
+    if (scanOnCooldown || scanInFlight || intelValidating) return;
 
     setScanError('');
 
@@ -744,8 +757,10 @@ export function AiBriefAnalysis({
     PROVIDERS.some(p => !!savedAnalyses?.[p]) ||
     !!systemScanAt;
 
-  const scanDisabled = scanOnCooldown || scanInFlight;
-  const scanTitle = scanInFlight
+  const scanDisabled = scanOnCooldown || scanInFlight || intelValidating;
+  const scanTitle = intelValidating
+    ? 'Wait for screenshot validation to finish'
+    : scanInFlight
     ? 'Scan All in progress…'
     : scanOnCooldown
       ? `Available in ${formatCooldownWait(cooldownMs)} (10 min between Scan All — AI + verdict)`
@@ -828,7 +843,7 @@ export function AiBriefAnalysis({
       )}
 
       <ConsensusVerdict
-        brief={activeBrief}
+        brief={briefForAi}
         analyses={modelTexts}
         savedText={scanInFlight ? undefined : savedAnalyses?.consensus}
         autoRunSignal={consensusSignal}
@@ -842,7 +857,7 @@ export function AiBriefAnalysis({
         <AnalysisBlock
           key={p}
           provider={p}
-          brief={activeBrief}
+          brief={briefForAi}
           runSignal={signals[p]}
           scanRunId={scanRunId}
           savedText={scanInFlight ? undefined : savedAnalyses?.[p]}

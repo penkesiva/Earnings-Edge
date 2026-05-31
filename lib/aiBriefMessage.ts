@@ -1,5 +1,6 @@
 import type { AiBriefPayload } from '@/components/AiBriefAnalysis';
 import { appendNewsSections } from '@/lib/newsSentiment';
+import { appendWhaleIntelSection } from '@/lib/intelImages';
 
 /** Build the user message for GPT / Gemini / Claude earnings analysis. */
 export function buildAiBriefUserMessage(brief: AiBriefPayload): string {
@@ -68,6 +69,8 @@ export function buildAiBriefUserMessage(brief: AiBriefPayload): string {
     rawHeadlines: brief.raw_headlines,
     newsOverall: brief.news_sentiment ?? null,
   });
+
+  appendWhaleIntelSection(lines, brief.whale_intel);
 
   return lines.join('\n');
 }

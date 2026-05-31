@@ -4,7 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { FinalActionBadge, SignalBadge } from '@/components/SignalBadge';
 import { ScreamTestCard } from '@/components/ScreamTestCard';
 import { ScanDiffBanner } from '@/components/ScanDiffBanner';
-import { AiBriefAnalysis } from '@/components/AiBriefAnalysis';
+import { BriefAnalysisPanel } from '@/components/BriefAnalysisPanel';
 import { loadBriefAiAnalyses } from '@/lib/loadBriefAiAnalyses';
 import { getStockSnapshot } from '@/lib/alpaca';
 import { getCompanyName } from '@/lib/fmp';
@@ -173,7 +173,7 @@ export default async function BriefPage({
             newsOverall={newsOverall}
             rawHeadlines={rawHeadlines}
           />
-          <AiBriefAnalysis
+          <BriefAnalysisPanel
             savedAnalyses={savedAnalyses}
             lastAiScanAt={lastAiScanAt}
             lastConsensusAt={lastConsensusAt}

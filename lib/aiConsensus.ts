@@ -108,6 +108,12 @@ export function buildSystemSummary(brief: AiBriefPayload): string {
   ];
   if (brief.final_action_rationale) parts.push(`Rationale: ${brief.final_action_rationale}`);
 
+  if (brief.whale_intel?.summary?.trim()) {
+    parts.push('');
+    parts.push('Whale / analyst screenshot intel (OCR, same-ticker validated):');
+    parts.push(brief.whale_intel.summary.replace(/\n/g, '\n  '));
+  }
+
   const structure = brief.suggested_structure;
   if (structure?.action && structure.action !== 'SKIP') {
     parts.push(`Suggested structure: ${structure.action.replace(/_/g, ' ')}`);
