@@ -60,40 +60,44 @@ function UpcomingMobileCard({
   earningsDate: string;
   aiMeta: DashboardBriefAiMeta | null;
 }) {
+  const header = (
+    <div className="flex items-start justify-between gap-2">
+      <div className="min-w-0">
+        <div className="flex items-center gap-2">
+          <span className="font-bold text-lg tracking-tight">{event.ticker}</span>
+          <TimingBadge timing={event.timing} />
+        </div>
+        {brief ? (
+          <div className="flex items-center gap-2 mt-1">
+            <ScoreCell value={brief.composite_score} />
+            {brief.expected_move_dollar != null && (
+              <span className="text-[11px] text-fg-dim font-mono">
+                ±${brief.expected_move_dollar.toFixed(2)}
+              </span>
+            )}
+          </div>
+        ) : (
+          <span className="text-[10px] text-fg-dim tracking-widest mt-1 block">NO BRIEF YET</span>
+        )}
+      </div>
+      <div className="shrink-0">
+        <DashboardResultCell compact consensusText={aiMeta?.consensusText} />
+      </div>
+    </div>
+  );
+
   return (
     <div className="border border-border bg-bg-elevated p-3 space-y-3">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            {brief ? (
-              <Link
-                href={`/briefs/${brief.id}`}
-                className="font-bold text-lg tracking-tight hover:text-signal-buy"
-              >
-                {event.ticker}
-              </Link>
-            ) : (
-              <span className="font-bold text-lg tracking-tight">{event.ticker}</span>
-            )}
-            <TimingBadge timing={event.timing} />
-          </div>
-          {brief ? (
-            <div className="flex items-center gap-2 mt-1">
-              <ScoreCell value={brief.composite_score} />
-              {brief.expected_move_dollar != null && (
-                <span className="text-[11px] text-fg-dim font-mono">
-                  ±${brief.expected_move_dollar.toFixed(2)}
-                </span>
-              )}
-            </div>
-          ) : (
-            <span className="text-[10px] text-fg-dim tracking-widest mt-1 block">NO BRIEF YET</span>
-          )}
-        </div>
-        <div className="shrink-0">
-          <DashboardResultCell compact consensusText={aiMeta?.consensusText} />
-        </div>
-      </div>
+      {brief ? (
+        <Link
+          href={`/briefs/${brief.id}`}
+          className="block active:opacity-75 touch-manipulation -m-3 p-3 mb-0"
+        >
+          {header}
+        </Link>
+      ) : (
+        header
+      )}
 
       <HomeScanAllCell
         ticker={event.ticker}
@@ -170,22 +174,11 @@ export function UpcomingWeekList({
                       {events.map(e => {
                         const brief = briefByKey.get(`${date}:${e.ticker}`);
                         const aiMeta = aiMetaFor(brief?.id);
-                        return (
-                          <div
-                            key={e.id}
-                            className="grid grid-cols-12 gap-3 px-4 py-3 text-sm items-center"
-                          >
+
+                        const rowMain = (
+                          <>
                             <div className="col-span-2 font-bold flex items-center gap-1.5 min-w-0">
-                              {brief ? (
-                                <Link
-                                  href={`/briefs/${brief.id}`}
-                                  className="hover:text-signal-buy truncate"
-                                >
-                                  {e.ticker}
-                                </Link>
-                              ) : (
-                                <span>{e.ticker}</span>
-                              )}
+                              <span className="truncate">{e.ticker}</span>
                               <TimingBadge timing={e.timing} />
                             </div>
                             <div className="col-span-1">
@@ -203,7 +196,34 @@ export function UpcomingWeekList({
                                 ? `±$${brief.expected_move_dollar.toFixed(2)} (${brief.expected_move_pct?.toFixed(1) ?? '—'}%)`
                                 : '—'}
                             </div>
-                            <div className="col-span-3 min-w-0">
+                            <div className="col-span-2 text-right">
+                              <ScanAgeLabel
+                                at={aiMeta?.lastConsensusAt ?? aiMeta?.lastAiScanAt ?? null}
+                                neverLabel="—"
+                                align="end"
+                              />
+                            </div>
+                          </>
+                        );
+
+                        return (
+                          <div
+                            key={e.id}
+                            className="grid grid-cols-12 gap-3 px-4 py-3 text-sm items-center"
+                          >
+                            {brief ? (
+                              <Link
+                                href={`/briefs/${brief.id}`}
+                                className="col-span-9 grid grid-cols-9 gap-3 items-center min-w-0 terminal-row -my-3 py-3 -ml-4 pl-4 -mr-1"
+                              >
+                                {rowMain}
+                              </Link>
+                            ) : (
+                              <div className="col-span-9 grid grid-cols-9 gap-3 items-center min-w-0">
+                                {rowMain}
+                              </div>
+                            )}
+                            <div className="col-span-3 min-w-0 relative z-10">
                               <HomeScanAllCell
                                 ticker={e.ticker}
                                 earningsDate={date}
@@ -211,13 +231,6 @@ export function UpcomingWeekList({
                                 lastAiScanAt={aiMeta?.lastAiScanAt}
                                 lastConsensusAt={aiMeta?.lastConsensusAt}
                                 consensusText={aiMeta?.consensusText}
-                              />
-                            </div>
-                            <div className="col-span-2 text-right">
-                              <ScanAgeLabel
-                                at={aiMeta?.lastConsensusAt ?? aiMeta?.lastAiScanAt ?? null}
-                                neverLabel="—"
-                                align="end"
                               />
                             </div>
                           </div>
