@@ -11,6 +11,7 @@ import {
   formatConsensusForCopy,
   parseSynthesisResponse,
   resolveVerdictWhy,
+  resolveVerdictWhale,
   type AlignmentChip,
   type Direction,
   type ParsedTradePlan,
@@ -228,9 +229,10 @@ export function ConsensusVerdict({
     parsed.direction
   );
   const whyText = resolveVerdictWhy(parsed, analyses);
+  const whaleText = resolveVerdictWhale(parsed, brief);
 
   const isSaved = !!savedText && effectiveText === savedText;
-  const copyText = formatConsensusForCopy(parsed, whyText, alignSummary, brief.ticker);
+  const copyText = formatConsensusForCopy(parsed, whyText, alignSummary, brief.ticker, whaleText);
 
   return (
     <div className={`border px-4 py-3 space-y-2 ${finalVerdictPanelBorder(parsed.verdict, parsed.direction)}`}>
@@ -281,7 +283,14 @@ export function ConsensusVerdict({
       {parsed.move && <p className="text-sm font-mono text-fg">{parsed.move}</p>}
       {whyText && (
         <p className="text-xs text-fg-muted leading-snug border-l-2 border-border-subtle pl-3 w-full">
+          <span className="text-fg-dim tracking-widest text-[10px] block mb-0.5">WHY</span>
           {whyText}
+        </p>
+      )}
+      {whaleText && (
+        <p className="text-xs text-fg-muted leading-snug border-l-2 border-signal-buy/40 pl-3 w-full">
+          <span className="text-fg-dim tracking-widest text-[10px] block mb-0.5">WHALE</span>
+          {whaleText}
         </p>
       )}
       {parsed.tradePlan?.legs.length || parsed.tradePlan?.type === 'NONE' ? (

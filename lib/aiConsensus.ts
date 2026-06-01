@@ -242,6 +242,8 @@ export interface ParsedSynthesis {
   move: string | null;
   confidence: string | null;
   why: string | null;
+  /** Screenshot / whale flow intel line from synthesis. */
+  whale: string | null;
   /** Legacy single-line TRADE (older saved syntheses). */
   trade: string | null;
   tradePlan: ParsedTradePlan | null;
@@ -363,10 +365,23 @@ export function parseSynthesisResponse(text: string): ParsedSynthesis {
     move: line('MOVE'),
     confidence: line('CONFIDENCE'),
     why: line('WHY'),
+    whale: line('WHALE'),
     trade: line('TRADE'),
     tradePlan: parseTradePlan(text, line),
     raw: text,
   };
+}
+
+/** WHALE line from synthesis, else brief OCR summary for display. */
+export function resolveVerdictWhale(
+  parsed: ParsedSynthesis,
+  brief: AiBriefPayload,
+): string | null {
+  const fromSynth = parsed.whale?.trim();
+  if (fromSynth && fromSynth !== '—' && fromSynth !== '-') return fromSynth;
+  const ocr = brief.whale_intel?.summary?.trim();
+  if (!ocr) return null;
+  return ocr.replace(/\n/g, ' · ').slice(0, 280);
 }
 
 /** Plain-text block for clipboard from parsed Final Verdict. */
@@ -375,6 +390,7 @@ export function formatConsensusForCopy(
   why: string | null,
   alignSummary: string,
   ticker: string,
+  whale?: string | null,
 ): string {
   const head = [
     `${ticker} — Final Verdict`,
@@ -383,6 +399,7 @@ export function formatConsensusForCopy(
   const body = [
     parsed.move ? `Move: ${parsed.move}` : null,
     why ? `Why: ${why}` : null,
+    whale ? `Whale: ${whale}` : null,
     formatTradePlanForCopy(parsed.tradePlan) ?? (parsed.trade ? `Trade: ${parsed.trade}` : null),
     `Alignment: ${alignSummary}`,
   ].filter(Boolean);

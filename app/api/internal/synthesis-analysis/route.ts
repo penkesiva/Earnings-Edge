@@ -32,6 +32,8 @@ Definitions:
 
 Rules:
 - Weight all inputs; screenshot intel is optional context — can confirm or contradict chain/headlines; treat as stale if unclear.
+- When whale/screenshot intel appears in the user message, WHALE must not be — ; WHY must mention it (confirm, contradict, or neutral).
+- When no whale intel in the user message, set WHALE: —
 - Do not ignore the system when 3 LLMs agree but system screams conflict (→ NO-GO or WATCH).
 - When 3/3 LLMs agree on direction AND system leans same way → strong GO.
 - IV rank ≥ 80: favor premium-selling structures over naked long options unless unanimous high-confidence directional GO.
@@ -45,7 +47,8 @@ VERDICT: GO | NO-GO | WATCH
 DIRECTION: UP | DOWN | NEUTRAL
 MOVE: [one line: dollar range | % range | target price, e.g. -$7 to -$11 | -9% to -13% | target ~$68]
 CONFIDENCE: N/10
-WHY: [one short sentence, max 25 words — dominant edge only, no recap of every signal]
+WHY: [one short sentence, max 25 words — dominant edge only; if whale intel provided, cite it explicitly]
+WHALE: [one line — how screenshot/flow intel affects the call, or — if none provided]
 TRADE TYPE: [structure name, e.g. CALL CREDIT SPREAD | PUT DEBIT SPREAD | IRON CONDOR | NONE]
 TRADE EXPIRY: [YYYY-MM-DD from system legs, or —]
 TRADE LEG 1: [BUY|SELL] [CALL|PUT] $[strike]  (or — if no trade)
@@ -105,6 +108,7 @@ export async function POST(req: NextRequest) {
 
   const systemSummary = buildSystemSummary(brief);
   const pre = computeDeterministicConsensus(brief, analyses);
+  const hasWhaleIntel = !!brief.whale_intel?.summary?.trim();
 
   const userParts = [
     '## System (quant + options chain)',
@@ -114,11 +118,25 @@ export async function POST(req: NextRequest) {
     '',
   ];
 
+  if (hasWhaleIntel) {
+    userParts.push(
+      '## Whale / analyst screenshot intel (user-uploaded, ticker-validated OCR)',
+      brief.whale_intel!.summary.trim(),
+      '',
+      'Treat whale intel as a first-class signal — reflect it in WHALE and WHY.',
+      '',
+    );
+  }
+
   for (const p of filled) {
     userParts.push(`## ${p.toUpperCase()} analysis`, analyses[p]!.trim(), '');
   }
 
-  userParts.push('Produce the final VERDICT block now.');
+  userParts.push(
+    hasWhaleIntel
+      ? 'Produce the final VERDICT block now (WHALE line required).'
+      : 'Produce the final VERDICT block now.',
+  );
 
   const upstream = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
