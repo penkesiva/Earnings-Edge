@@ -2,11 +2,16 @@
  * LLM-based headline classifier — risks + per-headline sentiment + overall bias
  * in a single batch call (shared by overhangDetector.ts).
  *
- * Provider: Gemini 2.0 Flash > OpenAI GPT-4o-mini
+ * Provider: Gemini 2.5 Flash Lite > OpenAI GPT-4o-mini
  * Cache: llm_scan_cache per (ticker, scan_date)
  */
 
 import type { OverhangCategory } from '@/lib/screamTest';
+import {
+  GEMINI_FLASH_LITE_MODEL,
+  GEMINI_VISION_OCR_MODEL,
+  geminiGenerateContentUrl,
+} from '@/lib/geminiModels';
 import { supabaseAdmin } from '@/lib/supabase';
 import type {
   HeadlineSentiment,
@@ -199,23 +204,20 @@ async function callLlm(
   if (provider === 'gemini') {
     const key = process.env.GEMINI_API_KEY;
     if (!key) return '{}';
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
-          contents: [{ parts: [{ text: userMessage }] }],
-          generationConfig: {
-            response_mime_type: 'application/json',
-            temperature: 0,
-            maxOutputTokens: 8192,
-          },
-        }),
-        cache: 'no-store',
-      },
-    );
+    const res = await fetch(geminiGenerateContentUrl(GEMINI_FLASH_LITE_MODEL, key), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
+        contents: [{ parts: [{ text: userMessage }] }],
+        generationConfig: {
+          response_mime_type: 'application/json',
+          temperature: 0,
+          maxOutputTokens: 8192,
+        },
+      }),
+      cache: 'no-store',
+    });
     if (!res.ok) return '{}';
     const data = (await res.json()) as {
       candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
@@ -370,19 +372,16 @@ export async function fetchGeminiSearchHeadlines(
     `Include up to 15 headlines. Estimate the date if exact date is unclear.`;
 
   try {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          tools: [{ google_search: {} }],
-          generationConfig: { response_mime_type: 'application/json', temperature: 0 },
-        }),
-        cache: 'no-store',
-      },
-    );
+    const res = await fetch(geminiGenerateContentUrl(GEMINI_VISION_OCR_MODEL, key), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        tools: [{ google_search: {} }],
+        generationConfig: { response_mime_type: 'application/json', temperature: 0 },
+      }),
+      cache: 'no-store',
+    });
 
     if (!res.ok) return [];
 

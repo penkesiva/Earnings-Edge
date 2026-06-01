@@ -7,6 +7,11 @@
 import { NextRequest } from 'next/server';
 import type { AiBriefPayload } from '@/components/AiBriefAnalysis';
 import { buildAiBriefUserMessage } from '@/lib/aiBriefMessage';
+import {
+  GEMINI_ANALYSIS_MODEL,
+  geminiStreamGenerateContentUrl,
+  parseGeminiHttpError,
+} from '@/lib/geminiModels';
 import { parseScanRequestBody } from '@/lib/parseScanRequest';
 import { assertScanRunAllowed } from '@/lib/tickerScanLock';
 import { supabaseAdmin } from '@/lib/supabase';
@@ -129,24 +134,20 @@ export async function POST(req: NextRequest) {
     const userMessage = buildAiBriefUserMessage(brief);
 
     // Gemini streaming: alt=sse returns SSE events
-    const model = 'gemini-3.1-pro-preview';
-    const upstream = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?key=${key}&alt=sse`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
-          contents: [{ parts: [{ text: userMessage }] }],
-          generationConfig: { maxOutputTokens: 2500 },
-        }),
-        cache: 'no-store',
-      }
-    );
+    const upstream = await fetch(geminiStreamGenerateContentUrl(GEMINI_ANALYSIS_MODEL, key), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
+        contents: [{ parts: [{ text: userMessage }] }],
+        generationConfig: { maxOutputTokens: 2500 },
+      }),
+      cache: 'no-store',
+    });
 
     if (!upstream.ok) {
       const err = await upstream.text();
-      return new Response(JSON.stringify({ error: err }), {
+      return new Response(JSON.stringify({ error: parseGeminiHttpError(err) }), {
         status: 502,
         headers: { 'Content-Type': 'application/json' },
       });

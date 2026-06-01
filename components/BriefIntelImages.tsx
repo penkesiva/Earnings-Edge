@@ -81,17 +81,9 @@ export function BriefIntelImages({
           ),
         );
       } catch (e) {
-        setItems(prev =>
-          prev.map(i =>
-            i.id === item.id
-              ? {
-                  ...i,
-                  status: 'rejected' as const,
-                  rejectReason: e instanceof Error ? e.message : 'Validation failed',
-                }
-              : i,
-          ),
-        );
+        URL.revokeObjectURL(item.previewUrl);
+        setItems(prev => prev.filter(i => i.id !== item.id));
+        setError(e instanceof Error ? e.message : 'Screenshot validation failed');
       }
     },
     [ticker],
@@ -265,7 +257,7 @@ export function BriefIntelImages({
       {error && <p className="mt-2 text-[11px] text-signal-sell">{error}</p>}
 
       <p className="mt-2 text-[10px] text-fg-dim">
-        Paste whale or analyst screenshots — Gemini checks {ticker} match + OCR. Not saved; used on Scan All only.
+        Upload on brief → Gemini 2.5 Flash OCR (cheap). RESCAN folds text into GPT, Gemini 3.1 Pro, Claude, then GPT final verdict.
       </p>
     </div>
   );

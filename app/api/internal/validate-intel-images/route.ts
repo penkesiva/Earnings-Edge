@@ -6,6 +6,11 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import {
+  GEMINI_VISION_OCR_MODEL,
+  geminiGenerateContentUrl,
+  parseGeminiHttpError,
+} from '@/lib/geminiModels';
+import {
   ACCEPTED_INTEL_MIME,
   MAX_INTEL_IMAGES,
 } from '@/lib/intelImages';
@@ -99,26 +104,26 @@ Respond with JSON ONLY:
     });
   }
 
-  const model = 'gemini-2.0-flash';
-  const upstream = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts }],
-        generationConfig: {
-          maxOutputTokens: 2048,
-          responseMimeType: 'application/json',
-        },
-      }),
-      cache: 'no-store',
-    },
-  );
+  const upstream = await fetch(geminiGenerateContentUrl(GEMINI_VISION_OCR_MODEL, key), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts }],
+      generationConfig: {
+        maxOutputTokens: 2048,
+        responseMimeType: 'application/json',
+        temperature: 0,
+      },
+    }),
+    cache: 'no-store',
+  });
 
   if (!upstream.ok) {
     const err = await upstream.text();
-    return NextResponse.json({ error: err }, { status: 502 });
+    return NextResponse.json(
+      { error: parseGeminiHttpError(err, 'Screenshot validation failed') },
+      { status: 502 },
+    );
   }
 
   const json = await upstream.json();
@@ -167,5 +172,5 @@ Respond with JSON ONLY:
     });
   }
 
-  return NextResponse.json({ ticker, results });
+  return NextResponse.json({ ticker, model: GEMINI_VISION_OCR_MODEL, results });
 }
