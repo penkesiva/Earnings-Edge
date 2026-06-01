@@ -223,13 +223,14 @@ export function ConsensusVerdict({
   const parsed = effectiveText ? parseSynthesisResponse(effectiveText) : null;
   if (!parsed) return null;
 
+  const whyText = resolveVerdictWhy(parsed, analyses);
+  const whaleText = resolveVerdictWhale(parsed, brief);
   const { summary: alignSummary, chips } = buildAlignmentChips(
     brief,
     analyses,
-    parsed.direction
+    parsed.direction,
+    { whaleLine: whaleText },
   );
-  const whyText = resolveVerdictWhy(parsed, analyses);
-  const whaleText = resolveVerdictWhale(parsed, brief);
 
   const isSaved = !!savedText && effectiveText === savedText;
   const copyText = formatConsensusForCopy(parsed, whyText, alignSummary, brief.ticker, whaleText);

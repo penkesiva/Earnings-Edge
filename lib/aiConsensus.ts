@@ -206,11 +206,42 @@ export type AlignmentChip = {
 
 const MODEL_LABELS = { openai: 'GPT', gemini: 'Gemini', claude: 'Claude' } as const;
 
-/** Per-source direction row — System + each model's actual lean (not checkmarks). */
+/** True when screenshot OCR was part of this verdict (session or saved WHALE line). */
+export function hasWhaleIntelForAlignment(
+  brief: AiBriefPayload,
+  whaleLine?: string | null,
+): boolean {
+  if (brief.whale_intel?.summary?.trim()) return true;
+  const w = whaleLine?.trim();
+  return !!w && w !== '—' && w !== '-';
+}
+
+/** Bullish/bearish lean from whale OCR or synthesis WHALE line (best-effort). */
+export function inferWhaleDirection(intel: string | null | undefined): Direction | null {
+  if (!intel?.trim()) return null;
+  const t = intel.toLowerCase();
+  const bull =
+    /\b(call-heavy|call heavy|bullish|call sweep|calls? sweep|heavy call|more calls|upside|long calls?)\b/.test(
+      t,
+    ) ||
+    (/\bcalls?\b/.test(t) && !/\bputs?\b/.test(t));
+  const bear =
+    /\b(put-heavy|put heavy|bearish|put sweep|puts? sweep|heavy put|more puts|downside|long puts?)\b/.test(
+      t,
+    ) ||
+    (/\bputs?\b/.test(t) && !/\bcalls?\b/.test(t));
+  if (bull && bear) return 'NEUTRAL';
+  if (bull) return 'UP';
+  if (bear) return 'DOWN';
+  return null;
+}
+
+/** Per-source direction row — System + models + optional Whale intel. */
 export function buildAlignmentChips(
   brief: AiBriefPayload,
   analyses: Partial<Record<'openai' | 'gemini' | 'claude', string>>,
-  consensusDirection: Direction | null
+  consensusDirection: Direction | null,
+  options?: { whaleLine?: string | null },
 ): { summary: string; chips: AlignmentChip[] } {
   const chips: AlignmentChip[] = [];
   const systemDir = systemDirectionFromBrief(brief);
@@ -224,6 +255,11 @@ export function buildAlignmentChips(
       continue;
     }
     chips.push({ label: MODEL_LABELS[p], direction: parseAiDirection(text) });
+  }
+
+  if (hasWhaleIntelForAlignment(brief, options?.whaleLine)) {
+    const intel = options?.whaleLine ?? brief.whale_intel?.summary ?? '';
+    chips.push({ label: 'Whale', direction: inferWhaleDirection(intel) });
   }
 
   const dirLabel = consensusDirection?.toLowerCase() ?? 'mixed';
