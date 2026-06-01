@@ -35,7 +35,8 @@ export function buildWhaleIntelSummary(items: IntelImageItem[]): WhaleIntelConte
 
   const parts = matched.map((item, idx) => {
     const src = item.sourceHint?.trim() || `Image ${idx + 1}`;
-    return `[${src}] ${item.extractedIntel!.trim()}`;
+    const line = item.extractedIntel!.trim();
+    return `${src}: ${line}`;
   });
 
   return {
@@ -53,7 +54,7 @@ export function buildWhaleIntelSummary(items: IntelImageItem[]): WhaleIntelConte
 export function appendWhaleIntelSection(lines: string[], intel: WhaleIntelContext | null | undefined): void {
   if (!intel?.summary?.trim()) return;
 
-  lines.push('## Whale / Analyst Screenshot Intel (OCR + vision — validate same ticker)');
+  lines.push('## Whale / Analyst Screenshot Intel (simple flow read)');
   lines.push(
     `  ${intel.matchedCount} matched screenshot${intel.matchedCount === 1 ? '' : 's'} of ${intel.totalCount} attached`,
   );

@@ -220,6 +220,9 @@ export function hasWhaleIntelForAlignment(
 export function inferWhaleDirection(intel: string | null | undefined): Direction | null {
   if (!intel?.trim()) return null;
   const t = intel.toLowerCase();
+  if (/\bcalls side\b/.test(t)) return 'UP';
+  if (/\bputs side\b/.test(t)) return 'DOWN';
+  if (/\bneutral\b/.test(t)) return 'NEUTRAL';
   const bull =
     /\b(call-heavy|call heavy|bullish|call sweep|calls? sweep|heavy call|more calls|upside|long calls?)\b/.test(
       t,

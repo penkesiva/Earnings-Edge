@@ -257,7 +257,7 @@ export function BriefIntelImages({
       {error && <p className="mt-2 text-[11px] text-signal-sell">{error}</p>}
 
       <p className="mt-2 text-[10px] text-fg-dim">
-        Upload on brief → Gemini 2.5 Flash OCR (cheap). RESCAN folds text into GPT, Gemini 3.1 Pro, Claude, then GPT final verdict.
+        Upload screenshots → simple read (calls side / puts side / neutral + strikes). RESCAN to fold into verdict.
       </p>
     </div>
   );

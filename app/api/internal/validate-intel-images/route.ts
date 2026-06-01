@@ -82,7 +82,12 @@ For EACH attached image (in order), return one JSON object in the "images" array
 - ticker_match: true ONLY if the screenshot is primarily about ${ticker} (company name on same company is OK)
 - detected_ticker: ticker symbol visible in image, or null
 - source_hint: short label e.g. "Unusual Whales", "SpotGamma", "X/Twitter", "Discord", "Unknown"
-- extracted_intel: OCR + interpret — strikes, expiries, call/put flow, premium, key levels, directional bias (max 400 chars, plain text bullets)
+- extracted_intel: ONE short plain line (max 120 chars). No Vol/OI, no ratios, no paragraphs.
+  Format exactly one of:
+  • "CALLS side · [expiry] $strikeC, $strikeC" (dominant call flow)
+  • "PUTS side · [expiry] $strikeP, $strikeP" (dominant put flow)
+  • "NEUTRAL · [expiry] calls $strikeC puts $strikeP" (mixed or balanced)
+  Use top 1–3 strikes only. Expiry as shown (e.g. Jun 05, Jul 17). Example: "CALLS side · Jun 05 $240C, $260C · Jul 17 $250C"
 - reject_reason: if ticker_match is false, one short reason; else null
 
 Respond with JSON ONLY:
