@@ -17,6 +17,30 @@ export function geminiStreamGenerateContentUrl(model: string, apiKey: string): s
   return `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?key=${apiKey}&alt=sse`;
 }
 
+/** Parse Gemini text output — handles fences, trailing prose, and minor JSON glitches. */
+export function parseGeminiJsonText<T = unknown>(raw: string): T {
+  const trimmed = raw.trim();
+  if (!trimmed) throw new Error('Empty Gemini response');
+
+  const attempts: string[] = [trimmed];
+  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fenced?.[1]) attempts.push(fenced[1].trim());
+
+  const start = trimmed.indexOf('{');
+  const end = trimmed.lastIndexOf('}');
+  if (start >= 0 && end > start) attempts.push(trimmed.slice(start, end + 1));
+
+  for (const candidate of attempts) {
+    try {
+      return JSON.parse(candidate) as T;
+    } catch {
+      // try next extraction
+    }
+  }
+
+  throw new Error('Invalid JSON from Gemini');
+}
+
 /** Turn Gemini HTTP error bodies into a short user-facing string. */
 export function parseGeminiHttpError(raw: string, fallback = 'Gemini request failed'): string {
   const trimmed = raw.trim();

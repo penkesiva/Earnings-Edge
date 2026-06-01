@@ -23,6 +23,7 @@ export function BriefIntelImages({
   const intel = useMemo(() => buildWhaleIntelSummary(items), [items]);
   const matched = items.filter(i => i.status === 'matched');
   const rejected = items.filter(i => i.status === 'rejected');
+  const errored = items.filter(i => i.status === 'error');
   const validating = items.some(i => i.status === 'validating');
 
   useEffect(() => {
@@ -81,9 +82,15 @@ export function BriefIntelImages({
           ),
         );
       } catch (e) {
-        URL.revokeObjectURL(item.previewUrl);
-        setItems(prev => prev.filter(i => i.id !== item.id));
-        setError(e instanceof Error ? e.message : 'Screenshot validation failed');
+        const message = e instanceof Error ? e.message : 'Screenshot validation failed';
+        setItems(prev =>
+          prev.map(i =>
+            i.id === item.id
+              ? { ...i, status: 'error' as const, rejectReason: message }
+              : i,
+          ),
+        );
+        setError(message);
       }
     },
     [ticker],
@@ -157,6 +164,11 @@ export function BriefIntelImages({
             {rejected.length} rejected
           </span>
         )}
+        {errored.length > 0 && (
+          <span className="text-[11px] text-signal-watch">
+            {errored.length} failed
+          </span>
+        )}
       </div>
 
       <div className="flex flex-wrap items-start gap-2">
@@ -168,7 +180,9 @@ export function BriefIntelImages({
                 ? 'border-signal-buy/50'
                 : item.status === 'rejected'
                   ? 'border-signal-sell/50'
-                  : 'border-border-subtle'
+                  : item.status === 'error'
+                    ? 'border-signal-watch/50'
+                    : 'border-border-subtle'
             }`}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -183,7 +197,9 @@ export function BriefIntelImages({
                   ? 'bg-signal-buy/90 text-bg'
                   : item.status === 'rejected'
                     ? 'bg-signal-sell/90 text-white'
-                    : 'bg-bg/80 text-fg-muted'
+                    : item.status === 'error'
+                      ? 'bg-signal-watch/90 text-bg'
+                      : 'bg-bg/80 text-fg-muted'
               }`}
             >
               {item.status === 'validating'
@@ -192,8 +208,20 @@ export function BriefIntelImages({
                   ? '✓'
                   : item.status === 'rejected'
                     ? '✗'
-                    : '·'}
+                    : item.status === 'error'
+                      ? '!'
+                      : '·'}
             </span>
+            {item.status === 'error' && (
+              <button
+                type="button"
+                onClick={() => validateOne(item)}
+                className="absolute inset-x-0 top-0 h-3 bg-signal-watch/80 text-[7px] font-bold text-bg hover:bg-signal-watch"
+                aria-label="Retry screenshot validation"
+              >
+                RETRY
+              </button>
+            )}
             <button
               type="button"
               onClick={() => removeItem(item.id)}
@@ -243,6 +271,16 @@ export function BriefIntelImages({
             <li key={item.id}>
               Wrong ticker{item.detectedTicker ? ` (${item.detectedTicker})` : ''}
               {item.rejectReason ? ` — ${item.rejectReason}` : ''}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {errored.length > 0 && (
+        <ul className="mt-2 space-y-1 text-[10px] text-signal-watch">
+          {errored.map(item => (
+            <li key={item.id}>
+              Validation failed{item.rejectReason ? ` — ${item.rejectReason}` : ''}
             </li>
           ))}
         </ul>

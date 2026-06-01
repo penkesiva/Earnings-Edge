@@ -1,6 +1,6 @@
 /** Ephemeral whale / analyst screenshot intel — not persisted to storage. */
 
-export type IntelImageStatus = 'pending' | 'validating' | 'matched' | 'rejected';
+export type IntelImageStatus = 'pending' | 'validating' | 'matched' | 'rejected' | 'error';
 
 export type IntelImageItem = {
   id: string;
