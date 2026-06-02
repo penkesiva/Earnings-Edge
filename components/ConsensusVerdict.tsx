@@ -124,12 +124,12 @@ export function ConsensusVerdict({
   const [responseAt, setResponseAt] = useState<string | null>(null);
 
   useEffect(() => {
-    if (savedText) {
-      setText(savedText);
-      setState('done');
-      if (savedAt) setResponseAt(savedAt);
-    }
-  }, [savedText, savedAt]);
+    if (!savedText) return;
+    if (responseAt && (!savedAt || savedAt < responseAt)) return;
+    setText(savedText);
+    setState('done');
+    if (savedAt) setResponseAt(savedAt);
+  }, [savedText, savedAt, responseAt]);
 
   const run = useCallback(async () => {
     const filled = (['openai', 'gemini', 'claude'] as const).filter(p => analyses[p]?.trim());
@@ -168,9 +168,8 @@ export function ConsensusVerdict({
       setState('done');
       const at = new Date().toISOString();
       setResponseAt(at);
-      onComplete?.(at);
 
-      fetch('/api/internal/save-ai-analysis', {
+      const saveRes = await fetch('/api/internal/save-ai-analysis', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -178,7 +177,16 @@ export function ConsensusVerdict({
           provider: 'consensus',
           text: out,
         }),
-      }).catch(() => {});
+      });
+      const saveData = await saveRes.json().catch(() => ({}));
+      if (!saveRes.ok) {
+        const errMsg = saveData.error ?? `Save failed: HTTP ${saveRes.status}`;
+        setError(errMsg);
+        onError?.(errMsg);
+        return;
+      }
+
+      onComplete?.(at);
     } catch (e) {
       const errMsg = e instanceof Error ? e.message : 'Network error';
       setError(errMsg);
