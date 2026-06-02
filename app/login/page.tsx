@@ -51,12 +51,12 @@ function LoginForm() {
 
         {/* Wordmark */}
         <div className="text-center space-y-1">
-          <div className="text-xs tracking-[0.3em] text-fg-subtle uppercase">
-            EARNINGS EDGE
-          </div>
-          <div className="text-[10px] tracking-widest text-fg-dim">
-            PRIVATE — ENTER PASSPHRASE
-          </div>
+          <h1 className="text-2xl font-serif font-bold tracking-tight text-fg">
+            Earnings Edge
+          </h1>
+          <p className="text-sm text-fg-dim">
+            Private — enter passphrase
+          </p>
         </div>
 
         {/* Form */}

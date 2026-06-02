@@ -22,34 +22,34 @@ export default function DashboardLayout({
         <div className="flex items-center justify-between gap-3 min-w-0">
           <Link href="/" className="flex items-center gap-2 shrink-0 min-w-0">
             <span className="w-2 h-2 bg-signal-buy pulse-dot rounded-full shrink-0" />
-            <span className="text-[11px] sm:text-sm font-bold tracking-widest truncate">
-              EARNINGS EDGE
+            <span className="text-base sm:text-lg font-serif font-bold tracking-tight truncate">
+              Earnings Edge
             </span>
           </Link>
           <div className="flex items-center gap-2 sm:hidden shrink-0">
-            <span className="text-[10px] text-fg-dim font-mono tabular-nums">{now}</span>
+            <span className="text-[10px] text-fg-dim tabular-nums">{now}</span>
             <ThemeToggle />
           </div>
         </div>
         <div className="flex items-center justify-between gap-3 sm:gap-8 min-w-0">
-          <nav className="flex gap-1 sm:gap-6 text-xs text-fg-muted overflow-x-auto -mx-1 px-1">
+          <nav className="flex gap-1 sm:gap-5 text-sm text-fg-muted overflow-x-auto -mx-1 px-1">
             <Link
               href="/"
-              className="hover:text-fg transition-colors py-2 px-2 sm:px-0 sm:py-1 shrink-0"
+              className="hover:text-fg transition-colors py-2 px-2 sm:px-0 sm:py-1 shrink-0 font-medium"
             >
-              HOME
+              Home
             </Link>
             <Link
               href="/watchlist"
-              className="hover:text-fg transition-colors py-2 px-2 sm:px-0 sm:py-1 shrink-0"
+              className="hover:text-fg transition-colors py-2 px-2 sm:px-0 sm:py-1 shrink-0 font-medium"
             >
-              WATCHLIST
+              Watchlist
             </Link>
             <Link
               href="/history"
-              className="hover:text-fg transition-colors py-2 px-2 sm:px-0 sm:py-1 shrink-0"
+              className="hover:text-fg transition-colors py-2 px-2 sm:px-0 sm:py-1 shrink-0 font-medium"
             >
-              HISTORY
+              History
             </Link>
           </nav>
           <div className="hidden sm:flex items-center gap-3 shrink-0">

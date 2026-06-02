@@ -5,14 +5,32 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
+        sans: [
+          'var(--font-sans)',
+          'system-ui',
+          '-apple-system',
+          'Segoe UI',
+          'sans-serif',
+        ],
+        serif: [
+          'var(--font-serif)',
+          'Georgia',
+          'Times New Roman',
+          'serif',
+        ],
+        display: [
+          'var(--font-serif)',
+          'Georgia',
+          'Times New Roman',
+          'serif',
+        ],
         mono: [
-          'var(--font-jetbrains-mono)',
+          'var(--font-mono)',
           'ui-monospace',
           'SFMono-Regular',
           'Menlo',
           'monospace',
         ],
-        display: ['Söhne', 'Inter Display', 'sans-serif'],
       },
       colors: {
         // Theme-aware tokens — values come from CSS vars set in globals.css.
