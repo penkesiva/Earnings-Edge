@@ -4,11 +4,11 @@
 
 /* ── Color tokens: dark (default) ──────────────────────────────────────────── */
 :root {
-  --color-bg:             #1c1c1f;
-  --color-bg-elevated:    #27272a;
-  --color-bg-hover:       #323236;
-  --color-border:         #3f3f46;
-  --color-border-subtle:  #35353b;
+  --color-bg:             #18181b;
+  --color-bg-elevated:    #242427;
+  --color-bg-hover:       #2e2e32;
+  --color-border:         #3a3a40;
+  --color-border-subtle:  #303036;
   --color-fg:             #f4f4f5;
   --color-fg-muted:       #a1a1aa;
   --color-fg-subtle:      #71717a;
@@ -32,11 +32,11 @@
 
 /* ── Color tokens: light (activated by html.light class via ThemeToggle) ──── */
 html.light {
-  --color-bg:             #e4e4e7;
-  --color-bg-elevated:    #ececed;
-  --color-bg-hover:       #d4d4d8;
-  --color-border:         #b8b8bd;
-  --color-border-subtle:  #cacace;
+  --color-bg:             #d0d0d5;
+  --color-bg-elevated:    #dadade;
+  --color-bg-hover:       #c4c4ca;
+  --color-border:         #a8a8ae;
+  --color-border-subtle:  #b6b6bc;
   --color-fg:             #0a0a0a;
   --color-fg-muted:       #3f3f46;
   --color-fg-subtle:      #52525b;
@@ -49,7 +49,7 @@ html.light {
   --color-tick-miss:      #3f3f46;
   --color-tick-miss-bg:   rgba(63, 63, 70, 0.12);
 
-  /* Darker signal hues for grey light UI — amber must read on #e4e4e7 */
+  /* Darker signal hues for grey light UI — amber must read on #d0d0d5 */
   --color-signal-buy:     4 120 87;
   --color-signal-watch:   180 83 9;
   --color-signal-sell:    185 28 28;
