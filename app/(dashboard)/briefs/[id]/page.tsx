@@ -868,6 +868,7 @@ function BriefInsightStrip({
   // ── News sentiment ────────────────────────────────────────────────────────
   const risks = overhangs ?? [];
   const maxSev = risks.reduce((m, r) => Math.max(m, r.severity ?? 3), 0);
+  const newsDisplay = getNewsSentimentDisplay(newsOverall, rawHeadlines, risks.length, maxSev);
   const newsInsight =
     newsInsightFromOverall(newsOverall, rawHeadlines) ??
     (risks.length > 0 ? newsInsightFromRisks(risks.length, maxSev) : newsInsightFromNoData());
@@ -877,6 +878,10 @@ function BriefInsightStrip({
     newsInsightFromOverall(newsOverall, rawHeadlines)
       ? (newsOverall?.summary?.slice(0, 48) ?? newsInsight.sub)
       : newsInsight.sub;
+  const newsReason =
+    newsDisplay.summary.length > 180
+      ? `${newsDisplay.summary.slice(0, 177).trim()}…`
+      : newsDisplay.summary;
 
   // ── IV environment ────────────────────────────────────────────────────────
   const ivr = ivRank;
@@ -903,6 +908,14 @@ function BriefInsightStrip({
         />
         <InsightCell label="IV ENV" value={ivLabel} sub={ivSub} valueCls={ivCls} />
       </div>
+      <a
+        href="#news-sentiment"
+        className="mt-3 block text-[11px] leading-relaxed text-fg-dim hover:text-fg-subtle"
+      >
+        <span className="text-fg-subtle">News:</span>{' '}
+        <span className={newsCls}>{newsDisplay.badge.label}</span>
+        <span> — {newsReason}</span>
+      </a>
     </div>
   );
 }
