@@ -165,6 +165,12 @@ create table if not exists earnings_outcomes (
   final_action text,
   hit boolean,
 
+  consensus_verdict text check (consensus_verdict in ('GO', 'NO-GO', 'WATCH')),
+  consensus_direction text check (consensus_direction in ('UP', 'DOWN', 'NEUTRAL')),
+  consensus_confidence integer,
+  consensus_trade_type text,
+  consensus_hit boolean,
+
   recorded_at timestamptz default now()
 );
 
@@ -174,6 +180,8 @@ comment on column earnings_outcomes.final_action is
   'The reconciled action at scan time (SKIP, LONG_CALL, CALL_DEBIT_SPREAD, etc.)';
 comment on column earnings_outcomes.hit is
   'True when the directional prediction was correct based on next-day move.';
+comment on column earnings_outcomes.consensus_hit is
+  'True when the saved Final Verdict direction matched next-day move; neutral/no-trade verdicts are null.';
 
 -- =============================================================================
 -- LLM headline cache (per ticker per scan day)
@@ -255,7 +263,12 @@ select
   o.next_day_close_pct,
   o.trade_taken,
   o.trade_pnl,
-  o.hit
+  o.hit,
+  o.consensus_verdict,
+  o.consensus_direction,
+  o.consensus_confidence,
+  o.consensus_trade_type,
+  o.consensus_hit
 from earnings_briefs b
 left join earnings_outcomes o on o.brief_id = b.id
 order by b.earnings_date desc;

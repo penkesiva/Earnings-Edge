@@ -12,7 +12,7 @@ export function HistoryStatsPanel({ rows }: { rows: HistoryStatsRow[] }) {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2 sm:gap-3">
         <StatCard label="BRIEFS" value={String(s.totalBriefs)} />
         <StatCard label="EPS LOGGED" value={String(s.epsLogged)} sub={s.pendingEps ? `${s.pendingEps} pending` : undefined} />
         <StatCard
@@ -20,6 +20,12 @@ export function HistoryStatsPanel({ rows }: { rows: HistoryStatsRow[] }) {
           value={s.structureHitRate != null ? `${s.structureHitRate.toFixed(0)}%` : '—'}
           valueClass={hitRateColor(s.structureHitRate)}
           sub={s.scored ? `${s.hits}✓ · ${s.misses}✗ of ${s.scored} scored` : 'No scored trades yet'}
+        />
+        <StatCard
+          label="FINAL DIR HIT"
+          value={s.consensusHitRate != null ? `${s.consensusHitRate.toFixed(0)}%` : '—'}
+          valueClass={hitRateColor(s.consensusHitRate)}
+          sub={s.consensusScored ? `${s.consensusHits}✓ · ${s.consensusMisses}✗ of ${s.consensusScored} scored` : 'No final verdicts yet'}
         />
         <StatCard label="SKIPPED" value={String(s.skipped)} sub="NO-GO / skip verdicts" />
         <StatCard
@@ -34,6 +40,7 @@ export function HistoryStatsPanel({ rows }: { rows: HistoryStatsRow[] }) {
         <span className="text-fg-muted">Structure hit rate</span> scores only system trade setups (spreads, condors)
         against next-day price — not EPS beat/miss. Skip and watch rows are excluded. A HIT means the
         structure matched the move; it does not mean you should have traded if final verdict was NO-GO.
+        <span className="text-fg-muted"> Final dir hit</span> scores saved AI Final Verdict UP/DOWN calls separately.
       </p>
 
       {s.recentMisses.length > 0 && (

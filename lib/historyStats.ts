@@ -18,6 +18,11 @@ export type HistoryStatsRow = {
   next_day_close_pct: number | null;
   hit: boolean | null;
   expected_move_pct?: number | null;
+  consensus_verdict?: string | null;
+  consensus_direction?: string | null;
+  consensus_confidence?: number | null;
+  consensus_trade_type?: string | null;
+  consensus_hit?: boolean | null;
 };
 
 export function isSkipAction(action: string | null | undefined): boolean {
@@ -44,6 +49,10 @@ export type HistoryStats = {
   hits: number;
   misses: number;
   structureHitRate: number | null;
+  consensusScored: number;
+  consensusHits: number;
+  consensusMisses: number;
+  consensusHitRate: number | null;
   recentMisses: HistoryStatsRow[];
 };
 
@@ -58,6 +67,12 @@ export function computeHistoryStats(rows: HistoryStatsRow[]): HistoryStats {
   const misses = scored.filter(r => r.hit === false);
   const structureHitRate = scored.length
     ? (hits.length / scored.length) * 100
+    : null;
+  const consensusScored = rows.filter(r => r.consensus_hit === true || r.consensus_hit === false);
+  const consensusHits = consensusScored.filter(r => r.consensus_hit === true);
+  const consensusMisses = consensusScored.filter(r => r.consensus_hit === false);
+  const consensusHitRate = consensusScored.length
+    ? (consensusHits.length / consensusScored.length) * 100
     : null;
 
   const recentMisses = misses
@@ -75,6 +90,10 @@ export function computeHistoryStats(rows: HistoryStatsRow[]): HistoryStats {
     hits: hits.length,
     misses: misses.length,
     structureHitRate,
+    consensusScored: consensusScored.length,
+    consensusHits: consensusHits.length,
+    consensusMisses: consensusMisses.length,
+    consensusHitRate,
     recentMisses,
   };
 }

@@ -15,6 +15,11 @@ export type HistoryRow = {
   next_day_close_pct: number | null;
   trade_pnl: number | null;
   hit: boolean | null;
+  consensus_verdict?: string | null;
+  consensus_direction?: string | null;
+  consensus_confidence?: number | null;
+  consensus_trade_type?: string | null;
+  consensus_hit?: boolean | null;
 };
 
 function ScoreCell({ value }: { value: number }) {
@@ -51,6 +56,27 @@ function HitCell({
   return <span className="text-fg-dim text-xs">—</span>;
 }
 
+function FinalVerdictMini({ r }: { r: HistoryRow }) {
+  if (!r.consensus_verdict) return null;
+  const tone =
+    r.consensus_verdict === 'GO' && r.consensus_direction === 'UP' ? 'text-signal-buy' :
+    r.consensus_verdict === 'GO' && r.consensus_direction === 'DOWN' ? 'text-signal-sell' :
+    r.consensus_verdict === 'WATCH' ? 'text-signal-watch' :
+    'text-fg-muted';
+  const hit =
+    r.consensus_hit === true ? ' HIT' :
+    r.consensus_hit === false ? ' MISS' :
+    '';
+  return (
+    <span className={`text-[10px] tracking-wide ${tone}`}>
+      FINAL {r.consensus_verdict}
+      {r.consensus_direction ? ` ${r.consensus_direction}` : ''}
+      {r.consensus_confidence ? ` ${r.consensus_confidence}/10` : ''}
+      {hit}
+    </span>
+  );
+}
+
 function HistoryMobileCard({ r }: { r: HistoryRow }) {
   return (
     <Link
@@ -68,6 +94,9 @@ function HistoryMobileCard({ r }: { r: HistoryRow }) {
       {r.final_action ? (
         <div className="mb-2 w-full [&_span]:block [&_span]:w-full [&_span]:text-center">
           <FinalActionBadge action={r.final_action} />
+          <div className="mt-1 text-center">
+            <FinalVerdictMini r={r} />
+          </div>
         </div>
       ) : (
         <p className="mb-2 text-xs text-fg-dim">—</p>
@@ -167,12 +196,13 @@ export function HistoryList({ rows }: { rows: HistoryRow[] }) {
             <div className="col-span-1 text-xs">
               <ScoreCell value={r.composite_score} />
             </div>
-            <div className="col-span-2 flex items-center min-w-0">
+            <div className="col-span-2 min-w-0 space-y-1">
               {r.final_action ? (
                 <FinalActionBadge action={r.final_action} />
               ) : (
                 <span className="text-fg-dim text-xs">—</span>
               )}
+              <FinalVerdictMini r={r} />
             </div>
             <div className="col-span-1 text-xs text-fg-muted">
               {r.expected_move_pct != null ? `±${r.expected_move_pct.toFixed(1)}%` : '—'}

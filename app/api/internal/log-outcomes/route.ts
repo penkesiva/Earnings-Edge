@@ -19,25 +19,102 @@ import { getEarningsSurprises } from '@/lib/fmp';
 import { getHistoricalBars } from '@/lib/alpaca';
 import { addCalendarDays, earningsSessionDate } from '@/lib/earningsDate';
 import { isScorableStructure } from '@/lib/historyStats';
+import { parseSynthesisResponse } from '@/lib/aiConsensus';
 
 export const maxDuration = 120;
+
+function parseConfidence(raw: string | null): number | null {
+  if (!raw) return null;
+  const n = parseInt(raw.match(/\d+/)?.[0] ?? '', 10);
+  return Number.isFinite(n) ? Math.min(10, Math.max(1, n)) : null;
+}
+
+function consensusHit(
+  direction: string | null,
+  nextDayClosePct: number | null,
+): boolean | null {
+  if (nextDayClosePct == null) return null;
+  if (direction === 'UP') return nextDayClosePct > 2;
+  if (direction === 'DOWN') return nextDayClosePct < -2;
+  return null;
+}
 
 export async function POST() {
   const sb = supabaseAdmin();
   const today = earningsSessionDate();
 
+  const baseOutcomeSelect =
+    'brief_id, ticker, earnings_date, final_action, expected_move_pct, beat_or_miss, surprise_pct, next_day_close_pct';
+  const outcomeSelect =
+    'brief_id, ticker, earnings_date, final_action, expected_move_pct, beat_or_miss, surprise_pct, next_day_close_pct, consensus_verdict';
+
   // Past briefs missing EPS and/or next-day price (re-run fills gaps as data arrives)
-  const { data: briefs, error: briefErr } = await sb
+  let supportsConsensusOutcomes = true;
+  let { data: pendingBriefs, error: briefErr } = await sb
     .from('v_brief_outcomes')
-    .select(
-      'brief_id, ticker, earnings_date, final_action, expected_move_pct, beat_or_miss, surprise_pct, next_day_close_pct'
-    )
+    .select(outcomeSelect)
     .lt('earnings_date', today)
     .or('beat_or_miss.is.null,next_day_close_pct.is.null')
     .limit(20);
 
+  if (briefErr && /consensus_verdict/i.test(briefErr.message)) {
+    supportsConsensusOutcomes = false;
+    const retry = await sb
+      .from('v_brief_outcomes')
+      .select(baseOutcomeSelect)
+      .lt('earnings_date', today)
+      .or('beat_or_miss.is.null,next_day_close_pct.is.null')
+      .limit(20);
+    pendingBriefs = retry.data as typeof pendingBriefs;
+    briefErr = retry.error;
+  }
+
   if (briefErr) return NextResponse.json({ error: briefErr.message }, { status: 500 });
+
+  // Backfill saved Final Verdict fields for rows that already have EPS/price.
+  const { data: consensusCandidates } = supportsConsensusOutcomes
+    ? await sb
+      .from('v_brief_outcomes')
+      .select(outcomeSelect)
+      .lt('earnings_date', today)
+      .not('next_day_close_pct', 'is', null)
+      .is('consensus_verdict', null)
+      .limit(40)
+    : { data: [] };
+
+  const candidateIds = (consensusCandidates ?? []).map(b => b.brief_id as string);
+  const { data: candidateConsensusRows } = candidateIds.length
+    ? await sb
+      .from('brief_ai_analyses')
+      .select('brief_id')
+      .eq('provider', 'consensus')
+      .in('brief_id', candidateIds)
+    : { data: [] };
+  const candidateConsensusIds = new Set(
+    (candidateConsensusRows ?? []).map(r => r.brief_id as string)
+  );
+
+  const byId = new Map<string, NonNullable<typeof pendingBriefs>[number]>();
+  for (const brief of pendingBriefs ?? []) byId.set(brief.brief_id as string, brief);
+  for (const brief of consensusCandidates ?? []) {
+    if (candidateConsensusIds.has(brief.brief_id as string)) {
+      byId.set(brief.brief_id as string, brief as NonNullable<typeof pendingBriefs>[number]);
+    }
+  }
+  const briefs = Array.from(byId.values()).slice(0, 20);
+
   if (!briefs?.length) return NextResponse.json({ count: 0, message: 'No pending outcomes.' });
+
+  const briefIds = briefs.map(b => b.brief_id as string);
+  const { data: consensusRows } = await sb
+    .from('brief_ai_analyses')
+    .select('brief_id, analysis_text')
+    .eq('provider', 'consensus')
+    .in('brief_id', briefIds);
+
+  const consensusByBrief = new Map(
+    (consensusRows ?? []).map(r => [r.brief_id as string, r.analysis_text as string])
+  );
 
   const results: { ticker: string; status: string; detail?: string }[] = [];
 
@@ -118,21 +195,36 @@ export async function POST() {
         }
       }
 
+      const consensusText = supportsConsensusOutcomes
+        ? consensusByBrief.get(brief.brief_id as string)
+        : undefined;
+      const consensus = consensusText ? parseSynthesisResponse(consensusText) : null;
+      const consensusDirection = consensus?.direction ?? null;
+      const consensusHitValue = consensusHit(consensusDirection, nextDayClosePct);
+      const outcomePayload = {
+        brief_id: brief.brief_id,
+        ticker,
+        earnings_date: earningsDate,
+        beat_or_miss: beatOrMiss,
+        surprise_pct: surprisePct,
+        next_day_open_pct: nextDayOpenPct,
+        next_day_close_pct: nextDayClosePct,
+        final_action: finalAction,
+        hit,
+        ...(supportsConsensusOutcomes ? {
+          consensus_verdict: consensus?.verdict ?? null,
+          consensus_direction: consensusDirection,
+          consensus_confidence: parseConfidence(consensus?.confidence ?? null),
+          consensus_trade_type: consensus?.tradePlan?.type ?? consensus?.trade ?? null,
+          consensus_hit: consensusHitValue,
+        } : {}),
+      };
+
       // ── Upsert outcome row ───────────────────────────────────────────────────
       const { error: upsertErr } = await sb
         .from('earnings_outcomes')
         .upsert(
-          {
-            brief_id: brief.brief_id,
-            ticker,
-            earnings_date: earningsDate,
-            beat_or_miss: beatOrMiss,
-            surprise_pct: surprisePct,
-            next_day_open_pct: nextDayOpenPct,
-            next_day_close_pct: nextDayClosePct,
-            final_action: finalAction,
-            hit,
-          },
+          outcomePayload,
           { onConflict: 'brief_id' }
         );
 

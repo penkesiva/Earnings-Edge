@@ -9,6 +9,7 @@ import type { AiBriefPayload } from '@/components/AiBriefAnalysis';
 import {
   buildSystemSummary,
   computeDeterministicConsensus,
+  parseSynthesisResponse,
 } from '@/lib/aiConsensus';
 import { parseScanRequestBody } from '@/lib/parseScanRequest';
 import { assertScanRunAllowed } from '@/lib/tickerScanLock';
@@ -35,8 +36,11 @@ Rules:
 - When whale/screenshot intel appears in the user message, WHALE must not be — ; WHY must mention it (confirm, contradict, or neutral).
 - When no whale intel in the user message, set WHALE: —
 - Do not ignore the system when 3 LLMs agree but system screams conflict (→ NO-GO or WATCH).
-- When 3/3 LLMs agree on direction AND system leans same way → strong GO.
+- When 3/3 LLMs agree on direction AND system leans same way → strong lean; use GO only when beat score/quality also supports it.
+- System SKIP_CONFLICT or SKIP_ASYMMETRIC_* caps the verdict at NO-GO/WATCH unless beat score ≥70 and model confidence is ≥8/10.
+- Beat score <70 caps directional consensus at WATCH unless confidence is ≥8/10 and the system is not a skip.
 - IV rank ≥ 80: favor premium-selling structures over naked long options unless unanimous high-confidence directional GO.
+- If the system or 2+ analysts prefer premium selling, do not output a debit spread; use the credit spread direction or NONE.
 - Separate beat probability from stock direction (sell-the-news is valid).
 - If models split on UP vs DOWN → NO-GO.
 - Be decisive. No hedging paragraphs.
@@ -64,6 +68,93 @@ TRADE rules:
 - IV rank ≥ 80: prefer credit spreads / premium sell over naked long options unless unanimous high-confidence directional GO.
 
 Do not add ALIGNMENT or any fields beyond the lines above.`;
+
+function replaceLine(text: string, key: string, value: string): string {
+  const re = new RegExp(`^${key}:\\s*.*$`, 'im');
+  return re.test(text) ? text.replace(re, `${key}: ${value}`) : `${text}\n${key}: ${value}`;
+}
+
+function noneTrade(text: string): string {
+  let out = text;
+  out = replaceLine(out, 'TRADE TYPE', 'NONE');
+  out = replaceLine(out, 'TRADE EXPIRY', '—');
+  out = replaceLine(out, 'TRADE LEG 1', '—');
+  out = replaceLine(out, 'TRADE LEG 2', '—');
+  out = replaceLine(out, 'TRADE LEG 3', '—');
+  out = replaceLine(out, 'TRADE LEG 4', '—');
+  out = replaceLine(out, 'TRADE LIMIT', '—');
+  return out;
+}
+
+function countPremiumSellPreferences(
+  brief: AiBriefPayload,
+  analyses: Partial<Record<'openai' | 'gemini' | 'claude', string>>,
+): number {
+  const systemPrefersPremium =
+    brief.final_action === 'PUT_CREDIT_SPREAD' ||
+    brief.final_action === 'CALL_CREDIT_SPREAD' ||
+    brief.final_action === 'IRON_CONDOR' ||
+    /sell premium|credit spread|sell vol/i.test(brief.final_action_rationale ?? '');
+
+  const modelVotes = Object.values(analyses).filter(text =>
+    /sell premium|credit spread|put credit|call credit|bull put|bear call|sell (?:out-of-the-money |otm )?(?:puts|calls)/i
+      .test(text ?? '')
+  ).length;
+
+  return (systemPrefersPremium ? 1 : 0) + modelVotes;
+}
+
+function guardSynthesisText(
+  text: string,
+  brief: AiBriefPayload,
+  analyses: Partial<Record<'openai' | 'gemini' | 'claude', string>>,
+  pre: ReturnType<typeof computeDeterministicConsensus>,
+): string {
+  const parsed = parseSynthesisResponse(text);
+  let out = text;
+
+  const action = brief.final_action ?? '';
+  const score = brief.composite_score ?? 0;
+  const avgConfidence = pre.avgConfidence ?? 0;
+  const systemSkip = action.startsWith('SKIP');
+  const exceptionalGo = score >= 70 && avgConfidence >= 8;
+  const lowQualityGo = score > 0 && score < 70 && avgConfidence < 8;
+  const tradeType = parsed.tradePlan?.type?.toUpperCase() ?? '';
+  const isDebitSpread = /\b(?:CALL|PUT) DEBIT SPREAD\b/.test(tradeType);
+  const premiumSellVotes = countPremiumSellPreferences(brief, analyses);
+
+  if (parsed.verdict === 'GO' && systemSkip && !exceptionalGo) {
+    out = replaceLine(out, 'VERDICT', action === 'SKIP_CONFLICT' ? 'NO-GO' : 'WATCH');
+    out = replaceLine(out, 'CONFIDENCE', `${Math.min(6, Math.max(3, Math.round(avgConfidence || 5)))}/10`);
+    out = replaceLine(
+      out,
+      'WHY',
+      'System skip/asymmetric-risk guard blocks GO despite directional model alignment.'
+    );
+    out = noneTrade(out);
+  } else if (parsed.verdict === 'GO' && lowQualityGo) {
+    out = replaceLine(out, 'VERDICT', 'WATCH');
+    out = replaceLine(out, 'CONFIDENCE', `${Math.min(6, Math.max(3, Math.round(avgConfidence || 5)))}/10`);
+    out = replaceLine(
+      out,
+      'WHY',
+      'Directional lean is not strong enough for GO with a sub-70 beat score.'
+    );
+    out = noneTrade(out);
+  }
+
+  if (isDebitSpread && premiumSellVotes >= 2) {
+    out = replaceLine(out, 'VERDICT', 'WATCH');
+    out = replaceLine(
+      out,
+      'WHY',
+      'Premium-selling consensus blocks debit-spread entry; wait or use the system credit structure.'
+    );
+    out = noneTrade(out);
+  }
+
+  return out;
+}
 
 export async function POST(req: NextRequest) {
   const key = process.env.OPENAI_API_KEY;
@@ -163,12 +254,14 @@ export async function POST(req: NextRequest) {
   }
 
   const json = await upstream.json();
-  const text =
+  const rawText =
     (json.choices?.[0]?.message?.content as string | undefined)?.trim() ?? '';
 
-  if (!text) {
+  if (!rawText) {
     return NextResponse.json({ error: 'Empty synthesis response' }, { status: 502 });
   }
+
+  const text = guardSynthesisText(rawText, brief, analyses, pre);
 
   return NextResponse.json({ text, preVote: pre });
 }

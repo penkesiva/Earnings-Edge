@@ -30,6 +30,11 @@ export default async function HistoryPage() {
     next_day_close_pct: r.next_day_close_pct,
     trade_pnl: r.trade_pnl,
     hit: r.hit,
+    consensus_verdict: r.consensus_verdict,
+    consensus_direction: r.consensus_direction,
+    consensus_confidence: r.consensus_confidence,
+    consensus_trade_type: r.consensus_trade_type,
+    consensus_hit: r.consensus_hit,
   }));
 
   const stats = computeHistoryStats(historyRows);

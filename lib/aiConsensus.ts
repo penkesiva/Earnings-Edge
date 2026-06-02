@@ -166,19 +166,20 @@ export function computeDeterministicConsensus(
   const unanimous = (direction === 'UP' && up === total) || (direction === 'DOWN' && down === total);
   const strong = direction != null && Math.max(up, down) >= 3 && total >= 3;
 
-  const skip =
-    brief.final_action?.startsWith('SKIP') &&
-    brief.final_action !== 'SKIP_ASYMMETRIC_DOWNSIDE_RISK' &&
-    brief.final_action !== 'SKIP_ASYMMETRIC_UPSIDE_RISK';
+  const action = brief.final_action ?? '';
+  const skip = action.startsWith('SKIP');
+  const score = brief.composite_score ?? 0;
 
   const split = up > 0 && down > 0;
   const avgConfidence =
     confidences.length > 0
       ? Math.round((confidences.reduce((a, b) => a + b, 0) / confidences.length) * 10) / 10
       : null;
+  const lowQualityGo = score > 0 && score < 70 && (avgConfidence == null || avgConfidence < 8);
 
   let verdict: VerdictCall = 'WATCH';
   if (split || (skip && !strong)) verdict = 'NO-GO';
+  else if (skip || lowQualityGo) verdict = direction ? 'WATCH' : 'NO-GO';
   else if (strong || unanimous) verdict = 'GO';
   else if (direction && Math.max(up, down) >= 2) verdict = 'WATCH';
 
@@ -265,12 +266,25 @@ export function buildAlignmentChips(
     chips.push({ label: 'Whale', direction: inferWhaleDirection(intel) });
   }
 
-  const dirLabel = consensusDirection?.toLowerCase() ?? 'mixed';
-  const aligned =
-    consensusDirection && consensusDirection !== 'NEUTRAL'
-      ? chips.filter(c => c.direction === consensusDirection).length
-      : 0;
-  const summary = `${aligned}/${chips.length} ${dirLabel}`;
+  const known = chips.filter(c => c.direction != null);
+  const up = known.filter(c => c.direction === 'UP').length;
+  const down = known.filter(c => c.direction === 'DOWN').length;
+  const neutral = known.filter(c => c.direction === 'NEUTRAL').length;
+
+  let summary: string;
+  if (!known.length) {
+    summary = `0/${chips.length} mixed`;
+  } else if (consensusDirection && consensusDirection !== 'NEUTRAL') {
+    const aligned = known.filter(c => c.direction === consensusDirection).length;
+    summary = `${aligned}/${chips.length} ${consensusDirection.toLowerCase()}`;
+  } else {
+    const parts = [
+      up ? `${up}↑` : null,
+      down ? `${down}↓` : null,
+      neutral ? `${neutral} neutral` : null,
+    ].filter(Boolean);
+    summary = parts.length ? parts.join(' · ') : `${known.length}/${chips.length} mixed`;
+  }
 
   return { summary, chips };
 }
