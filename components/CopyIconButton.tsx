@@ -70,7 +70,7 @@ export function CopyIconButton({
       disabled={!text.trim()}
       title={copied ? 'Copied!' : label}
       aria-label={copied ? 'Copied' : label}
-      className="icon-action-btn text-fg-dim hover:text-fg disabled:opacity-30 disabled:cursor-not-allowed"
+      className="icon-action-btn text-fg-muted border border-border bg-bg-elevated hover:text-fg hover:border-fg-subtle hover:bg-bg-hover disabled:opacity-30 disabled:cursor-not-allowed"
     >
       {copied ? <IconCheck /> : <IconCopy />}
     </button>
