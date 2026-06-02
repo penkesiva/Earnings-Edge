@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AiBriefPayload } from '@/components/AiBriefAnalysis';
 import { CopyIconButton } from '@/components/CopyIconButton';
 import { DirectionIndicator } from '@/components/DirectionIndicator';
+import { ResponseTimeStamp } from '@/components/ResponseTimeStamp';
 import {
   buildAlignmentChips,
   finalVerdictPanelBorder,
@@ -98,6 +99,7 @@ export function ConsensusVerdict({
   brief,
   analyses,
   savedText,
+  savedAt,
   autoRunSignal,
   scanRunId,
   onComplete,
@@ -107,6 +109,8 @@ export function ConsensusVerdict({
   brief: AiBriefPayload;
   analyses: Partial<Record<'openai' | 'gemini' | 'claude', string>>;
   savedText?: string;
+  /** When saved verdict was synthesized (DB `analyzed_at`). */
+  savedAt?: string | null;
   autoRunSignal: number;
   scanRunId?: string | null;
   /** Called when synthesis finishes successfully (ISO timestamp). */
@@ -117,13 +121,15 @@ export function ConsensusVerdict({
   const [state, setState] = useState<PanelState>('idle');
   const [text, setText] = useState('');
   const [error, setError] = useState('');
+  const [responseAt, setResponseAt] = useState<string | null>(null);
 
   useEffect(() => {
     if (savedText) {
       setText(savedText);
       setState('done');
+      if (savedAt) setResponseAt(savedAt);
     }
-  }, [savedText]);
+  }, [savedText, savedAt]);
 
   const run = useCallback(async () => {
     const filled = (['openai', 'gemini', 'claude'] as const).filter(p => analyses[p]?.trim());
@@ -137,6 +143,7 @@ export function ConsensusVerdict({
 
     setState('loading');
     setError('');
+    setResponseAt(null);
 
     try {
       const res = await fetch('/api/internal/synthesis-analysis', {
@@ -159,7 +166,9 @@ export function ConsensusVerdict({
       const out = data.text as string;
       setText(out);
       setState('done');
-      onComplete?.(new Date().toISOString());
+      const at = new Date().toISOString();
+      setResponseAt(at);
+      onComplete?.(at);
 
       fetch('/api/internal/save-ai-analysis', {
         method: 'POST',
@@ -236,7 +245,7 @@ export function ConsensusVerdict({
   const copyText = formatConsensusForCopy(parsed, whyText, alignSummary, brief.ticker, whaleText);
 
   return (
-    <div className={`border px-4 py-3 space-y-2 ${finalVerdictPanelBorder(parsed.verdict, parsed.direction)}`}>
+    <div className={`relative border px-4 py-3 pb-6 space-y-2 ${finalVerdictPanelBorder(parsed.verdict, parsed.direction)}`}>
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2">
           <span className="final-verdict-label">Final verdict</span>
@@ -312,6 +321,7 @@ export function ConsensusVerdict({
           </span>
         ))}
       </p>
+      <ResponseTimeStamp at={responseAt} className="absolute bottom-2 right-3" />
     </div>
   );
 }

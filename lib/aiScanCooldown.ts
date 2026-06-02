@@ -37,3 +37,36 @@ export function formatScanAge(isoTs: string): string {
     timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
   });
 }
+
+const RESPONSE_TIME_ZONE = 'America/Los_Angeles';
+
+/** When an AI panel or final verdict finished — shown bottom-right of each block. */
+export function formatResponseTime(isoTs: string): string {
+  const d = new Date(isoTs);
+  if (Number.isNaN(d.getTime())) return '';
+
+  const dayInTz = (date: Date) =>
+    date.toLocaleDateString('en-US', {
+      timeZone: RESPONSE_TIME_ZONE,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    });
+
+  const sameDay = dayInTz(d) === dayInTz(new Date());
+  const time = d.toLocaleString('en-US', {
+    timeZone: RESPONSE_TIME_ZONE,
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+
+  if (sameDay) return `${time} PT`;
+
+  const date = d.toLocaleString('en-US', {
+    timeZone: RESPONSE_TIME_ZONE,
+    month: 'short',
+    day: 'numeric',
+  });
+  return `${date} · ${time} PT`;
+}

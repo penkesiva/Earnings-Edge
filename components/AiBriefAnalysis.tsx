@@ -15,6 +15,10 @@ export type SavedAnalyses = Partial<
   Record<'openai' | 'gemini' | 'claude' | 'consensus', string>
 >;
 
+export type SavedAnalysisTimes = Partial<
+  Record<'openai' | 'gemini' | 'claude' | 'consensus', string>
+>;
+
 export type AiBriefPayload = {
   brief_id: string;
   ticker: string;
@@ -58,6 +62,7 @@ export type AiBriefPayload = {
 export function AiBriefAnalysis({
   brief,
   savedAnalyses,
+  savedAnalysisAt,
   lastAiScanAt,
   lastConsensusAt,
   whaleIntel,
@@ -65,6 +70,7 @@ export function AiBriefAnalysis({
 }: {
   brief: AiBriefPayload;
   savedAnalyses?: SavedAnalyses;
+  savedAnalysisAt?: SavedAnalysisTimes;
   lastAiScanAt?: string | null;
   lastConsensusAt?: string | null;
   systemScanAt?: string | null;
@@ -75,6 +81,7 @@ export function AiBriefAnalysis({
     <ScanAllPipeline
       brief={brief}
       savedAnalyses={savedAnalyses}
+      savedAnalysisAt={savedAnalysisAt}
       lastAiScanAt={lastAiScanAt}
       lastConsensusAt={lastConsensusAt}
       whaleIntel={whaleIntel}

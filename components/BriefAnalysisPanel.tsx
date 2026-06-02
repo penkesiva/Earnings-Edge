@@ -1,19 +1,21 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import { AiBriefAnalysis, type AiBriefPayload, type SavedAnalyses } from '@/components/AiBriefAnalysis';
+import { AiBriefAnalysis, type AiBriefPayload, type SavedAnalyses, type SavedAnalysisTimes } from '@/components/AiBriefAnalysis';
 import { BriefIntelImages } from '@/components/BriefIntelImages';
 import type { IntelImageItem, WhaleIntelContext } from '@/lib/intelImages';
 
 export function BriefAnalysisPanel({
   brief,
   savedAnalyses,
+  savedAnalysisAt,
   lastAiScanAt,
   lastConsensusAt,
   systemScanAt,
 }: {
   brief: AiBriefPayload;
   savedAnalyses?: SavedAnalyses;
+  savedAnalysisAt?: SavedAnalysisTimes;
   lastAiScanAt?: string | null;
   lastConsensusAt?: string | null;
   systemScanAt?: string | null;
@@ -35,6 +37,7 @@ export function BriefAnalysisPanel({
       <AiBriefAnalysis
         brief={brief}
         savedAnalyses={savedAnalyses}
+        savedAnalysisAt={savedAnalysisAt}
         lastAiScanAt={lastAiScanAt}
         lastConsensusAt={lastConsensusAt}
         systemScanAt={systemScanAt}

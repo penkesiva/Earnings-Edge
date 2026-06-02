@@ -1,11 +1,12 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { SavedAnalyses } from '@/components/AiBriefAnalysis';
+import type { SavedAnalyses, SavedAnalysisTimes } from '@/components/AiBriefAnalysis';
 
 const PROVIDERS = ['openai', 'gemini', 'claude', 'consensus'] as const;
 const MODEL_PROVIDERS = ['openai', 'gemini', 'claude'] as const;
 
 export type LoadedBriefAi = {
   analyses: SavedAnalyses;
+  analysisAt: SavedAnalysisTimes;
   /** Latest `analyzed_at` across GPT / Gemini / Claude. */
   lastAiScanAt: string | null;
   /** When final verdict (consensus) was last synthesized. */
@@ -71,19 +72,21 @@ export async function loadBriefAiAnalyses(
   }
 
   const saved: SavedAnalyses = {};
+  const analysisAt: SavedAnalysisTimes = {};
   let lastAiScanAt: string | null = null;
   let lastConsensusAt: string | null = null;
   for (const row of rows) {
     const p = row.provider as string;
+    const at = (row.analyzed_at as string | null) ?? null;
     if ((PROVIDERS as readonly string[]).includes(p)) {
       saved[p as keyof SavedAnalyses] = row.analysis_text as string;
+      if (at) analysisAt[p as keyof SavedAnalysisTimes] = at;
     }
-    if ((MODEL_PROVIDERS as readonly string[]).includes(p) && row.analyzed_at) {
-      const at = row.analyzed_at as string;
+    if ((MODEL_PROVIDERS as readonly string[]).includes(p) && at) {
       if (!lastAiScanAt || at > lastAiScanAt) lastAiScanAt = at;
     }
-    if (p === 'consensus' && row.analyzed_at) {
-      lastConsensusAt = row.analyzed_at as string;
+    if (p === 'consensus' && at) {
+      lastConsensusAt = at;
     }
   }
 
@@ -91,5 +94,5 @@ export async function loadBriefAiAnalyses(
     console.log('[brief-ai] loaded for', briefId, '→', Object.keys(saved).join(', '));
   }
 
-  return { analyses: saved, lastAiScanAt, lastConsensusAt };
+  return { analyses: saved, analysisAt, lastAiScanAt, lastConsensusAt };
 }

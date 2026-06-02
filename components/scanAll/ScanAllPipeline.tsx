@@ -9,10 +9,11 @@ import {
   type ReactNode,
 } from 'react';
 import { useRouter } from 'next/navigation';
-import type { AiBriefPayload, SavedAnalyses } from '@/components/AiBriefAnalysis';
+import type { AiBriefPayload, SavedAnalyses, SavedAnalysisTimes } from '@/components/AiBriefAnalysis';
 import { ConsensusVerdict } from '@/components/ConsensusVerdict';
 import { CopyIconButton } from '@/components/CopyIconButton';
 import { DirectionIndicator } from '@/components/DirectionIndicator';
+import { ResponseTimeStamp } from '@/components/ResponseTimeStamp';
 import type { WhaleIntelContext } from '@/lib/intelImages';
 import {
   formatCooldownWait,
@@ -189,6 +190,7 @@ function AnalysisBlock({
   runSignal,
   scanRunId,
   savedText,
+  savedAt,
   onComplete,
   onTerminal,
 }: {
@@ -197,12 +199,14 @@ function AnalysisBlock({
   runSignal: number;
   scanRunId: string | null;
   savedText?: string;
+  savedAt?: string | null;
   onComplete?: (provider: Provider, text: string) => void;
   onTerminal?: (provider: Provider) => void;
 }) {
   const [state, setState] = useState<PanelState>('idle');
   const [text, setText] = useState('');
   const [error, setError] = useState('');
+  const [responseAt, setResponseAt] = useState<string | null>(null);
   const runningRef = useRef(false);
   const lastRunSignal = useRef(0);
   const stateRef = useRef<PanelState>('idle');
@@ -215,8 +219,9 @@ function AnalysisBlock({
     if (savedText) {
       setText(savedText);
       setStateSync('done');
+      if (savedAt) setResponseAt(savedAt);
     }
-  }, [savedText]);
+  }, [savedText, savedAt]);
 
   const cfg = CONFIGS[provider];
   const c = cfg.color;
@@ -227,6 +232,7 @@ function AnalysisBlock({
     setStateSync('loading');
     setText('');
     setError('');
+    setResponseAt(null);
 
     try {
       const res = await fetch(cfg.endpoint, {
@@ -274,7 +280,11 @@ function AnalysisBlock({
         }
       }
       setStateSync('done');
-      if (accText) onComplete?.(provider, accText);
+      if (accText) {
+        const at = new Date().toISOString();
+        setResponseAt(at);
+        onComplete?.(provider, accText);
+      }
 
       if (accText && brief.brief_id) {
         fetch('/api/internal/save-ai-analysis', {
@@ -314,7 +324,7 @@ function AnalysisBlock({
     !!effectiveText && (effectiveState === 'done' || effectiveState === 'streaming');
 
   return (
-    <div className="pt-3 border-t border-border-subtle">
+    <div className="pt-3 border-t border-border-subtle relative pb-5">
       <div className="flex items-center gap-2 mb-2 flex-wrap">
         <span className={c.label}>{cfg.label}</span>
         {showDirection && <DirectionIndicator text={effectiveText} />}
@@ -344,6 +354,7 @@ function AnalysisBlock({
           dotClass={c.dot}
         />
       )}
+      <ResponseTimeStamp at={responseAt} className="absolute bottom-0 right-0" />
     </div>
   );
 }
@@ -396,6 +407,7 @@ export type ScanAllControls = {
 export function ScanAllPipeline({
   brief,
   savedAnalyses,
+  savedAnalysisAt,
   lastAiScanAt,
   lastConsensusAt,
   whaleIntel,
@@ -405,6 +417,7 @@ export function ScanAllPipeline({
 }: {
   brief: AiBriefPayload;
   savedAnalyses?: SavedAnalyses;
+  savedAnalysisAt?: SavedAnalysisTimes;
   lastAiScanAt?: string | null;
   lastConsensusAt?: string | null;
   whaleIntel?: WhaleIntelContext | null;
@@ -796,6 +809,7 @@ export function ScanAllPipeline({
           brief={briefForAi}
           analyses={modelTexts}
           savedText={scanInFlight ? undefined : savedAnalyses?.consensus}
+          savedAt={scanInFlight ? undefined : savedAnalysisAt?.consensus ?? lastConsensusAt}
           autoRunSignal={consensusSignal}
           scanRunId={scanRunId}
           onComplete={handleConsensusComplete}
@@ -810,6 +824,7 @@ export function ScanAllPipeline({
             runSignal={signals[p]}
             scanRunId={scanRunId}
             savedText={scanInFlight ? undefined : savedAnalyses?.[p]}
+            savedAt={scanInFlight ? undefined : savedAnalysisAt?.[p]}
             onComplete={handleComplete}
             onTerminal={handleTerminal}
           />
