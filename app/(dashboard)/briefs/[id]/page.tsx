@@ -5,6 +5,7 @@ import { FinalActionBadge, SignalBadge } from '@/components/SignalBadge';
 import { ScreamTestCard } from '@/components/ScreamTestCard';
 import { ScanDiffBanner } from '@/components/ScanDiffBanner';
 import { BriefAnalysisPanel } from '@/components/BriefAnalysisPanel';
+import { BriefSystemRow } from '@/components/BriefSystemRow';
 import { loadBriefAiAnalyses } from '@/lib/loadBriefAiAnalyses';
 import { getStockSnapshot } from '@/lib/alpaca';
 import { getCompanyName } from '@/lib/fmp';
@@ -160,26 +161,35 @@ export default async function BriefPage({
           </div>
           <BriefInsightStrip
             compositeScore={brief.composite_score}
-            finalAction={finalAction}
             ivRank={brief.iv_rank ?? null}
             putCallRatio={brief.put_call_ratio ?? null}
+            overhangs={screamUnresolved}
+            newsOverall={newsOverall}
+            rawHeadlines={rawHeadlines}
+          />
+        </div>
+      </div>
+
+      <BriefAnalysisPanel
+        savedAnalyses={savedAnalyses}
+        savedAnalysisAt={savedAnalysisAt}
+        lastAiScanAt={lastAiScanAt}
+        lastConsensusAt={lastConsensusAt}
+        systemScanAt={systemScanAt}
+        systemRow={
+          <BriefSystemRow
+            compositeScore={brief.composite_score}
+            finalAction={finalAction}
+            ivRank={brief.iv_rank ?? null}
             expectedMovePct={brief.expected_move_pct ?? null}
             expectedMoveDollar={brief.expected_move_dollar ?? null}
             spot={brief.spot_price ?? null}
             preferredExpiry={preferredExpiry}
             screamDirection={brief.scream_direction ?? null}
             screamScore={brief.scream_score ?? null}
-            overhangs={screamUnresolved}
-            newsOverall={newsOverall}
-            rawHeadlines={rawHeadlines}
           />
-          <BriefAnalysisPanel
-            savedAnalyses={savedAnalyses}
-            savedAnalysisAt={savedAnalysisAt}
-            lastAiScanAt={lastAiScanAt}
-            lastConsensusAt={lastConsensusAt}
-            systemScanAt={systemScanAt}
-            brief={{
+        }
+        brief={{
             brief_id:                 brief.id,
             ticker:                   brief.ticker,
             earnings_date:            brief.earnings_date,
@@ -207,9 +217,8 @@ export default async function BriefPage({
             news_sentiment:           newsOverall,
             spot_price:               brief.spot_price ?? null,
             suggested_structure:      structure ?? null,
-          }} />
-        </div>
-      </div>
+          }}
+      />
 
       {/* ── Flip banner (above everything else when critical) ──────────────── */}
       <ScanDiffBanner ticker={brief.ticker} scans={scanRows} />
@@ -823,20 +832,11 @@ function ComponentBar({ label, value }: { label: string; value: number | null })
 // ── Brief Insight Strip ───────────────────────────────────────────────────────
 
 function BriefInsightStrip({
-  compositeScore, finalAction, ivRank, putCallRatio,
-  expectedMovePct, expectedMoveDollar, spot, preferredExpiry,
-  screamDirection, screamScore, overhangs, newsOverall, rawHeadlines,
+  compositeScore, ivRank, putCallRatio, overhangs, newsOverall, rawHeadlines,
 }: {
   compositeScore: number;
-  finalAction: string | null;
   ivRank: number | null;
   putCallRatio: number | null;
-  expectedMovePct: number | null;
-  expectedMoveDollar: number | null;
-  spot: number | null;
-  preferredExpiry: string | null;
-  screamDirection: string | null;
-  screamScore: number | null;
   overhangs: NarrativeOverhang[] | null;
   newsOverall: NewsOverallSentiment | null;
   rawHeadlines: RawHeadline[] | null;
@@ -888,100 +888,8 @@ function BriefInsightStrip({
                    ['LOW',        'text-signal-buy'];
   const ivSub = ivr !== null ? `rank ${ivr}` : '';
 
-  // ── Signal lean (from final action + scream) ──────────────────────────────
-  const bullishActions = new Set([
-    'LONG_CALL', 'CALL_DEBIT_SPREAD', 'PUT_CREDIT_SPREAD', 'BULLISH_WATCH',
-    'SKIP_ASYMMETRIC_UPSIDE_RISK',
-  ]);
-  const bearishActions = new Set([
-    'LONG_PUT', 'PUT_DEBIT_SPREAD', 'CALL_CREDIT_SPREAD', 'BEARISH_WATCH',
-    'SKIP_ASYMMETRIC_DOWNSIDE_RISK',
-  ]);
-
-  const [leanLabel, leanCls] =
-    finalAction && bullishActions.has(finalAction)  ? ['BULLISH ▲',     'text-signal-buy']   :
-    finalAction && bearishActions.has(finalAction)  ? ['BEARISH ▼',     'text-signal-sell']  :
-    finalAction === 'IRON_CONDOR'                   ? ['NEUTRAL ↔',     'text-signal-watch'] :
-    finalAction === 'SKIP_CONFLICT'                 ? ['CONFLICTED',    'text-fg-muted']     :
-                                                      ['UNCLEAR',       'text-fg-dim'];
-
-  // ── Stock direction take ──────────────────────────────────────────────────
-  const isBullish  = finalAction && bullishActions.has(finalAction);
-  const isBearish  = finalAction && bearishActions.has(finalAction);
-  const isNeutral  = finalAction === 'IRON_CONDOR';
-  const isLongCall = finalAction === 'LONG_CALL';
-  const isLongPut  = finalAction === 'LONG_PUT';
-
-  // Dollar range: show ≈$X if available, fallback to %
-  const movePctStr = expectedMovePct ? `±${expectedMovePct.toFixed(1)}%` : null;
-  const moveDolStr = expectedMoveDollar ? `≈$${expectedMoveDollar.toFixed(2)}` : null;
-  const moveStr    = moveDolStr && movePctStr ? `${moveDolStr} (${movePctStr})` : movePctStr ?? null;
-
-  // Strong scream conviction note
-  const screamNote = screamScore && screamScore >= 4 && screamDirection &&
-    screamDirection !== 'none' && screamDirection !== 'mixed'
-    ? ` · ${screamScore}/5 ${screamDirection} chain`
-    : '';
-
-  // IV implication (terse)
-  const ivNote =
-    ivr === null      ? '' :
-    ivr >= 80         ? ' · Extreme IV — sell premium over buying' :
-    ivr >= 60         ? ' · High IV — spreads over naked' :
-                        '';
-
-  let directionTake: string;
-  let directionCls: string;
-  if (isBullish) {
-    directionTake = `Likely UP${moveStr ? ` ${moveStr}` : ''}${screamNote}${ivNote}`;
-    directionCls = 'text-signal-buy';
-  } else if (isBearish) {
-    directionTake = `Likely DOWN${moveStr ? ` ${moveStr}` : ''}${screamNote}${ivNote}`;
-    directionCls = 'text-signal-sell';
-  } else if (isNeutral) {
-    directionTake = `Contained${moveStr ? ` ${moveStr}` : ''} — vol crush expected${ivNote}`;
-    directionCls = 'text-signal-watch';
-  } else {
-    directionTake = `Direction unclear${moveStr ? ` — market pricing ${moveStr}` : ''}${ivNote}`;
-    directionCls = 'text-fg-muted';
-  }
-
-  // ── Beat ↔ direction tension note ─────────────────────────────────────────
-  // Surfaces sell-the-news or buy-the-rumor setups explicitly.
-  let tensionNote: string | null = null;
-  if (isBearish && compositeScore >= 65) {
-    tensionNote = `Beat ${beatLabel} but chain bearish — classic sell-the-news setup`;
-  } else if (isBullish && compositeScore < 40) {
-    tensionNote = `Beat ${beatLabel} but chain bullish — buy-the-rumor momentum play`;
-  } else if (isNeutral && compositeScore >= 65) {
-    tensionNote = `Beat ${beatLabel} — IV crush likely to offset any directional move`;
-  }
-
-  // ── Naked-option suggestion (LONG_CALL / LONG_PUT only) ───────────────────
-  // Compute ATM strike the same way the legs table does: round spot to nearest
-  // standard increment. Also show a slightly OTM alternative for higher leverage.
-  let nakedOptionLine: React.ReactNode = null;
-  if ((isLongCall || isLongPut) && spot !== null && preferredExpiry) {
-    const atmStrike = roundStrike(spot);
-    const otmStrike = isLongCall
-      ? roundStrike(spot + (expectedMoveDollar ?? spot * 0.05) * 0.5)
-      : roundStrike(spot - (expectedMoveDollar ?? spot * 0.05) * 0.5);
-    const type = isLongCall ? 'CALL' : 'PUT';
-    const typeCls = isLongCall ? 'text-signal-buy' : 'text-signal-sell';
-    nakedOptionLine = (
-      <div className={`font-medium ${typeCls}`}>
-        Buy: <span className="font-bold">${atmStrike} {type}</span>{' '}
-        <span className="text-fg-dim">exp {preferredExpiry}</span>
-        <span className="text-fg-dim"> · OTM alt: </span>
-        <span className="font-bold">${otmStrike} {type}</span>
-        <span className="text-fg-dim"> (higher leverage, smaller size)</span>
-      </div>
-    );
-  }
-
   return (
-    <div className="mt-4 pt-3 border-t border-border-subtle space-y-3">
-      {/* 4-cell signal grid */}
+    <div className="mt-4 pt-3 border-t border-border-subtle">
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-2">
         <InsightCell label="BEAT" value={beatLabel} sub={`${compositeScore}/100`} valueCls={beatCls} />
         <InsightCell label="OPTIONS FLOW" shortLabel="FLOW" value={flowLabel} sub={flowSub} valueCls={flowCls} />
@@ -994,25 +902,6 @@ function BriefInsightStrip({
           linkHint="read headlines ↓"
         />
         <InsightCell label="IV ENV" value={ivLabel} sub={ivSub} valueCls={ivCls} />
-      </div>
-
-      {/* System verdict — single crisp line */}
-      <div className="text-xs border-t border-border-subtle pt-2 space-y-1.5">
-        <div className="flex flex-wrap items-baseline gap-x-1 gap-y-0.5">
-          <span className="text-fg-dim tracking-widest shrink-0">System</span>
-          <span className={`font-semibold ${leanCls}`}>{leanLabel}</span>
-        </div>
-        <p className={`leading-relaxed ${directionCls}`}>{directionTake}</p>
-        <a
-          href="#news-sentiment"
-          className="inline-block text-fg-dim hover:text-fg-subtle underline-offset-2 hover:underline"
-        >
-          News ↓
-        </a>
-        {tensionNote && (
-          <div className="text-fg-dim italic">{tensionNote}</div>
-        )}
-        {nakedOptionLine}
       </div>
     </div>
   );

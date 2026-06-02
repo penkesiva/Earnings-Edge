@@ -402,6 +402,8 @@ export type ScanAllControls = {
   scanError: string;
   signalChips: ScanSignalChip[];
   activeBrief: AiBriefPayload;
+  verdictPanel: ReactNode;
+  analysisPanels: ReactNode;
 };
 
 export function ScanAllPipeline({
@@ -781,6 +783,40 @@ export function ScanAllPipeline({
           ? '↻ RESCAN'
           : '✦ SCAN ALL';
 
+  const panelWrap = hidePanels ? 'sr-only' : undefined;
+
+  const verdictPanel = (
+    <ConsensusVerdict
+      brief={briefForAi}
+      analyses={modelTexts}
+      savedText={scanInFlight ? undefined : savedAnalyses?.consensus}
+      savedAt={scanInFlight ? undefined : savedAnalysisAt?.consensus ?? lastConsensusAt}
+      autoRunSignal={consensusSignal}
+      scanRunId={scanRunId}
+      onComplete={handleConsensusComplete}
+      onError={handleConsensusError}
+      hideManualControls
+    />
+  );
+
+  const analysisPanels = (
+    <>
+      {SCAN_ALL_PROVIDERS.map(p => (
+        <AnalysisBlock
+          key={p}
+          provider={p}
+          brief={briefForAi}
+          runSignal={signals[p]}
+          scanRunId={scanRunId}
+          savedText={scanInFlight ? undefined : savedAnalyses?.[p]}
+          savedAt={scanInFlight ? undefined : savedAnalysisAt?.[p]}
+          onComplete={handleComplete}
+          onTerminal={handleTerminal}
+        />
+      ))}
+    </>
+  );
+
   const controls: ScanAllControls = {
     scanAll,
     scanDisabled,
@@ -797,39 +833,19 @@ export function ScanAllPipeline({
     scanError,
     signalChips,
     activeBrief,
+    verdictPanel,
+    analysisPanels,
   };
-
-  const panelWrap = hidePanels ? 'sr-only' : undefined;
 
   return (
     <>
       {children(controls)}
-      <div className={panelWrap} aria-hidden={hidePanels}>
-        <ConsensusVerdict
-          brief={briefForAi}
-          analyses={modelTexts}
-          savedText={scanInFlight ? undefined : savedAnalyses?.consensus}
-          savedAt={scanInFlight ? undefined : savedAnalysisAt?.consensus ?? lastConsensusAt}
-          autoRunSignal={consensusSignal}
-          scanRunId={scanRunId}
-          onComplete={handleConsensusComplete}
-          onError={handleConsensusError}
-          hideManualControls
-        />
-        {SCAN_ALL_PROVIDERS.map(p => (
-          <AnalysisBlock
-            key={p}
-            provider={p}
-            brief={briefForAi}
-            runSignal={signals[p]}
-            scanRunId={scanRunId}
-            savedText={scanInFlight ? undefined : savedAnalyses?.[p]}
-            savedAt={scanInFlight ? undefined : savedAnalysisAt?.[p]}
-            onComplete={handleComplete}
-            onTerminal={handleTerminal}
-          />
-        ))}
-      </div>
+      {hidePanels && (
+        <div className={panelWrap} aria-hidden={hidePanels}>
+          {verdictPanel}
+          {analysisPanels}
+        </div>
+      )}
     </>
   );
 }
