@@ -24,7 +24,7 @@ export function AddTickerForm() {
   const [state, formAction] = useFormState(addTicker, {});
 
   return (
-    <form action={formAction} className="border border-border bg-bg-elevated p-3 sm:p-4 space-y-3">
+    <form action={formAction} className="border border-border bg-bg-elevated p-2.5 sm:p-4 space-y-2.5">
       <div className="w-full min-w-0 sm:max-w-lg">
         <label className="text-xs text-fg-subtle tracking-widest block mb-1.5">TICKER</label>
         <div className="flex gap-2 items-stretch w-full min-w-0">

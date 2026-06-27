@@ -18,7 +18,7 @@ export function DashboardRefresh() {
   }
 
   return (
-    <div className="w-full min-w-0 border border-border bg-bg-elevated px-3 py-3 sm:px-4 text-sm">
+    <div className="w-full min-w-0 border border-border bg-bg-elevated px-2.5 py-2.5 sm:px-4 sm:py-3 text-sm">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
         <div className="flex flex-wrap items-center gap-2 min-w-0">
           <div className="text-xs text-fg-subtle tracking-widest uppercase">Earnings dates</div>

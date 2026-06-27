@@ -50,12 +50,12 @@ export function BatchImportForm() {
 
   return (
     <details className="group border border-border bg-bg-elevated">
-      <summary className="cursor-pointer px-3 sm:px-4 py-3 text-xs tracking-widest text-fg-subtle flex items-center justify-between gap-2 select-none min-w-0">
+      <summary className="cursor-pointer px-2.5 sm:px-4 py-2.5 sm:py-3 text-xs tracking-widest text-fg-subtle flex items-center justify-between gap-2 select-none min-w-0">
         <span className="min-w-0 leading-snug">BATCH IMPORT — paste a schedule</span>
         <span className="text-fg-dim group-open:rotate-180 transition-transform">▾</span>
       </summary>
 
-      <form action={formAction} className="border-t border-border-subtle px-4 pb-4 pt-3 space-y-3">
+      <form action={formAction} className="border-t border-border-subtle px-2.5 sm:px-4 pb-3 sm:pb-4 pt-2.5 space-y-2.5">
         <p className="text-[11px] text-fg-dim tracking-wide font-mono">
           TKR | Date | AMC/BMO
         </p>
