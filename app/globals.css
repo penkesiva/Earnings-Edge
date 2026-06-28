@@ -30,28 +30,28 @@
 
 /* ── Color tokens: light (activated by html.light class via ThemeToggle) ──── */
 html.light {
-  --color-bg:             #d0d0d5;
-  --color-bg-elevated:    #dadade;
-  --color-bg-hover:       #c4c4ca;
-  --color-border:         #a8a8ae;
-  --color-border-subtle:  #b6b6bc;
-  --color-fg:             #0a0a0a;
-  --color-fg-muted:       #3f3f46;
-  --color-fg-subtle:      #52525b;
-  --color-fg-dim:         #71717a;
+  --color-bg:             #faf8f5;
+  --color-bg-elevated:    #ffffff;
+  --color-bg-hover:       #f3f0eb;
+  --color-border:         #e5e2dc;
+  --color-border-subtle:  #eeebe6;
+  --color-fg:             #1c1917;
+  --color-fg-muted:       #44403c;
+  --color-fg-subtle:      #57534e;
+  --color-fg-dim:         #78716c;
 
   --color-tick-yes:       #047857;
-  --color-tick-yes-bg:    rgba(5, 150, 105, 0.22);
+  --color-tick-yes-bg:    rgba(5, 150, 105, 0.14);
   --color-tick-no:        #b91c1c;
-  --color-tick-no-bg:     rgba(220, 38, 38, 0.2);
-  --color-tick-miss:      #3f3f46;
-  --color-tick-miss-bg:   rgba(63, 63, 70, 0.12);
+  --color-tick-no-bg:     rgba(220, 38, 38, 0.12);
+  --color-tick-miss:      #57534e;
+  --color-tick-miss-bg:   rgba(87, 83, 78, 0.1);
 
-  /* Darker signal hues for grey light UI — amber must read on #d0d0d5 */
+  /* Readable signal hues on warm white UI */
   --color-signal-buy:     4 120 87;
   --color-signal-watch:   180 83 9;
   --color-signal-sell:    185 28 28;
-  --color-signal-neutral: 82 82 91;
+  --color-signal-neutral: 87 83 78;
 }
 
 * {
@@ -125,7 +125,7 @@ html.light .scanline::after {
   color: #22c55e;
 }
 
-/* Final verdict alignment ticks — higher contrast on light grey UI */
+/* Final verdict alignment ticks — contrast on light UI */
 .alignment-mark {
   display: inline-flex;
   align-items: center;
