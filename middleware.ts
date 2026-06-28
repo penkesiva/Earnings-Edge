@@ -1,40 +1,64 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { authGateEnabled, isEmailAllowed } from '@/lib/authAllowlist';
+import { getSupabaseAuthUser } from '@/lib/supabase/middleware';
 
-const COOKIE_NAME = 'ee_session';
+const LEGACY_COOKIE = 'ee_session';
 
-/** Paths that bypass the auth gate entirely. */
 function isPublic(pathname: string): boolean {
   return (
     pathname === '/login' ||
     pathname.startsWith('/api/auth/') ||
+    pathname.startsWith('/auth/') ||
     pathname.startsWith('/_next/') ||
     pathname.startsWith('/favicon')
   );
 }
 
-export function middleware(req: NextRequest) {
-  const { pathname } = req.nextUrl;
-
-  // Skip if no password is configured (dev convenience — set SITE_PASSWORD to enable).
-  const password = process.env.SITE_PASSWORD;
-  if (!password) return NextResponse.next();
-
-  if (isPublic(pathname)) return NextResponse.next();
-
-  const session = req.cookies.get(COOKIE_NAME)?.value;
-  if (session === password) return NextResponse.next();
-
-  // Redirect to login, preserving the original destination.
+function redirectToLogin(req: NextRequest, reason?: string) {
   const loginUrl = req.nextUrl.clone();
   loginUrl.pathname = '/login';
   loginUrl.search = '';
-  if (pathname !== '/') {
-    loginUrl.searchParams.set('next', pathname);
+  if (reason) loginUrl.searchParams.set('error', reason);
+  else if (req.nextUrl.pathname !== '/') {
+    loginUrl.searchParams.set('next', req.nextUrl.pathname);
   }
   return NextResponse.redirect(loginUrl);
 }
 
+function hasLegacySession(req: NextRequest): boolean {
+  const password = process.env.SITE_PASSWORD;
+  if (!password) return false;
+  return req.cookies.get(LEGACY_COOKIE)?.value === password;
+}
+
+export async function middleware(req: NextRequest) {
+  const { pathname } = req.nextUrl;
+
+  if (isPublic(pathname)) return NextResponse.next();
+
+  if (pathname.startsWith('/api/cron/')) {
+    const secret = process.env.CRON_SECRET;
+    const auth = req.headers.get('authorization');
+    if (secret && auth === `Bearer ${secret}`) return NextResponse.next();
+  }
+
+  if (!authGateEnabled()) return NextResponse.next();
+
+  if (hasLegacySession(req)) return NextResponse.next();
+
+  const { response, user } = await getSupabaseAuthUser(req);
+
+  if (user?.email && isEmailAllowed(user.email)) {
+    return response;
+  }
+
+  if (user?.email && !isEmailAllowed(user.email)) {
+    return redirectToLogin(req, 'not_allowed');
+  }
+
+  return redirectToLogin(req);
+}
+
 export const config = {
-  // Run on every route except static files
   matcher: ['/((?!_next/static|_next/image|favicon\\.ico).*)'],
 };

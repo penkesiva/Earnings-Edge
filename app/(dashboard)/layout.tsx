@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { BuildStamp } from '@/components/BuildStamp';
+import { SignOutButton } from '@/components/SignOutButton';
+import { authGateEnabled } from '@/lib/authAllowlist';
 
 export default function DashboardLayout({
   children,
@@ -16,6 +18,8 @@ export default function DashboardLayout({
     hour12: false,
   });
 
+  const showSignOut = authGateEnabled();
+
   return (
     <div className="relative z-10 max-w-[1400px] mx-auto px-3 sm:px-6 py-3 sm:py-4">
       <header className="border-b border-border pb-3 mb-5 sm:mb-8 space-y-3 sm:space-y-0 sm:flex sm:items-center sm:justify-between sm:gap-3">
@@ -27,6 +31,7 @@ export default function DashboardLayout({
             </span>
           </Link>
           <div className="flex items-center gap-2 sm:hidden shrink-0">
+            {showSignOut ? <SignOutButton /> : null}
             <span className="text-[10px] text-fg-dim tabular-nums">{now}</span>
             <ThemeToggle />
           </div>
@@ -53,6 +58,7 @@ export default function DashboardLayout({
             </Link>
           </nav>
           <div className="hidden sm:flex items-center gap-3 shrink-0">
+            {showSignOut ? <SignOutButton /> : null}
             <ThemeToggle />
             <div className="text-xs text-fg-subtle text-right whitespace-nowrap">{now} PT</div>
           </div>
