@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { authGateEnabled, isEmailAllowed } from '@/lib/authAllowlist';
 import { getSupabaseAuthUser } from '@/lib/supabase/middleware';
 
-const LEGACY_COOKIE = 'ee_session';
-
 function isPublic(pathname: string): boolean {
   return (
     pathname === '/login' ||
@@ -23,12 +21,6 @@ function redirectToLogin(req: NextRequest, reason?: string) {
     loginUrl.searchParams.set('next', req.nextUrl.pathname);
   }
   return NextResponse.redirect(loginUrl);
-}
-
-function hasLegacySession(req: NextRequest): boolean {
-  const password = process.env.SITE_PASSWORD;
-  if (!password) return false;
-  return req.cookies.get(LEGACY_COOKIE)?.value === password;
 }
 
 export async function middleware(req: NextRequest) {
@@ -54,8 +46,6 @@ export async function middleware(req: NextRequest) {
   }
 
   if (!authGateEnabled()) return NextResponse.next();
-
-  if (hasLegacySession(req)) return NextResponse.next();
 
   const { response, user } = await getSupabaseAuthUser(req);
 

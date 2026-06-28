@@ -19,10 +19,7 @@ export function authRequired(): boolean {
   return v === 'true' || v === '1' || v === 'yes';
 }
 
-/** Login gate: AUTH_REQUIRED, SITE_PASSWORD, or non-empty AUTH_ALLOWED_EMAILS. */
+/** Login gate: AUTH_REQUIRED or non-empty AUTH_ALLOWED_EMAILS. */
 export function authGateEnabled(): boolean {
-  return (
-    authRequired() ||
-    !!(process.env.SITE_PASSWORD?.trim() || process.env.AUTH_ALLOWED_EMAILS?.trim())
-  );
+  return authRequired() || !!process.env.AUTH_ALLOWED_EMAILS?.trim();
 }

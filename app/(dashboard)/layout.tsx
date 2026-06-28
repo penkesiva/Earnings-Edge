@@ -56,6 +56,14 @@ export default function DashboardLayout({
             >
               History
             </Link>
+            {showSignOut ? (
+              <Link
+                href="/settings"
+                className="hover:text-fg transition-colors py-2 px-2 sm:px-0 sm:py-1 shrink-0 font-medium"
+              >
+                Settings
+              </Link>
+            ) : null}
           </nav>
           <div className="hidden sm:flex items-center gap-3 shrink-0">
             {showSignOut ? <SignOutButton /> : null}
