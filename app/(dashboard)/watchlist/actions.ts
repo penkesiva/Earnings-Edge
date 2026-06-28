@@ -5,6 +5,12 @@ import { revalidatePath } from 'next/cache';
 import { earningsSessionDate } from '@/lib/earningsDate';
 import { parseBatchLine } from '@/lib/batchImportParse';
 import { pruneTickerFromApp } from '@/lib/pruneTickerData';
+import {
+  addCandidateToWatchlist,
+  dismissEarningsCandidate,
+  fetchAndStoreEarningsCandidates,
+  type FetchDiscoveryResult,
+} from '@/lib/earningsDiscovery';
 
 export type WatchlistFormState = { error?: string };
 
@@ -179,6 +185,67 @@ export async function setManualEarnings(formData: FormData) {
 
   if (error) {
     throw new Error(error.message);
+  }
+
+  revalidatePath('/watchlist');
+  revalidatePath('/');
+}
+
+// ─── Earnings discovery ──────────────────────────────────────────────────────
+
+export type DiscoveryActionState = {
+  error?: string;
+  success?: string;
+  stats?: FetchDiscoveryResult;
+};
+
+export async function fetchUpcomingEarningsAction(): Promise<DiscoveryActionState> {
+  try {
+    const { sb, user } = await requireAuthSession();
+    const stats = await fetchAndStoreEarningsCandidates(sb, user.id);
+    revalidatePath('/watchlist');
+    const rejectedTotal = Object.values(stats.rejected).reduce((a, b) => a + b, 0);
+    return {
+      success: `Found ${stats.pendingShown} names for the next 14 days (${rejectedTotal} filtered out).`,
+      stats,
+    };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return { error: msg };
+  }
+}
+
+export async function addDiscoveryCandidateAction(formData: FormData) {
+  const id = formData.get('candidate_id') as string;
+  const { sb, user } = await requireAuthSession();
+  const result = await addCandidateToWatchlist(sb, user.id, id);
+  if (!result.ok) throw new Error(result.error);
+  revalidatePath('/watchlist');
+  revalidatePath('/');
+}
+
+export async function dismissDiscoveryCandidateAction(formData: FormData) {
+  const id = formData.get('candidate_id') as string;
+  const { sb, user } = await requireAuthSession();
+  const result = await dismissEarningsCandidate(sb, user.id, id);
+  if (!result.ok) throw new Error(result.error);
+  revalidatePath('/watchlist');
+}
+
+export async function addAllDiscoveryCandidatesAction() {
+  const { sb, user } = await requireAuthSession();
+  const { data: pending } = await sb
+    .from('earnings_candidates')
+    .select('id')
+    .eq('user_id', user.id)
+    .eq('status', 'pending')
+    .gte('earnings_date', earningsSessionDate());
+
+  if (!pending?.length) return;
+
+  for (const row of pending) {
+    const result = await addCandidateToWatchlist(sb, user.id, row.id);
+    if (!result.ok) throw new Error(result.error);
   }
 
   revalidatePath('/watchlist');

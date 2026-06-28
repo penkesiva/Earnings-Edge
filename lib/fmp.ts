@@ -327,9 +327,39 @@ const SECTOR_ETFS: Record<string, string> = {
   'Communication Services': 'XLC',
 };
 
+// ----- Quote batch (discovery + dashboards) -----
+export async function getQuotesBatch(
+  tickers: string[],
+): Promise<Map<string, { price: number | null; marketCap: number | null; name: string | null }>> {
+  const out = new Map<string, { price: number | null; marketCap: number | null; name: string | null }>();
+  if (!tickers.length) return out;
+
+  const chunkSize = 50;
+  for (let i = 0; i < tickers.length; i += chunkSize) {
+    const chunk = tickers.slice(i, i + chunkSize);
+    const sym = chunk.map(t => encodeURIComponent(t)).join(',');
+    const data = await fmp(`quote?symbol=${sym}`);
+    const rows = Array.isArray(data) ? data : [];
+    for (const raw of rows as Record<string, unknown>[]) {
+      const symbol = String(raw.symbol ?? '').toUpperCase();
+      if (!symbol) continue;
+      const rawName = raw.name ?? raw.companyName;
+      out.set(symbol, {
+        price: num(raw.price),
+        marketCap: num(raw.marketCap ?? raw.market_cap),
+        name: typeof rawName === 'string' && rawName.trim() ? rawName.trim() : null,
+      });
+    }
+  }
+  return out;
+}
+
 export async function getCompanyProfile(ticker: string): Promise<{
   companyName: string | null;
   sector: string | null;
+  industry: string | null;
+  price: number | null;
+  marketCap: number | null;
 }> {
   const profile = await fmp(`profile?symbol=${encodeURIComponent(ticker)}`);
   const row = Array.isArray(profile) ? profile[0] : null;
@@ -337,7 +367,10 @@ export async function getCompanyProfile(ticker: string): Promise<{
   const companyName =
     typeof rawName === 'string' && rawName.trim() ? rawName.trim() : null;
   const sector = typeof row?.sector === 'string' ? row.sector : null;
-  return { companyName, sector };
+  const industry = typeof row?.industry === 'string' ? row.industry : null;
+  const price = num(row?.price);
+  const marketCap = num(row?.marketCap ?? row?.mktCap);
+  return { companyName, sector, industry, price, marketCap };
 }
 
 export async function getCompanyName(ticker: string): Promise<string | null> {
