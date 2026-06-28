@@ -51,6 +51,12 @@ const config: Config = {
           dim: 'var(--color-fg-dim)',
         },
         // Theme-aware via --color-signal-* RGB channels in globals.css
+        accent: {
+          DEFAULT: 'var(--color-accent)',
+          secondary: 'var(--color-accent-secondary)',
+          muted: 'var(--color-accent-muted)',
+          border: 'var(--color-accent-border)',
+        },
         signal: {
           buy: 'rgb(var(--color-signal-buy) / <alpha-value>)',
           watch: 'rgb(var(--color-signal-watch) / <alpha-value>)',

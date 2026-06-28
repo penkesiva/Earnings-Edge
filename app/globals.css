@@ -26,6 +26,13 @@
   --color-signal-watch:   250 204 21;
   --color-signal-sell:    248 113 113;
   --color-signal-neutral: 161 161 170;
+
+  /* Brand / UI accent — navigation, headers, panels (not trade signals) */
+  --color-accent:             #34d399;
+  --color-accent-secondary:   #60a5fa;
+  --color-accent-muted:       rgba(52, 211, 153, 0.12);
+  --color-accent-border:      rgba(52, 211, 153, 0.32);
+  --color-accent-secondary-muted: rgba(96, 165, 250, 0.12);
 }
 
 /* ── Color tokens: light (activated by html.light class via ThemeToggle) ──── */
@@ -52,6 +59,12 @@ html.light {
   --color-signal-watch:   180 83 9;
   --color-signal-sell:    185 28 28;
   --color-signal-neutral: 87 83 78;
+
+  --color-accent:             #059669;
+  --color-accent-secondary:   #2563eb;
+  --color-accent-muted:       rgba(5, 150, 105, 0.1);
+  --color-accent-border:      rgba(5, 150, 105, 0.28);
+  --color-accent-secondary-muted: rgba(37, 99, 235, 0.1);
 }
 
 * {
@@ -71,6 +84,84 @@ html, body {
 h1, h2, .font-display {
   font-family: var(--font-serif), Georgia, 'Times New Roman', serif;
   letter-spacing: -0.02em;
+}
+
+/* ── Subtle UI accents (brand + wayfinding, not trade signals) ─────────────── */
+.page-chevron {
+  color: var(--color-accent);
+}
+
+.app-header {
+  border-bottom: 1px solid var(--color-border);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--color-accent) 5%, var(--color-bg)) 0%,
+    var(--color-bg) 100%
+  );
+}
+
+.nav-link {
+  color: var(--color-fg-muted);
+  transition: color 120ms ease;
+}
+.nav-link:hover {
+  color: var(--color-fg);
+}
+.nav-link--active {
+  color: var(--color-accent);
+}
+
+.day-section-title {
+  border-left: 3px solid var(--color-accent);
+  padding-left: 0.625rem;
+}
+
+.panel-accent {
+  border-color: var(--color-accent-border);
+  background: linear-gradient(
+    135deg,
+    var(--color-accent-muted) 0%,
+    var(--color-bg-elevated) 55%
+  );
+}
+
+.table-head-accent {
+  background: color-mix(in srgb, var(--color-accent) 6%, var(--color-bg-elevated));
+  border-bottom-color: var(--color-accent-border);
+}
+
+.card-row-accent {
+  border-left: 3px solid var(--color-accent-border);
+}
+
+.stat-card-hit {
+  border-top: 2px solid rgb(var(--color-signal-buy) / 0.55);
+  background: linear-gradient(
+    180deg,
+    rgb(var(--color-signal-buy) / 0.08) 0%,
+    var(--color-bg-elevated) 100%
+  );
+}
+
+.stat-card-warn {
+  border-top: 2px solid rgb(var(--color-signal-watch) / 0.55);
+  background: linear-gradient(
+    180deg,
+    rgb(var(--color-signal-watch) / 0.08) 0%,
+    var(--color-bg-elevated) 100%
+  );
+}
+
+.timing-bmo {
+  color: var(--color-accent-secondary);
+  border-color: color-mix(in srgb, var(--color-accent-secondary) 45%, transparent);
+  background: var(--color-accent-secondary-muted);
+}
+
+.timing-amc {
+  color: rgb(var(--color-signal-watch));
+  border-color: rgb(var(--color-signal-watch) / 0.45);
+  background: rgb(var(--color-signal-watch) / 0.1);
 }
 
 .scanline::after {

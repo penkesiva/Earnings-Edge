@@ -30,9 +30,7 @@ function TimingBadge({ timing }: { timing: string | undefined | null }) {
   return (
     <span
       className={`text-[10px] font-bold tracking-widest px-1 py-0.5 border ${
-        isBmo
-          ? 'text-sky-400 border-sky-400/40'
-          : 'text-signal-watch border-signal-watch/50'
+        isBmo ? 'timing-bmo' : 'timing-amc'
       }`}
     >
       {timing}
@@ -87,7 +85,7 @@ function UpcomingMobileCard({
   );
 
   return (
-    <div className="border border-border bg-bg-elevated p-3 space-y-3">
+    <div className={`border border-border bg-bg-elevated p-3 space-y-3 ${brief ? 'card-row-accent' : ''}`}>
       {brief ? (
         <Link
           href={`/briefs/${brief.id}`}
@@ -162,7 +160,7 @@ export function UpcomingWeekList({
                   </div>
 
                   <div className="hidden md:block border border-border">
-                    <div className="grid grid-cols-12 gap-3 px-4 py-2 text-xs text-fg-subtle uppercase tracking-widest border-b border-border-subtle bg-bg">
+                    <div className="grid grid-cols-12 gap-3 px-4 py-2 text-xs text-fg-subtle uppercase tracking-widest table-head-accent">
                       <div className="col-span-2">TKR</div>
                       <div className="col-span-1">SCORE</div>
                       <div className="col-span-2">VERDICT</div>

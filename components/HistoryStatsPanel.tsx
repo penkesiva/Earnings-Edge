@@ -20,19 +20,17 @@ export function HistoryStatsPanel({ rows }: { rows: HistoryStatsRow[] }) {
           value={s.structureHitRate != null ? `${s.structureHitRate.toFixed(0)}%` : '—'}
           valueClass={hitRateColor(s.structureHitRate)}
           sub={s.scored ? `${s.hits}✓ · ${s.misses}✗ of ${s.scored} scored` : 'No scored trades yet'}
+          accent="hit"
         />
         <StatCard
           label="FINAL DIR HIT"
           value={s.consensusHitRate != null ? `${s.consensusHitRate.toFixed(0)}%` : '—'}
           valueClass={hitRateColor(s.consensusHitRate)}
           sub={s.consensusScored ? `${s.consensusHits}✓ · ${s.consensusMisses}✗ of ${s.consensusScored} scored` : 'No final verdicts yet'}
+          accent="hit"
         />
         <StatCard label="SKIPPED" value={String(s.skipped)} sub="NO-GO / skip verdicts" />
-        <StatCard
-          label="AWAIT PRICE"
-          value={String(s.awaitingPrice)}
-          sub={s.awaitingPrice ? 'Re-run log outcomes' : undefined}
-        />
+        <StatCard label="AWAIT PRICE" value={String(s.awaitingPrice)} sub={s.awaitingPrice ? 'Re-run log outcomes' : undefined} accent="warn" />
         <StatCard label="PENDING EPS" value={String(s.pendingEps)} />
       </div>
 
@@ -82,14 +80,18 @@ function StatCard({
   value,
   sub,
   valueClass = 'text-fg',
+  accent,
 }: {
   label: string;
   value: string;
   sub?: string;
   valueClass?: string;
+  accent?: 'hit' | 'warn';
 }) {
+  const accentClass =
+    accent === 'hit' ? 'stat-card-hit' : accent === 'warn' ? 'stat-card-warn' : '';
   return (
-    <div className="border border-border bg-bg-elevated px-3 py-2.5 min-w-0">
+    <div className={`border border-border bg-bg-elevated px-3 py-2.5 min-w-0 ${accentClass}`}>
       <div className="text-[10px] text-fg-dim tracking-widest uppercase truncate">{label}</div>
       <div className={`text-xl font-bold tabular-nums mt-0.5 ${valueClass}`}>{value}</div>
       {sub ? <div className="text-[10px] text-fg-dim mt-0.5 leading-snug">{sub}</div> : null}

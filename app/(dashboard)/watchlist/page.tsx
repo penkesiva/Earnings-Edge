@@ -19,7 +19,7 @@ export default async function WatchlistPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         <div className="min-w-0">
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight mb-2">
-            <span className="text-fg-subtle">›</span> WATCHLIST
+            <span className="page-chevron">›</span> WATCHLIST
           </h1>
           <p className="text-sm text-fg-subtle">
             {tickers?.filter(t => t.active).length ?? 0} active · {tickers?.length ?? 0} total

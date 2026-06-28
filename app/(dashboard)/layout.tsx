@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { BuildStamp } from '@/components/BuildStamp';
 import { SignOutButton } from '@/components/SignOutButton';
+import { DashboardNav } from '@/components/DashboardNav';
 import { authGateEnabled } from '@/lib/authAllowlist';
 
 export default function DashboardLayout({
@@ -22,12 +23,12 @@ export default function DashboardLayout({
 
   return (
     <div className="relative z-10 max-w-[1400px] mx-auto px-3 sm:px-6 py-3 sm:py-4">
-      <header className="border-b border-border pb-3 mb-5 sm:mb-8 space-y-3 sm:space-y-0 sm:flex sm:items-center sm:justify-between sm:gap-3">
+      <header className="app-header pb-3 mb-5 sm:mb-8 space-y-3 sm:space-y-0 sm:flex sm:items-center sm:justify-between sm:gap-3">
         <div className="flex items-center justify-between gap-3 min-w-0">
-          <Link href="/" className="flex items-center gap-2 shrink-0 min-w-0">
-            <span className="w-2 h-2 bg-signal-buy pulse-dot rounded-full shrink-0" />
+          <Link href="/" className="flex items-center gap-2 shrink-0 min-w-0 group">
+            <span className="w-2 h-2 bg-accent pulse-dot rounded-full shrink-0 shadow-[0_0_8px_var(--color-accent-border)]" />
             <span className="text-base sm:text-lg font-serif font-bold tracking-tight truncate">
-              Earnings Edge
+              Earnings <span className="text-accent">Edge</span>
             </span>
           </Link>
           <div className="flex items-center gap-2 sm:hidden shrink-0">
@@ -37,34 +38,7 @@ export default function DashboardLayout({
           </div>
         </div>
         <div className="flex items-center justify-between gap-3 sm:gap-8 min-w-0">
-          <nav className="flex gap-1 sm:gap-5 text-sm text-fg-muted overflow-x-auto -mx-1 px-1">
-            <Link
-              href="/"
-              className="hover:text-fg transition-colors py-2 px-2 sm:px-0 sm:py-1 shrink-0 font-medium"
-            >
-              Home
-            </Link>
-            <Link
-              href="/watchlist"
-              className="hover:text-fg transition-colors py-2 px-2 sm:px-0 sm:py-1 shrink-0 font-medium"
-            >
-              Watchlist
-            </Link>
-            <Link
-              href="/history"
-              className="hover:text-fg transition-colors py-2 px-2 sm:px-0 sm:py-1 shrink-0 font-medium"
-            >
-              History
-            </Link>
-            {showSignOut ? (
-              <Link
-                href="/settings"
-                className="hover:text-fg transition-colors py-2 px-2 sm:px-0 sm:py-1 shrink-0 font-medium"
-              >
-                Settings
-              </Link>
-            ) : null}
-          </nav>
+          <DashboardNav showSettings={showSignOut} />
           <div className="hidden sm:flex items-center gap-3 shrink-0">
             {showSignOut ? <SignOutButton /> : null}
             <ThemeToggle />

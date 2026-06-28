@@ -49,7 +49,7 @@ function LoginForm() {
     <div className="min-h-screen flex flex-col items-center justify-center bg-bg px-4">
       <div className="w-full max-w-sm space-y-8">
         <div className="text-center space-y-1">
-          <h1 className="text-2xl font-serif font-bold tracking-tight text-fg">Earnings Edge</h1>
+          <h1 className="text-2xl font-serif font-bold tracking-tight text-fg">Earnings <span className="text-accent">Edge</span></h1>
           <p className="text-sm text-fg-dim">Sign in to continue</p>
         </div>
 

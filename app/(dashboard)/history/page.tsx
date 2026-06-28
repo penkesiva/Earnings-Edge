@@ -44,7 +44,7 @@ export default async function HistoryPage() {
       <div className="flex items-start justify-between flex-wrap gap-4">
         <div className="min-w-0">
           <h1 className="text-3xl font-bold tracking-tight mb-2">
-            <span className="text-fg-subtle">›</span> HISTORY
+            <span className="page-chevron">›</span> HISTORY
           </h1>
           <p className="text-sm text-fg-subtle">
             Outcome tracking for past earnings briefs

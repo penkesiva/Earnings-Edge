@@ -14,7 +14,7 @@ export function DayPrepHeader({
         marketOpen ? '' : 'opacity-50'
       }`}
     >
-      <div className="min-w-0">
+      <div className="min-w-0 day-section-title">
         <h3
           className={`text-sm font-bold tracking-wide ${
             marketOpen ? 'text-fg' : 'text-fg-muted'
