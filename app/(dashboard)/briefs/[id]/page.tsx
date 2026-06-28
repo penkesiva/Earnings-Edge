@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { requireAuthSession } from '@/lib/authServer';
+import { resolveAlpacaAuthForUser } from '@/lib/alpacaCredentials';
 import { FinalActionBadge, SignalBadge } from '@/components/SignalBadge';
 import { ScreamTestCard } from '@/components/ScreamTestCard';
 import { ScanDiffBanner } from '@/components/ScanDiffBanner';
@@ -46,7 +47,7 @@ export default async function BriefPage({
   params: { id: string };
   searchParams?: { from?: string };
 }) {
-  const { sb } = await requireAuthSession();
+  const { sb, user } = await requireAuthSession();
   const { data: brief } = await sb
     .from('earnings_briefs')
     .select('*')
@@ -97,7 +98,8 @@ export default async function BriefPage({
   // Fetch live price — Alpaca latestTrade, falls back to stored scan price if unavailable.
   let livePrice: number | null = null;
   try {
-    const snap = await getStockSnapshot(brief.ticker);
+    const alpacaAuth = await resolveAlpacaAuthForUser(user.id);
+    const snap = await getStockSnapshot(brief.ticker as string, alpacaAuth);
     if (snap.price > 0) livePrice = snap.price;
   } catch {
     // Non-fatal — display falls back to scan-time price below.

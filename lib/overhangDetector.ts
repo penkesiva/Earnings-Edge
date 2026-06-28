@@ -19,7 +19,7 @@
  *   macro_specific overhangs with auto-assigned severity based on drop size.
  */
 
-import { getHistoricalBars } from '@/lib/alpaca';
+import { getHistoricalBars, type AlpacaAuth } from '@/lib/alpaca';
 import type { NarrativeOverhang, OverhangCategory } from '@/lib/screamTest';
 import { addCalendarDays, earningsSessionDate } from '@/lib/earningsDate';
 import { classifyHeadlines, fetchGeminiSearchHeadlines, hasLlmProvider } from '@/lib/llmClassifier';
@@ -208,6 +208,7 @@ export async function detectOverhangs(opts: {
   userId: string;
   daysBack?: number;
   asOfDate?: string;
+  alpacaAuth?: AlpacaAuth | null;
 }): Promise<OverhangResult> {
   const daysBack = opts.daysBack ?? 60;
   const ticker = opts.ticker.toUpperCase();
@@ -219,7 +220,7 @@ export async function detectOverhangs(opts: {
     // Fetch FMP news, Alpaca bars, and Gemini search headlines in parallel.
     const [fmpNews, bars, geminiRaw] = await Promise.all([
       fetchStableStockNews(ticker),
-      getHistoricalBars(ticker, start, end, '1Day'),
+      getHistoricalBars(ticker, start, end, '1Day', opts.alpacaAuth),
       fetchGeminiSearchHeadlines(ticker, end),
     ]);
 

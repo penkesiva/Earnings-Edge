@@ -15,6 +15,7 @@
 
 import { NextResponse } from 'next/server';
 import { isAuthApiResult, requireAuthApi } from '@/lib/authServer';
+import { resolveAlpacaAuthForUser } from '@/lib/alpacaCredentials';
 import { getEarningsSurprises } from '@/lib/fmp';
 import { getHistoricalBars } from '@/lib/alpaca';
 import { addCalendarDays, earningsSessionDate } from '@/lib/earningsDate';
@@ -44,6 +45,7 @@ export async function POST() {
   if (!isAuthApiResult(auth)) return auth;
 
   const sb = auth.sb;
+  const alpacaAuth = await resolveAlpacaAuthForUser(auth.user.id);
   const today = earningsSessionDate();
 
   const baseOutcomeSelect =
@@ -160,7 +162,9 @@ export async function POST() {
       // Fetch 3 trading days after earnings to find the first post-earnings close
       const fetchStart = earningsDate;
       const fetchEnd   = addCalendarDays(earningsDate, 4);
-      const bars = await getHistoricalBars(ticker, fetchStart, fetchEnd, '1Day').catch(() => [] as { o: number; c: number }[]);
+      const bars = await getHistoricalBars(ticker, fetchStart, fetchEnd, '1Day', alpacaAuth).catch(
+        () => [] as { o: number; c: number }[],
+      );
 
       // bars[0] is the earnings date close (or pre-earnings last close),
       // bars[1] is the next trading day close

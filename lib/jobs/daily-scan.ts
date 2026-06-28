@@ -29,6 +29,7 @@ import { detectOverhangs } from '@/lib/overhangDetector';
 import { reconcileSignals } from '@/lib/reconcile';
 import { sendBriefEmail } from '@/lib/email';
 import { sendPush } from '@/lib/push';
+import { resolveAlpacaAuthForUser } from '@/lib/alpacaCredentials';
 import { earningsSessionDate } from '@/lib/earningsDate';
 
 export type DailyScanTickerResult = {
@@ -246,6 +247,7 @@ async function runDailyScanForUser(
 
 async function generateBrief(userId: string, ticker: string, earningsDate: string) {
   const sb = supabaseAdmin();
+  const alpacaAuth = await resolveAlpacaAuthForUser(userId);
 
   const [
     snapshot,
@@ -257,7 +259,7 @@ async function generateBrief(userId: string, ticker: string, earningsDate: strin
     insiderSellingCluster,
     forwardPe,
   ] = await Promise.all([
-    getStockSnapshot(ticker),
+    getStockSnapshot(ticker, alpacaAuth),
     withFmpFallback(
       () => computeBeatStats(ticker, 4),
       { beatsLastN: 0, totalQuarters: 0, avgSurprisePct: 0 },
@@ -286,21 +288,21 @@ async function generateBrief(userId: string, ticker: string, earningsDate: strin
     .toISOString()
     .slice(0, 10);
   const today = earningsSessionDate();
-  const sectorBars = await getHistoricalBars(sectorEtf, fiveDaysAgo, today);
+  const sectorBars = await getHistoricalBars(sectorEtf, fiveDaysAgo, today, '1Day', alpacaAuth);
   const sectorReturn5d =
     sectorBars.length >= 2
       ? ((sectorBars[sectorBars.length - 1].c - sectorBars[0].c) / sectorBars[0].c) * 100
       : 0;
 
   const expiryAfter = nextFridayAfter(earningsDate);
-  const chain = await getOptionChain(ticker, expiryAfter);
+  const chain = await getOptionChain(ticker, expiryAfter, 0.15, alpacaAuth);
   const expectedMove = computeExpectedMove(chain);
   const putCall = computePutCallRatio(chain);
 
   const yearAgo = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000)
     .toISOString()
     .slice(0, 10);
-  const yearBars = await getHistoricalBars(ticker, yearAgo, today);
+  const yearBars = await getHistoricalBars(ticker, yearAgo, today, '1Day', alpacaAuth);
   const ivHistory = computeRollingRealizedVol(yearBars, 30);
   const currentIv = chain.calls[Math.floor(chain.calls.length / 2)]?.iv ?? 0.3;
   const ivRank = computeIvRank(currentIv, ivHistory);
@@ -314,7 +316,12 @@ async function generateBrief(userId: string, ticker: string, earningsDate: strin
   let rawHeadlines: { date: string; title: string; source: string }[] = [];
   let newsSentiment: object | null = null;
   try {
-    const overhangResult = await detectOverhangs({ ticker, asOfDate: earningsDate, userId });
+    const overhangResult = await detectOverhangs({
+      ticker,
+      asOfDate: earningsDate,
+      userId,
+      alpacaAuth,
+    });
     narrativeOverhangs = overhangResult.overhangs;
     rawHeadlines = overhangResult.rawHeadlines;
     newsSentiment = overhangResult.newsOverall as object | null;
