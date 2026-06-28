@@ -156,7 +156,7 @@ function LoginForm() {
         ) : null}
 
         <p className="text-center text-[10px] text-fg-dim tracking-widest">
-          INVITE-ONLY BETA
+          SIGN IN WITH YOUR GOOGLE ACCOUNT
         </p>
       </div>
     </div>

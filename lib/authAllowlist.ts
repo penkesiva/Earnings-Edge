@@ -1,4 +1,4 @@
-/** Comma-separated emails in AUTH_ALLOWED_EMAILS (lowercase). Empty = any signed-in user. */
+/** Comma-separated emails in AUTH_ALLOWED_EMAILS. Unset/empty = any signed-in Google user. */
 
 export function parseAllowedEmails(): string[] | null {
   const raw = process.env.AUTH_ALLOWED_EMAILS?.trim();
@@ -14,7 +14,15 @@ export function isEmailAllowed(email: string | undefined | null): boolean {
   return list.includes(email.toLowerCase());
 }
 
-/** Gate login when SITE_PASSWORD and/or AUTH_ALLOWED_EMAILS is set. */
+export function authRequired(): boolean {
+  const v = process.env.AUTH_REQUIRED?.trim().toLowerCase();
+  return v === 'true' || v === '1' || v === 'yes';
+}
+
+/** Login gate: AUTH_REQUIRED, SITE_PASSWORD, or non-empty AUTH_ALLOWED_EMAILS. */
 export function authGateEnabled(): boolean {
-  return !!(process.env.SITE_PASSWORD?.trim() || process.env.AUTH_ALLOWED_EMAILS?.trim());
+  return (
+    authRequired() ||
+    !!(process.env.SITE_PASSWORD?.trim() || process.env.AUTH_ALLOWED_EMAILS?.trim())
+  );
 }
