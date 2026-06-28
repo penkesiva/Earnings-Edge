@@ -34,6 +34,17 @@ function hasLegacySession(req: NextRequest): boolean {
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
+  // Supabase sometimes falls back to Site URL with ?code= on / — forward to our handler.
+  const authCode = req.nextUrl.searchParams.get('code');
+  if (authCode && pathname !== '/auth/callback') {
+    const callbackUrl = req.nextUrl.clone();
+    callbackUrl.pathname = '/auth/callback';
+    if (!callbackUrl.searchParams.has('next') && pathname !== '/') {
+      callbackUrl.searchParams.set('next', pathname);
+    }
+    return NextResponse.redirect(callbackUrl);
+  }
+
   if (isPublic(pathname)) return NextResponse.next();
 
   if (pathname.startsWith('/api/cron/')) {
