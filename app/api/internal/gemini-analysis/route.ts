@@ -14,7 +14,7 @@ import {
 } from '@/lib/geminiModels';
 import { parseScanRequestBody } from '@/lib/parseScanRequest';
 import { assertScanRunAllowed } from '@/lib/tickerScanLock';
-import { supabaseAdmin } from '@/lib/supabase';
+import { isAuthApiResult, requireAuthApi } from '@/lib/authServer';
 
 export const maxDuration = 120;
 
@@ -98,6 +98,9 @@ Rules:
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = await requireAuthApi();
+    if (!isAuthApiResult(auth)) return auth;
+
     const key = process.env.GEMINI_API_KEY;
     if (!key) {
       return new Response(
@@ -116,7 +119,8 @@ export async function POST(req: NextRequest) {
         });
       }
       const denied = await assertScanRunAllowed(
-        supabaseAdmin(),
+        auth.sb,
+        auth.user.id,
         parsed.brief.ticker,
         parsed.scan_run_id,
       );

@@ -13,7 +13,7 @@ import {
 } from '@/lib/aiConsensus';
 import { parseScanRequestBody } from '@/lib/parseScanRequest';
 import { assertScanRunAllowed } from '@/lib/tickerScanLock';
-import { supabaseAdmin } from '@/lib/supabase';
+import { isAuthApiResult, requireAuthApi } from '@/lib/authServer';
 
 export const maxDuration = 60;
 
@@ -157,6 +157,9 @@ function guardSynthesisText(
 }
 
 export async function POST(req: NextRequest) {
+  const auth = await requireAuthApi();
+  if (!isAuthApiResult(auth)) return auth;
+
   const key = process.env.OPENAI_API_KEY;
   if (!key) {
     return NextResponse.json({ error: 'OPENAI_API_KEY not configured' }, { status: 503 });
@@ -186,7 +189,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'brief and analyses required' }, { status: 400 });
   }
 
-  const denied = await assertScanRunAllowed(supabaseAdmin(), brief.ticker, scanRunId);
+  const denied = await assertScanRunAllowed(auth.sb, auth.user.id, brief.ticker, scanRunId);
   if (denied) return denied;
 
   const filled = (['openai', 'gemini', 'claude'] as const).filter(p => analyses[p]?.trim());

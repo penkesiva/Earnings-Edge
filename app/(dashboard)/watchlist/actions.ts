@@ -1,6 +1,6 @@
 'use server';
 
-import { supabaseAdmin } from '@/lib/supabase';
+import { requireAuthSession } from '@/lib/authServer';
 import { revalidatePath } from 'next/cache';
 import { earningsSessionDate } from '@/lib/earningsDate';
 import { parseBatchLine } from '@/lib/batchImportParse';
@@ -18,10 +18,10 @@ export async function addTicker(
     return { error: 'Ticker is required' };
   }
 
-  const sb = supabaseAdmin();
+  const { sb, user } = await requireAuthSession();
   const { error } = await sb
     .from('watchlist')
-    .upsert({ ticker, active: true }, { onConflict: 'ticker' });
+    .upsert({ user_id: user.id, ticker, active: true }, { onConflict: 'user_id,ticker' });
 
   if (error) {
     return { error: error.message };
@@ -35,7 +35,7 @@ export async function toggleTicker(formData: FormData) {
   const id = formData.get('id') as string;
   const active = formData.get('active') === 'true';
 
-  const sb = supabaseAdmin();
+  const { sb } = await requireAuthSession();
   const { error } = await sb.from('watchlist').update({ active: !active }).eq('id', id);
 
   if (error) {
@@ -48,7 +48,7 @@ export async function toggleTicker(formData: FormData) {
 export async function deleteTicker(formData: FormData) {
   const id = formData.get('id') as string;
 
-  const sb = supabaseAdmin();
+  const { sb, user } = await requireAuthSession();
   const { data: row, error: fetchError } = await sb
     .from('watchlist')
     .select('ticker')
@@ -64,7 +64,7 @@ export async function deleteTicker(formData: FormData) {
   }
 
   if (row?.ticker) {
-    await pruneTickerFromApp(sb, row.ticker);
+    await pruneTickerFromApp(sb, user.id, row.ticker);
   }
 
   revalidatePath('/watchlist');
@@ -113,10 +113,11 @@ export async function batchImport(
     };
   }
 
-  const sb = supabaseAdmin();
+  const { sb, user } = await requireAuthSession();
 
   // 1. Upsert watchlist rows — include manual date + timing so the UI column shows them
   const watchlistRows = parsed.map(r => ({
+    user_id: user.id,
     ticker: r.ticker,
     active: true,
     manual_earnings_date: r.dateIso,
@@ -124,11 +125,12 @@ export async function batchImport(
   }));
   const { error: wlErr } = await sb
     .from('watchlist')
-    .upsert(watchlistRows, { onConflict: 'ticker', ignoreDuplicates: false });
+    .upsert(watchlistRows, { onConflict: 'user_id,ticker', ignoreDuplicates: false });
   if (wlErr) return { error: `Watchlist upsert failed: ${wlErr.message}` };
 
   // 2. Upsert earnings_events rows
   const eventRows = parsed.map(r => ({
+    user_id: user.id,
     ticker: r.ticker,
     earnings_date: r.dateIso,
     timing: r.timing,
@@ -136,7 +138,7 @@ export async function batchImport(
   }));
   const { error: evErr } = await sb
     .from('earnings_events')
-    .upsert(eventRows, { onConflict: 'ticker,earnings_date' });
+    .upsert(eventRows, { onConflict: 'user_id,ticker,earnings_date' });
   if (evErr) return { error: `Calendar upsert failed: ${evErr.message}` };
 
   revalidatePath('/watchlist');
@@ -169,7 +171,7 @@ export async function setManualEarnings(formData: FormData) {
     throw new Error('Manual timing must be BMO, AMC, UNK, or empty');
   }
 
-  const sb = supabaseAdmin();
+  const { sb } = await requireAuthSession();
   const { error } = await sb
     .from('watchlist')
     .update({ manual_earnings_date, manual_timing })

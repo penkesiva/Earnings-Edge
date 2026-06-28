@@ -1,4 +1,4 @@
-import { supabaseAdmin } from '@/lib/supabase';
+import { requireAuthSession } from '@/lib/authServer';
 import { dashboardSessionDate } from '@/lib/earningsDate';
 import { computeHistoryStats } from '@/lib/historyStats';
 import { HistoryList, type HistoryRow } from '@/components/HistoryList';
@@ -8,7 +8,7 @@ import { LogOutcomesButton } from './LogOutcomesButton';
 export const dynamic = 'force-dynamic';
 
 export default async function HistoryPage() {
-  const sb = supabaseAdmin();
+  const { sb } = await requireAuthSession();
   const today = dashboardSessionDate();
 
   const { data: rows } = await sb

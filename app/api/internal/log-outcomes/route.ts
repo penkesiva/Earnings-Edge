@@ -14,7 +14,7 @@
  */
 
 import { NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
+import { isAuthApiResult, requireAuthApi } from '@/lib/authServer';
 import { getEarningsSurprises } from '@/lib/fmp';
 import { getHistoricalBars } from '@/lib/alpaca';
 import { addCalendarDays, earningsSessionDate } from '@/lib/earningsDate';
@@ -40,7 +40,10 @@ function consensusHit(
 }
 
 export async function POST() {
-  const sb = supabaseAdmin();
+  const auth = await requireAuthApi();
+  if (!isAuthApiResult(auth)) return auth;
+
+  const sb = auth.sb;
   const today = earningsSessionDate();
 
   const baseOutcomeSelect =

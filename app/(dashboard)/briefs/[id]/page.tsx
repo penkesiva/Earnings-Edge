@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { supabaseAdmin } from '@/lib/supabase';
+import { requireAuthSession } from '@/lib/authServer';
 import { FinalActionBadge, SignalBadge } from '@/components/SignalBadge';
 import { ScreamTestCard } from '@/components/ScreamTestCard';
 import { ScanDiffBanner } from '@/components/ScanDiffBanner';
@@ -46,7 +46,7 @@ export default async function BriefPage({
   params: { id: string };
   searchParams?: { from?: string };
 }) {
-  const sb = supabaseAdmin();
+  const { sb } = await requireAuthSession();
   const { data: brief } = await sb
     .from('earnings_briefs')
     .select('*')

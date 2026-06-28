@@ -1,4 +1,4 @@
-import { supabaseAdmin } from '@/lib/supabase';
+import { requireAuthSession } from '@/lib/authServer';
 import { AddTickerForm } from './AddTickerForm';
 import { BatchImportForm } from './BatchImportForm';
 import { deleteTicker, setManualEarnings, toggleTicker } from './actions';
@@ -8,7 +8,7 @@ import { WatchlistMobileList } from './WatchlistMobileList';
 export const dynamic = 'force-dynamic';
 
 export default async function WatchlistPage() {
-  const sb = supabaseAdmin();
+  const { sb } = await requireAuthSession();
   const { data: tickers } = await sb
     .from('watchlist')
     .select('*')

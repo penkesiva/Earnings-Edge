@@ -18,12 +18,14 @@ export function msUntilIso(iso: string | null | undefined, nowMs = Date.now()): 
 
 export async function getTickerScanLock(
   sb: SupabaseClient,
+  userId: string,
   ticker: string,
 ): Promise<TickerScanLockStatus> {
   const normalized = ticker.trim().toUpperCase();
   const { data } = await sb
     .from('ticker_scan_locks')
     .select('run_id, locked_until, started_at')
+    .eq('user_id', userId)
     .eq('ticker', normalized)
     .maybeSingle();
 
@@ -47,6 +49,7 @@ export type AcquireScanLockResult =
 
 export async function acquireTickerScanLock(
   sb: SupabaseClient,
+  userId: string,
   ticker: string,
   briefId?: string,
 ): Promise<AcquireScanLockResult> {
@@ -54,6 +57,7 @@ export async function acquireTickerScanLock(
   const lockMinutes = Math.round(AI_SCAN_COOLDOWN_MS / 60_000);
 
   const { data, error } = await sb.rpc('acquire_ticker_scan_lock', {
+    p_user_id: userId,
     p_ticker: normalized,
     p_brief_id: briefId ?? null,
     p_lock_minutes: lockMinutes,
@@ -86,10 +90,11 @@ export async function acquireTickerScanLock(
 /** Reject when another Scan All holds the ticker lock. */
 export async function assertScanRunAllowed(
   sb: SupabaseClient,
+  userId: string,
   ticker: string,
   scanRunId?: string | null,
 ): Promise<NextResponse | null> {
-  const status = await getTickerScanLock(sb, ticker);
+  const status = await getTickerScanLock(sb, userId, ticker);
   if (!status.isLocked) return null;
   if (scanRunId && status.runId === scanRunId) return null;
 

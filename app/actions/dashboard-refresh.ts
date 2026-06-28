@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { requireAuthSession } from '@/lib/authServer';
 import { runUpdateCalendarJob } from '@/lib/jobs/update-calendar';
 import type { UpdateCalendarJobResult } from '@/lib/jobs/update-calendar';
 import { runDailyScanJob } from '@/lib/jobs/daily-scan';
@@ -62,7 +63,8 @@ function formatScanMessage(res: DailyScanJobResult): string {
  */
 export async function syncCalendarAction(): Promise<RefreshResult> {
   try {
-    const res = await runUpdateCalendarJob();
+    const { user } = await requireAuthSession();
+    const res = await runUpdateCalendarJob({ userId: user.id });
     revalidatePath('/');
     revalidatePath('/history');
     return { ok: true, message: formatCalendarMessage(res) };
@@ -78,7 +80,8 @@ export async function syncCalendarAction(): Promise<RefreshResult> {
  */
 export async function runDailyScanAction(): Promise<RefreshResult> {
   try {
-    const res = await runDailyScanJob();
+    const { user } = await requireAuthSession();
+    const res = await runDailyScanJob({ userId: user.id });
     revalidatePath('/');
     revalidatePath('/history');
     return { ok: true, message: formatScanMessage(res) };
@@ -93,8 +96,13 @@ export async function runDailyScanAction(): Promise<RefreshResult> {
  */
 export async function runTomorrowPrepAction(): Promise<RefreshResult> {
   try {
+    const { user } = await requireAuthSession();
     const tomorrow = addCalendarDays(earningsSessionDate(), 1);
-    const res = await runDailyScanJob({ targetDate: tomorrow, sendNotifications: false });
+    const res = await runDailyScanJob({
+      userId: user.id,
+      targetDate: tomorrow,
+      sendNotifications: false,
+    });
     revalidatePath('/');
     revalidatePath('/history');
     if ('idleReason' in res) {

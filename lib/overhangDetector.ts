@@ -205,6 +205,7 @@ export type OverhangResult = {
  */
 export async function detectOverhangs(opts: {
   ticker: string;
+  userId: string;
   daysBack?: number;
   asOfDate?: string;
 }): Promise<OverhangResult> {
@@ -258,7 +259,7 @@ export async function detectOverhangs(opts: {
     if (hasLlmProvider() && allArticles.length > 0) {
       // ── LLM path — one call: risks + per-headline sentiment + overall bias ──
       const headlines = allArticles.map((a, i) => ({ i, date: a.date, title: a.title }));
-      llmClassification = await classifyHeadlines(ticker, headlines, end);
+      llmClassification = await classifyHeadlines(ticker, headlines, end, opts.userId);
 
       for (const r of llmClassification.risks) {
         if (r.severity < 2) continue; // severity 1 = noise

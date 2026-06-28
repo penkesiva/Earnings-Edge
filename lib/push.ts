@@ -18,6 +18,7 @@ function ensureVapid() {
 }
 
 export async function sendPush(payload: {
+  userId: string;
   ticker: string;
   signal: string;
   score: number;
@@ -26,7 +27,10 @@ export async function sendPush(payload: {
   if (!ensureVapid()) return;
 
   const sb = supabaseAdmin();
-  const { data: subs } = await sb.from('push_subscriptions').select('*');
+  const { data: subs } = await sb
+    .from('push_subscriptions')
+    .select('*')
+    .eq('user_id', payload.userId);
 
   if (!subs?.length) return;
 

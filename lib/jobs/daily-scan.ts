@@ -3,6 +3,7 @@
  */
 
 import { supabaseAdmin } from '@/lib/supabase';
+import { listWatchlistUserIds } from '@/lib/authServer';
 import {
   getStockSnapshot,
   getOptionChain,
@@ -51,6 +52,8 @@ export type DailyScanJobResult =
     };
 
 export type RunDailyScanOptions = {
+  /** When set, scan only this user. Cron omits to scan all users with watchlists. */
+  userId?: string;
   /** Default true. Set false for manual dashboard testing to avoid email/push floods. */
   sendNotifications?: boolean;
   /** Optional explicit US session date (YYYY-MM-DD), defaults to today's session date. */
@@ -84,17 +87,57 @@ async function withFmpFallback<T>(
 export async function runDailyScanJob(
   options: RunDailyScanOptions = {}
 ): Promise<DailyScanJobResult> {
+  const sb = supabaseAdmin();
+
+  if (options.userId) {
+    return runDailyScanForUser(sb, options.userId, options);
+  }
+
+  const userIds = await listWatchlistUserIds(sb);
+  if (!userIds.length) {
+    return { count: 0, idleReason: 'empty_watchlist' };
+  }
+
+  let totalCount = 0;
+  const allResults: DailyScanTickerResult[] = [];
+  let lastIdle: DailyScanJobResult | null = null;
+
+  for (const userId of userIds) {
+    const res = await runDailyScanForUser(sb, userId, options);
+    if ('idleReason' in res) {
+      lastIdle = res;
+      continue;
+    }
+    totalCount += res.count;
+    allResults.push(...res.results);
+  }
+
+  if (totalCount > 0) {
+    return { count: totalCount, results: allResults };
+  }
+
+  return (
+    lastIdle ?? {
+      count: 0,
+      idleReason: 'empty_watchlist',
+    }
+  );
+}
+
+async function runDailyScanForUser(
+  sb: ReturnType<typeof supabaseAdmin>,
+  userId: string,
+  options: RunDailyScanOptions,
+): Promise<DailyScanJobResult> {
   const sendNotifications = options.sendNotifications !== false;
   const targetDate = options.targetDate;
   const singleTicker = options.singleTicker?.toUpperCase();
-
-  const sb = supabaseAdmin();
   const today = targetDate || earningsSessionDate();
 
-  // Join via PostgREST requires a FK; we only have ticker text on both sides — filter in two steps.
   const { data: wl, error: wlError } = await sb
     .from('watchlist')
     .select('ticker')
+    .eq('user_id', userId)
     .eq('active', true);
 
   if (wlError) throw new Error(wlError.message);
@@ -104,12 +147,12 @@ export async function runDailyScanJob(
     return { count: 0, idleReason: 'empty_watchlist' };
   }
 
-  // When re-scanning a single brief, restrict to that ticker only (skip the rest).
   const eligibleTickers = singleTicker ? [singleTicker] : watchTickers;
 
   const { data: events, error: eventsError } = await sb
     .from('earnings_events')
     .select('*')
+    .eq('user_id', userId)
     .eq('earnings_date', today)
     .in('ticker', eligibleTickers);
 
@@ -119,6 +162,7 @@ export async function runDailyScanJob(
     const { data: upcoming } = await sb
       .from('earnings_events')
       .select('ticker, earnings_date')
+      .eq('user_id', userId)
       .in('ticker', watchTickers)
       .gte('earnings_date', today)
       .order('earnings_date', { ascending: true })
@@ -139,7 +183,7 @@ export async function runDailyScanJob(
 
   for (const event of events) {
     try {
-      const brief = await generateBrief(event.ticker, today);
+      const brief = await generateBrief(userId, event.ticker, today);
       results.push({
         ticker: event.ticker,
         status: 'ok',
@@ -175,6 +219,7 @@ export async function runDailyScanJob(
 
         tasks.push(
           sendPush({
+            userId,
             ticker: event.ticker,
             signal: brief.signal,
             score: brief.composite_score,
@@ -199,7 +244,7 @@ export async function runDailyScanJob(
   return { count: results.length, results };
 }
 
-async function generateBrief(ticker: string, earningsDate: string) {
+async function generateBrief(userId: string, ticker: string, earningsDate: string) {
   const sb = supabaseAdmin();
 
   const [
@@ -269,7 +314,7 @@ async function generateBrief(ticker: string, earningsDate: string) {
   let rawHeadlines: { date: string; title: string; source: string }[] = [];
   let newsSentiment: object | null = null;
   try {
-    const overhangResult = await detectOverhangs({ ticker, asOfDate: earningsDate });
+    const overhangResult = await detectOverhangs({ ticker, asOfDate: earningsDate, userId });
     narrativeOverhangs = overhangResult.overhangs;
     rawHeadlines = overhangResult.rawHeadlines;
     newsSentiment = overhangResult.newsOverall as object | null;
@@ -336,6 +381,7 @@ async function generateBrief(ticker: string, earningsDate: string) {
     .from('earnings_briefs')
     .upsert(
       {
+        user_id: userId,
         ticker,
         earnings_date: earningsDate,
         beat_streak_score: beatStats.totalQuarters > 0 ? score.components.beatStreakScore : null,
@@ -389,7 +435,7 @@ async function generateBrief(ticker: string, earningsDate: string) {
         raw_headlines: rawHeadlines as unknown as object,
         news_sentiment: newsSentiment,
       },
-      { onConflict: 'ticker,earnings_date' }
+      { onConflict: 'user_id,ticker,earnings_date' }
     )
     .select()
     .single();
@@ -398,6 +444,7 @@ async function generateBrief(ticker: string, earningsDate: string) {
 
   // Log scan snapshot for flip detection (fire-and-forget, never throws)
   sb.from('brief_scans').insert({
+    user_id: userId,
     ticker,
     reconciled_action: reconciled.final_action,
     scream_score: screamResult.score,

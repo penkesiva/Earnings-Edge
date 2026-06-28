@@ -7,10 +7,13 @@
  * Body: { brief_id: string, provider: 'openai' | 'gemini' | 'claude', text: string }
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
+import { isAuthApiResult, requireAuthApi } from '@/lib/authServer';
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = await requireAuthApi();
+    if (!isAuthApiResult(auth)) return auth;
+
     const { brief_id, provider, text } = (await req.json()) as {
       brief_id?: string;
       provider?: string;
@@ -26,10 +29,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: `Unknown provider: ${provider}` }, { status: 400 });
     }
 
-    const sb = supabaseAdmin();
     console.log('[save-ai-analysis] upserting', { brief_id, provider, textLen: text.length });
 
-    const { error } = await sb
+    const { error } = await auth.sb
       .from('brief_ai_analyses')
       .upsert(
         { brief_id, provider, analysis_text: text, analyzed_at: new Date().toISOString() },

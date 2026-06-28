@@ -1,5 +1,5 @@
 import { Suspense } from 'react';
-import { supabaseAdmin } from '@/lib/supabase';
+import { requireAuthSession } from '@/lib/authServer';
 import { loadDashboardBriefAiByIds } from '@/lib/loadDashboardBriefAi';
 import { getHomeWeekdaySlots } from '@/lib/usMarketCalendar';
 import { FearGreedIndex, FearGreedIndexSkeleton } from '@/components/FearGreedIndex';
@@ -64,7 +64,7 @@ function buildUpcomingByDate(
 }
 
 export default async function HomePage() {
-  const sb = supabaseAdmin();
+  const { sb } = await requireAuthSession();
   const sessions = getHomeWeekdaySlots(5);
   const sessionDates = sessions.map(s => s.date);
 

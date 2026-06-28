@@ -3,7 +3,7 @@
  * in a single batch call (shared by overhangDetector.ts).
  *
  * Provider: Gemini 2.5 Flash Lite > OpenAI GPT-4o-mini
- * Cache: llm_scan_cache per (ticker, scan_date)
+ * Cache: llm_scan_cache per (user_id, ticker, scan_date)
  */
 
 import type { OverhangCategory } from '@/lib/screamTest';
@@ -12,6 +12,7 @@ import {
   GEMINI_VISION_OCR_MODEL,
   geminiGenerateContentUrl,
 } from '@/lib/geminiModels';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabaseAdmin } from '@/lib/supabase';
 import type {
   HeadlineSentiment,
@@ -260,12 +261,17 @@ type CacheRow = {
   news_overall: NewsOverallSentiment;
 };
 
-async function readCache(ticker: string, scanDate: string): Promise<CacheRow | null> {
+async function readCache(
+  sb: SupabaseClient,
+  userId: string,
+  ticker: string,
+  scanDate: string,
+): Promise<CacheRow | null> {
   try {
-    const db = supabaseAdmin();
-    const { data, error } = await db
+    const { data, error } = await sb
       .from('llm_scan_cache')
       .select('risks, headline_sentiments, news_overall')
+      .eq('user_id', userId)
       .eq('ticker', ticker)
       .eq('scan_date', scanDate)
       .maybeSingle();
@@ -283,18 +289,24 @@ async function readCache(ticker: string, scanDate: string): Promise<CacheRow | n
   }
 }
 
-async function writeCache(ticker: string, scanDate: string, row: CacheRow): Promise<void> {
+async function writeCache(
+  sb: SupabaseClient,
+  userId: string,
+  ticker: string,
+  scanDate: string,
+  row: CacheRow,
+): Promise<void> {
   try {
-    const db = supabaseAdmin();
-    await db.from('llm_scan_cache').upsert(
+    await sb.from('llm_scan_cache').upsert(
       {
+        user_id: userId,
         ticker,
         scan_date: scanDate,
         risks: row.risks,
         headline_sentiments: row.headline_sentiments,
         news_overall: row.news_overall,
       },
-      { onConflict: 'ticker,scan_date' },
+      { onConflict: 'user_id,ticker,scan_date' },
     );
   } catch {
     // non-fatal
@@ -305,19 +317,21 @@ async function writeCache(ticker: string, scanDate: string, row: CacheRow): Prom
 
 /**
  * Classify all headlines in one LLM call: per-headline sentiment, overall bias,
- * and material risks. Cached per (ticker, scanDate).
+ * and material risks. Cached per (userId, ticker, scanDate).
  */
 export async function classifyHeadlines(
   ticker: string,
   headlines: HeadlineInput[],
-  scanDate?: string,
+  scanDate: string | undefined,
+  userId: string,
+  sb: SupabaseClient = supabaseAdmin(),
 ): Promise<LlmClassificationResult> {
   if (headlines.length === 0) {
     return { risks: [], sentiments: [], overall: emptyNewsOverall() };
   }
 
   if (scanDate) {
-    const cached = await readCache(ticker, scanDate);
+    const cached = await readCache(sb, userId, ticker, scanDate);
     if (cached) {
       return {
         risks: cached.risks,
@@ -341,7 +355,7 @@ export async function classifyHeadlines(
   const result = parseClassification(json, headlines.length);
 
   if (scanDate && (process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY)) {
-    await writeCache(ticker, scanDate, {
+    await writeCache(sb, userId, ticker, scanDate, {
       risks: result.risks,
       headline_sentiments: result.sentiments,
       news_overall: result.overall,

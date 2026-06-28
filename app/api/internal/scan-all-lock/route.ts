@@ -1,20 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { acquireTickerScanLock, getTickerScanLock } from '@/lib/tickerScanLock';
-import { supabaseAdmin } from '@/lib/supabase';
+import { isAuthApiResult, requireAuthApi } from '@/lib/authServer';
 
 /** GET ?ticker=HPQ — current lock status for Scan All cooldown UI. */
 export async function GET(req: NextRequest) {
+  const auth = await requireAuthApi();
+  if (!isAuthApiResult(auth)) return auth;
+
   const ticker = req.nextUrl.searchParams.get('ticker')?.trim();
   if (!ticker) {
     return NextResponse.json({ error: 'ticker query param required' }, { status: 400 });
   }
 
-  const status = await getTickerScanLock(supabaseAdmin(), ticker);
+  const status = await getTickerScanLock(auth.sb, auth.user.id, ticker);
   return NextResponse.json(status);
 }
 
 /** POST { ticker, brief_id? } — atomic acquire; first caller wins for ~5 minutes. */
 export async function POST(req: NextRequest) {
+  const auth = await requireAuthApi();
+  if (!isAuthApiResult(auth)) return auth;
+
   let body: { ticker?: string; brief_id?: string };
   try {
     body = await req.json();
@@ -29,7 +35,8 @@ export async function POST(req: NextRequest) {
 
   try {
     const result = await acquireTickerScanLock(
-      supabaseAdmin(),
+      auth.sb,
+      auth.user.id,
       ticker,
       body.brief_id,
     );
