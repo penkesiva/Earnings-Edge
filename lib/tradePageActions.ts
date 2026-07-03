@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { requireAuthSession } from '@/lib/authServer';
 import {
   getOrCreateAutomationSettings,
+  isTradeSchemaReady,
   listRecentTradeOrders,
   updateAutomationSettings,
 } from '@/lib/automationSettings';
@@ -18,7 +19,8 @@ export type TradePageState = {
 
 export async function loadTradePageData() {
   const { sb, user } = await requireAuthSession();
-  const [settings, candidates, orders, alpacaSummaries] = await Promise.all([
+  const [schemaReady, settings, candidates, orders, alpacaSummaries] = await Promise.all([
+    isTradeSchemaReady(sb),
     getOrCreateAutomationSettings(sb, user.id),
     loadGoTradeCandidates(sb, user.id),
     listRecentTradeOrders(sb, user.id),
@@ -29,7 +31,7 @@ export async function loadTradePageData() {
     s => s.environment === 'paper' && s.configured,
   );
 
-  return { settings, candidates, orders, paperConfigured };
+  return { settings, candidates, orders, paperConfigured, migrationRequired: !schemaReady };
 }
 
 export async function toggleAutoTradeAction(

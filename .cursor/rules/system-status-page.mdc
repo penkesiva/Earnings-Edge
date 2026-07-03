@@ -13,7 +13,7 @@ After **systematic** project changes, update in the same PR/commit:
 
 1. **`lib/systemStatusManifest.ts`** — phases, migrations list, required env vars, bump `manifestVersion`
 2. **`lib/systemHealthCheck.ts`** — new table probes or env checks when schema/infra changes
-3. **Login landing** — default post-auth path is `/status` (`app/login/page.tsx`, `app/auth/callback/route.ts`)
+3. **Login landing** — default post-auth path is `/` (Home); `/status` is in the nav for health checks
 
 Trigger examples: new migration, new major route/page, new required env var, shipped/planned phase, auth or RLS change.
 

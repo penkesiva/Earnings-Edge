@@ -15,7 +15,7 @@ function LoginForm() {
   const [error, setError] = useState('');
   const [googleLoading, setGoogleLoading] = useState(false);
 
-  const next = searchParams.get('next') || '/status';
+  const next = searchParams.get('next') || '/';
   const queryError = searchParams.get('error');
 
   useEffect(() => {

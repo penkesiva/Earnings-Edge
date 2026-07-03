@@ -14,7 +14,7 @@ import {
   toggleKillSwitchAction,
   updateMaxNotionalAction,
   type TradePageState,
-} from '@/app/(dashboard)/trade/actions';
+} from '@/lib/tradePageActions';
 
 const FIELD =
   'w-full h-10 box-border bg-bg border border-border px-3 text-sm font-mono focus:outline-none focus:border-accent';
@@ -87,11 +87,13 @@ export function TradeAutomationPanel({
   candidates,
   orders,
   paperConfigured,
+  migrationRequired = false,
 }: {
   settings: AutomationSettings;
   candidates: GoTradeCandidate[];
   orders: TradeOrderRow[];
   paperConfigured: boolean;
+  migrationRequired?: boolean;
 }) {
   const [autoState, autoAction] = useFormState(toggleAutoTradeAction, {});
   const [killState, killAction] = useFormState(toggleKillSwitchAction, {});
@@ -128,7 +130,11 @@ export function TradeAutomationPanel({
         </div>
       ) : null}
 
-      <section className="border panel-accent divide-y divide-border-subtle">
+      <section
+        className={`border panel-accent divide-y divide-border-subtle ${
+          migrationRequired ? 'opacity-60 pointer-events-none' : ''
+        }`}
+      >
         <div className="px-4 py-3 flex flex-wrap items-center gap-2 justify-between bg-bg-elevated">
           <div>
             <h2 className="text-sm font-bold tracking-wide">Automation</h2>

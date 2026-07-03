@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { isMissingRelationError } from '@/lib/supabaseErrors';
 
 export type AutomationSettings = {
   userId: string;
@@ -25,6 +26,15 @@ export type TradeOrderRow = {
   errorMessage: string | null;
   createdAt: string;
 };
+
+const DEFAULT_SETTINGS = (userId: string): AutomationSettings => ({
+  userId,
+  autoTradeEnabled: false,
+  killSwitch: false,
+  liveTradingEnabled: false,
+  maxNotionalUsd: 1000,
+  updatedAt: new Date().toISOString(),
+});
 
 type SettingsRow = {
   user_id: string;
@@ -92,7 +102,10 @@ export async function getOrCreateAutomationSettings(
     .eq('user_id', userId)
     .maybeSingle();
 
-  if (error) throw new Error(error.message);
+  if (error) {
+    if (isMissingRelationError(error)) return DEFAULT_SETTINGS(userId);
+    throw new Error(error.message);
+  }
   if (data) return mapSettings(data as SettingsRow);
 
   const now = new Date().toISOString();
@@ -102,7 +115,10 @@ export async function getOrCreateAutomationSettings(
     .select('*')
     .single();
 
-  if (insertError) throw new Error(insertError.message);
+  if (insertError) {
+    if (isMissingRelationError(insertError)) return DEFAULT_SETTINGS(userId);
+    throw new Error(insertError.message);
+  }
   return mapSettings(inserted as SettingsRow);
 }
 
@@ -141,7 +157,10 @@ export async function updateAutomationSettings(
     .select('*')
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) {
+    if (isMissingRelationError(error)) throw new Error('Run migration 0019_automation_trade.sql in Supabase.');
+    throw new Error(error.message);
+  }
   return mapSettings(data as SettingsRow);
 }
 
@@ -157,7 +176,10 @@ export async function listRecentTradeOrders(
     .order('created_at', { ascending: false })
     .limit(limit);
 
-  if (error) throw new Error(error.message);
+  if (error) {
+    if (isMissingRelationError(error)) return [];
+    throw new Error(error.message);
+  }
   return (data ?? []).map(row => mapOrder(row as OrderRow));
 }
 
@@ -173,6 +195,15 @@ export async function getTradedBriefIds(
     .eq('user_id', userId)
     .in('brief_id', briefIds);
 
-  if (error) throw new Error(error.message);
+  if (error) {
+    if (isMissingRelationError(error)) return new Set();
+    throw new Error(error.message);
+  }
   return new Set((data ?? []).map(r => r.brief_id as string));
+}
+
+export async function isTradeSchemaReady(sb: SupabaseClient): Promise<boolean> {
+  const { error } = await sb.from('automation_settings').select('*', { head: true });
+  if (!error) return true;
+  return !isMissingRelationError(error);
 }
