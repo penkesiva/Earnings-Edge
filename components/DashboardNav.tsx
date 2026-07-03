@@ -8,6 +8,7 @@ const LINKS = [
   { href: '/watchlist', label: 'Watchlist' },
   { href: '/trade', label: 'Trade' },
   { href: '/history', label: 'History' },
+  { href: '/status', label: 'Status' },
   { href: '/settings', label: 'Settings' },
 ] as const;
 

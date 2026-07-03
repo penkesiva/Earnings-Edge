@@ -7,8 +7,8 @@ import type { SupabaseCookie } from '@/lib/supabase/cookies';
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const code = url.searchParams.get('code');
-  const nextPath = url.searchParams.get('next') ?? '/';
-  const safeNext = nextPath.startsWith('/') && !nextPath.startsWith('//') ? nextPath : '/';
+  const nextPath = url.searchParams.get('next') ?? '/status';
+  const safeNext = nextPath.startsWith('/') && !nextPath.startsWith('//') ? nextPath : '/status';
 
   if (!code) {
     return NextResponse.redirect(`${url.origin}/login?error=auth`);

@@ -1,0 +1,31 @@
+---
+description: Keep the authenticated /status page and manifest in sync with project changes.
+alwaysApply: true
+---
+
+# System status page
+
+The app has a **login-only** health page at **`/status`** (`app/(dashboard)/status/page.tsx`).
+
+## When to update
+
+After **systematic** project changes, update in the same PR/commit:
+
+1. **`lib/systemStatusManifest.ts`** — phases, migrations list, required env vars, bump `manifestVersion`
+2. **`lib/systemHealthCheck.ts`** — new table probes or env checks when schema/infra changes
+3. **Login landing** — default post-auth path is `/status` (`app/login/page.tsx`, `app/auth/callback/route.ts`)
+
+Trigger examples: new migration, new major route/page, new required env var, shipped/planned phase, auth or RLS change.
+
+## Do not
+
+- Expose secret values on `/status` (boolean/set-only for env)
+- Add `/status` to public routes in `middleware.ts`
+- Skip manifest update when adding a migration users must run
+
+## Quick checklist
+
+- [ ] Phase row added or status changed in manifest
+- [ ] Migration row added if new `supabase/migrations/*.sql`
+- [ ] Health probe for new tables if applicable
+- [ ] `manifestVersion` date bumped
