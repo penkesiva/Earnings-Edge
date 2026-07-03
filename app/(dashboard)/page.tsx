@@ -1,8 +1,14 @@
 import { Suspense } from 'react';
 import { requireAuthSession } from '@/lib/authServer';
 import { loadDashboardBriefAiByIds } from '@/lib/loadDashboardBriefAi';
+import {
+  buildTopEarningsPicks,
+  getPreMarketFocusDates,
+  type TopPickBriefInput,
+} from '@/lib/topEarningsPicks';
 import { getHomeWeekdaySlots } from '@/lib/usMarketCalendar';
 import { FearGreedIndex, FearGreedIndexSkeleton } from '@/components/FearGreedIndex';
+import { TopEarningsPicksPanel } from '@/components/TopEarningsPicksPanel';
 import { UpcomingWeekList } from '@/components/UpcomingWeekList';
 
 export const dynamic = 'force-dynamic';
@@ -67,6 +73,24 @@ export default async function HomePage() {
   const { sb } = await requireAuthSession();
   const sessions = getHomeWeekdaySlots(5);
   const sessionDates = sessions.map(s => s.date);
+  const focusDates = getPreMarketFocusDates(2);
+
+  const { data: activeWatchlist } = await sb
+    .from('watchlist')
+    .select('ticker')
+    .eq('active', true);
+
+  const activeTickers = new Set((activeWatchlist ?? []).map(w => w.ticker));
+
+  const { data: focusBriefs } = focusDates.length
+    ? await sb
+        .from('earnings_briefs')
+        .select(
+          'id, ticker, earnings_date, composite_score, scream_score, scream_qualifies, scream_direction, final_action, expected_move_pct',
+        )
+        .in('earnings_date', focusDates)
+        .order('composite_score', { ascending: false })
+    : { data: [] as TopPickBriefInput[] };
 
   const { data: sessionEvents } = sessionDates.length
     ? await sb
@@ -96,8 +120,19 @@ export default async function HomePage() {
     sessionBriefs ?? [],
   );
 
-  const allBriefIds = (sessionBriefs ?? []).map(b => b.id);
+  const allBriefIds = [
+    ...new Set([
+      ...(focusBriefs ?? []).map(b => b.id),
+      ...(sessionBriefs ?? []).map(b => b.id),
+    ]),
+  ];
   const aiMetaByBriefId = await loadDashboardBriefAiByIds(sb, allBriefIds);
+  const topPicks = buildTopEarningsPicks(
+    focusBriefs ?? [],
+    aiMetaByBriefId,
+    activeTickers,
+    focusDates,
+  );
   const aiMetaFor = (briefId: string | undefined) =>
     briefId ? aiMetaByBriefId.get(briefId) ?? null : null;
 
@@ -106,6 +141,12 @@ export default async function HomePage() {
       <Suspense fallback={<FearGreedIndexSkeleton />}>
         <FearGreedIndex />
       </Suspense>
+
+      <TopEarningsPicksPanel
+        focusLabel={topPicks.focusLabel}
+        bullish={topPicks.bullish}
+        bearish={topPicks.bearish}
+      />
 
       <UpcomingWeekList
         sessions={sessions}
