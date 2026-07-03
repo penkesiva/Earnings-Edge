@@ -26,7 +26,7 @@ export type ServerEnvRequirement = {
 
 export const SYSTEM_STATUS_MANIFEST = {
   /** Bump when you change phases, migrations, or env requirements below. */
-  manifestVersion: '2026-06-02',
+  manifestVersion: '2026-06-03',
 
   phases: [
     {
@@ -56,6 +56,12 @@ export const SYSTEM_STATUS_MANIFEST = {
       status: 'shipped',
     },
     {
+      id: 'year-round',
+      name: 'Year-round Top 10 beyond earnings week',
+      route: '/',
+      status: 'shipped',
+    },
+    {
       id: 'alpaca',
       name: 'Per-user Alpaca paper/live keys in Settings',
       route: '/settings',
@@ -68,12 +74,6 @@ export const SYSTEM_STATUS_MANIFEST = {
       route: '/trade',
       migration: '0019',
       status: 'shipped',
-    },
-    {
-      id: 'year-round',
-      name: 'Year-round Top 10 beyond earnings week',
-      route: '/',
-      status: 'planned',
     },
   ] satisfies SystemPhase[],
 

@@ -3,12 +3,17 @@ import { requireAuthSession } from '@/lib/authServer';
 import { loadDashboardBriefAiByIds } from '@/lib/loadDashboardBriefAi';
 import {
   buildTopEarningsPicks,
+  buildYearRoundTopPicks,
   getPreMarketFocusDates,
-  type TopPickBriefInput,
+  YEAR_ROUND_PICK_HORIZON_DAYS,
 } from '@/lib/topEarningsPicks';
+import { addCalendarDays, earningsSessionDate } from '@/lib/earningsDate';
 import { getHomeWeekdaySlots } from '@/lib/usMarketCalendar';
 import { FearGreedIndex, FearGreedIndexSkeleton } from '@/components/FearGreedIndex';
-import { TopEarningsPicksPanel } from '@/components/TopEarningsPicksPanel';
+import {
+  TopEarningsPicksPanel,
+  TopYearRoundPicksPanel,
+} from '@/components/TopEarningsPicksPanel';
 import { UpcomingWeekList } from '@/components/UpcomingWeekList';
 
 export const dynamic = 'force-dynamic';
@@ -74,6 +79,8 @@ export default async function HomePage() {
   const sessions = getHomeWeekdaySlots(5);
   const sessionDates = sessions.map(s => s.date);
   const focusDates = getPreMarketFocusDates(2);
+  const today = earningsSessionDate();
+  const yearRoundEnd = addCalendarDays(today, YEAR_ROUND_PICK_HORIZON_DAYS);
 
   const { data: activeWatchlist } = await sb
     .from('watchlist')
@@ -82,15 +89,15 @@ export default async function HomePage() {
 
   const activeTickers = new Set((activeWatchlist ?? []).map(w => w.ticker));
 
-  const { data: focusBriefs } = focusDates.length
-    ? await sb
-        .from('earnings_briefs')
-        .select(
-          'id, ticker, earnings_date, composite_score, scream_score, scream_qualifies, scream_direction, final_action, expected_move_pct',
-        )
-        .in('earnings_date', focusDates)
-        .order('composite_score', { ascending: false })
-    : { data: [] as TopPickBriefInput[] };
+  const pickBriefSelect =
+    'id, ticker, earnings_date, composite_score, scream_score, scream_qualifies, scream_direction, final_action, expected_move_pct';
+
+  const { data: pickBriefs } = await sb
+    .from('earnings_briefs')
+    .select(pickBriefSelect)
+    .gte('earnings_date', today)
+    .lte('earnings_date', yearRoundEnd)
+    .order('composite_score', { ascending: false });
 
   const { data: sessionEvents } = sessionDates.length
     ? await sb
@@ -122,16 +129,23 @@ export default async function HomePage() {
 
   const allBriefIds = [
     ...new Set([
-      ...(focusBriefs ?? []).map(b => b.id),
+      ...(pickBriefs ?? []).map(b => b.id),
       ...(sessionBriefs ?? []).map(b => b.id),
     ]),
   ];
   const aiMetaByBriefId = await loadDashboardBriefAiByIds(sb, allBriefIds);
   const topPicks = buildTopEarningsPicks(
-    focusBriefs ?? [],
+    pickBriefs ?? [],
     aiMetaByBriefId,
     activeTickers,
     focusDates,
+  );
+  const yearRoundPicks = buildYearRoundTopPicks(
+    pickBriefs ?? [],
+    aiMetaByBriefId,
+    activeTickers,
+    focusDates,
+    today,
   );
   const aiMetaFor = (briefId: string | undefined) =>
     briefId ? aiMetaByBriefId.get(briefId) ?? null : null;
@@ -146,6 +160,12 @@ export default async function HomePage() {
         focusLabel={topPicks.focusLabel}
         bullish={topPicks.bullish}
         bearish={topPicks.bearish}
+      />
+
+      <TopYearRoundPicksPanel
+        focusLabel={yearRoundPicks.focusLabel}
+        bullish={yearRoundPicks.bullish}
+        bearish={yearRoundPicks.bearish}
       />
 
       <UpcomingWeekList

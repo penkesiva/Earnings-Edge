@@ -161,27 +161,6 @@ export function SystemStatusPanel({ report }: { report: SystemHealthReport }) {
               status="ok"
               title={phase.name}
               href={phase.route}
-              footer={phase.migration ? `Migration ${phase.migration}` : undefined}
-            />
-          ))}
-        </div>
-      </section>
-
-      <section className="space-y-3">
-        <h3 className="text-sm font-bold tracking-wide">
-          <span className="page-chevron">›</span> SUPABASE MIGRATIONS
-        </h3>
-        <p className="text-xs text-fg-subtle">
-          Run in the Supabase SQL editor if health checks show missing tables.
-        </p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {SYSTEM_STATUS_MANIFEST.migrations.map(m => (
-            <StatusCard
-              key={m.id}
-              status="ok"
-              title={m.file}
-              detail={m.summary}
-              footer={`Migration ${m.id}`}
             />
           ))}
         </div>

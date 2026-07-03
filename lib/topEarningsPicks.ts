@@ -1,6 +1,6 @@
 import { parseSynthesisResponse, type Direction, type VerdictCall } from '@/lib/aiConsensus';
 import type { DashboardBriefAiMeta } from '@/lib/loadDashboardBriefAi';
-import { formatDayHeader } from '@/lib/earningsDate';
+import { formatDayHeader, addCalendarDays, earningsSessionDate } from '@/lib/earningsDate';
 import { getHomeWeekdaySlots } from '@/lib/usMarketCalendar';
 
 export type TopPickBriefInput = {
@@ -92,18 +92,17 @@ export function computeTopPickRankScore(input: {
   return Math.round(score * 10) / 10;
 }
 
-export function buildTopEarningsPicks(
+function collectTopPickRows(
   briefs: TopPickBriefInput[],
   aiMetaByBriefId: Map<string, DashboardBriefAiMeta>,
   activeTickers: Set<string>,
-  focusDates: string[],
-): TopPicksResult {
-  const focusSet = new Set(focusDates);
+  includeDate: (earningsDate: string) => boolean,
+): TopPickRow[] {
   const rows: TopPickRow[] = [];
 
   for (const brief of briefs) {
     if (!activeTickers.has(brief.ticker)) continue;
-    if (!focusSet.has(brief.earnings_date)) continue;
+    if (!includeDate(brief.earnings_date)) continue;
 
     const meta = aiMetaByBriefId.get(brief.id);
     const consensusText = meta?.consensusText ?? null;
@@ -138,6 +137,10 @@ export function buildTopEarningsPicks(
     });
   }
 
+  return rows;
+}
+
+function splitTopRows(rows: TopPickRow[]): { bullish: TopPickRow[]; bearish: TopPickRow[] } {
   const bullish = rows
     .filter(r => r.direction === 'UP')
     .sort((a, b) => b.rankScore - a.rankScore || b.compositeScore - a.compositeScore)
@@ -148,6 +151,37 @@ export function buildTopEarningsPicks(
     .sort((a, b) => b.rankScore - a.rankScore || b.compositeScore - a.compositeScore)
     .slice(0, 10);
 
+  return { bullish, bearish };
+}
+
+function dedupeTopRowsByTicker(rows: TopPickRow[]): TopPickRow[] {
+  const best = new Map<string, TopPickRow>();
+  for (const row of rows) {
+    const existing = best.get(row.ticker);
+    if (!existing || row.rankScore > existing.rankScore) {
+      best.set(row.ticker, row);
+    }
+  }
+  return [...best.values()];
+}
+
+export const YEAR_ROUND_PICK_HORIZON_DAYS = 90;
+
+export function buildTopEarningsPicks(
+  briefs: TopPickBriefInput[],
+  aiMetaByBriefId: Map<string, DashboardBriefAiMeta>,
+  activeTickers: Set<string>,
+  focusDates: string[],
+): TopPicksResult {
+  const focusSet = new Set(focusDates);
+  const rows = collectTopPickRows(
+    briefs,
+    aiMetaByBriefId,
+    activeTickers,
+    date => focusSet.has(date),
+  );
+  const { bullish, bearish } = splitTopRows(rows);
+
   const focusLabel =
     focusDates.length === 0
       ? ''
@@ -156,4 +190,35 @@ export function buildTopEarningsPicks(
         : `${formatDayHeader(focusDates[0])} · ${formatDayHeader(focusDates[1])}`;
 
   return { focusDates, focusLabel, bullish, bearish };
+}
+
+/** Watchlist picks outside the pre-earnings window — one best brief per ticker. */
+export function buildYearRoundTopPicks(
+  briefs: TopPickBriefInput[],
+  aiMetaByBriefId: Map<string, DashboardBriefAiMeta>,
+  activeTickers: Set<string>,
+  excludeDates: string[],
+  today: string,
+  horizonDays = YEAR_ROUND_PICK_HORIZON_DAYS,
+): TopPicksResult {
+  const exclude = new Set(excludeDates);
+  const horizonEnd = addCalendarDays(today, horizonDays);
+
+  const rows = dedupeTopRowsByTicker(
+    collectTopPickRows(
+      briefs,
+      aiMetaByBriefId,
+      activeTickers,
+      date => date >= today && date <= horizonEnd && !exclude.has(date),
+    ),
+  );
+
+  const { bullish, bearish } = splitTopRows(rows);
+
+  return {
+    focusDates: [],
+    focusLabel: `Next ${horizonDays} days · outside earnings focus`,
+    bullish,
+    bearish,
+  };
 }

@@ -26,6 +26,5 @@ Trigger examples: new migration, new major route/page, new required env var, shi
 ## Quick checklist
 
 - [ ] Phase row added or status changed in manifest
-- [ ] Migration row added if new `supabase/migrations/*.sql`
-- [ ] Health probe for new tables if applicable
 - [ ] `manifestVersion` date bumped
+- Migrations list stays in `systemStatusManifest.ts` for agents only — not shown on `/status` UI
