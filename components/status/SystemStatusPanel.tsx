@@ -34,27 +34,88 @@ function StatusBadge({ status }: { status: HealthStatus }) {
   );
 }
 
+function cardBorder(status: HealthStatus): string {
+  if (status === 'ok') return 'border-signal-buy/25';
+  if (status === 'warn') return 'border-signal-watch/35';
+  if (status === 'fail') return 'border-signal-sell/35';
+  return 'border-border';
+}
+
+function StatusCard({
+  status,
+  title,
+  detail,
+  href,
+  footer,
+}: {
+  status: HealthStatus;
+  title: string;
+  detail?: string;
+  href?: string;
+  footer?: string;
+}) {
+  const body = (
+    <>
+      <div className="flex items-start justify-between gap-2">
+        <StatusDot status={status} />
+        <StatusBadge status={status} />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className={`text-sm font-medium leading-snug ${href ? 'group-hover:text-accent' : ''}`}>
+          {title}
+        </p>
+        {detail ? (
+          <p className="text-xs text-fg-dim mt-2 break-words leading-relaxed">{detail}</p>
+        ) : null}
+        {footer ? (
+          <p className="text-[10px] text-fg-dim mt-2 uppercase tracking-widest">{footer}</p>
+        ) : null}
+      </div>
+    </>
+  );
+
+  const cls = `border bg-bg-elevated p-4 flex flex-col gap-3 h-full min-h-[7rem] transition-colors ${cardBorder(status)}`;
+
+  if (href) {
+    return (
+      <Link href={href} className={`${cls} group hover:bg-bg-hover hover:border-accent/40`}>
+        {body}
+      </Link>
+    );
+  }
+
+  return <article className={cls}>{body}</article>;
+}
+
 export function SystemStatusPanel({ report }: { report: SystemHealthReport }) {
   const allOk = report.summary.fail === 0;
   const shipped = SYSTEM_STATUS_MANIFEST.phases.filter(p => p.status === 'shipped');
 
   return (
-    <div className="space-y-8 max-w-2xl">
+    <div className="space-y-8 max-w-4xl">
       <section
-        className={`border px-4 py-5 ${
+        className={`border px-5 py-5 sm:px-6 ${
           allOk ? 'panel-accent border-signal-buy/30 bg-signal-buy/5' : 'border-signal-watch/40 bg-signal-watch/5'
         }`}
       >
         <div className="flex items-start gap-3">
           <StatusDot status={allOk ? 'ok' : 'warn'} />
-          <div className="space-y-2 min-w-0">
+          <div className="space-y-2 min-w-0 flex-1">
             <h2 className="text-lg font-bold tracking-tight">
               {allOk ? 'You’re in — everything checks out' : 'Signed in — some checks need attention'}
             </h2>
             <p className="text-sm text-fg-subtle break-all">{report.userEmail}</p>
-            <p className="text-xs text-fg-dim">
-              {report.summary.ok} ok · {report.summary.warn} warn · {report.summary.fail} fail
-            </p>
+            <div className="flex flex-wrap gap-2 pt-1">
+              <span className="text-[10px] tracking-widest uppercase px-2 py-1 border border-signal-buy/40 text-signal-buy bg-signal-buy/10">
+                {report.summary.ok} ok
+              </span>
+              <span className="text-[10px] tracking-widest uppercase px-2 py-1 border border-signal-watch/40 text-signal-watch bg-signal-watch/10">
+                {report.summary.warn} warn
+              </span>
+              <span className="text-[10px] tracking-widest uppercase px-2 py-1 border border-signal-sell/40 text-signal-sell bg-signal-sell/10">
+                {report.summary.fail} fail
+              </span>
+            </div>
           </div>
         </div>
         <div className="mt-5 flex flex-wrap gap-2">
@@ -77,43 +138,33 @@ export function SystemStatusPanel({ report }: { report: SystemHealthReport }) {
         <h3 className="text-sm font-bold tracking-wide">
           <span className="page-chevron">›</span> HEALTH CHECKS
         </h3>
-        <ul className="border border-border divide-y divide-border-subtle">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {report.checks.map(row => (
-            <li key={row.id} className="px-4 py-3 flex items-start gap-3">
-              <StatusDot status={row.status} />
-              <div className="flex-1 min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-sm font-medium">{row.label}</span>
-                  <StatusBadge status={row.status} />
-                </div>
-                {row.detail ? (
-                  <p className="text-xs text-fg-dim mt-1 break-words">{row.detail}</p>
-                ) : null}
-              </div>
-            </li>
+            <StatusCard
+              key={row.id}
+              status={row.status}
+              title={row.label}
+              detail={row.detail}
+            />
           ))}
-        </ul>
+        </div>
       </section>
 
       <section className="space-y-3">
         <h3 className="text-sm font-bold tracking-wide">
           <span className="page-chevron">›</span> SHIPPED CAPABILITIES
         </h3>
-        <ul className="border border-border divide-y divide-border-subtle">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {shipped.map(phase => (
-            <li key={phase.id} className="px-4 py-3 flex items-center gap-3">
-              <StatusDot status="ok" />
-              <div className="flex-1 min-w-0">
-                <Link href={phase.route} className="text-sm font-medium hover:text-accent">
-                  {phase.name}
-                </Link>
-                {phase.migration ? (
-                  <p className="text-[10px] text-fg-dim mt-0.5">Migration {phase.migration}</p>
-                ) : null}
-              </div>
-            </li>
+            <StatusCard
+              key={phase.id}
+              status="ok"
+              title={phase.name}
+              href={phase.route}
+              footer={phase.migration ? `Migration ${phase.migration}` : undefined}
+            />
           ))}
-        </ul>
+        </div>
       </section>
 
       <section className="space-y-3">
@@ -123,14 +174,17 @@ export function SystemStatusPanel({ report }: { report: SystemHealthReport }) {
         <p className="text-xs text-fg-subtle">
           Run in the Supabase SQL editor if health checks show missing tables.
         </p>
-        <ul className="border border-border divide-y divide-border-subtle text-xs">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {SYSTEM_STATUS_MANIFEST.migrations.map(m => (
-            <li key={m.id} className="px-4 py-3">
-              <p className="font-mono text-fg">{m.file}</p>
-              <p className="text-fg-dim mt-1">{m.summary}</p>
-            </li>
+            <StatusCard
+              key={m.id}
+              status="ok"
+              title={m.file}
+              detail={m.summary}
+              footer={`Migration ${m.id}`}
+            />
           ))}
-        </ul>
+        </div>
       </section>
 
       <div className="text-[10px] text-fg-dim flex flex-wrap items-center gap-x-3 gap-y-1">
