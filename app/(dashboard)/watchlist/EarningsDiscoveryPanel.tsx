@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import type { EarningsCandidateRow } from '@/lib/earningsDiscovery';
+import { discoveryFilterSummary } from '@/lib/earningsDiscoveryFilter';
 import {
   addAllDiscoveryCandidatesAction,
   addDiscoveryCandidateAction,
@@ -104,9 +105,7 @@ export function EarningsDiscoveryPanel({
       <div className="px-3 sm:px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="min-w-0">
           <h2 className="text-sm font-bold tracking-wide">Upcoming earnings (14 days)</h2>
-          <p className="text-xs text-fg-subtle mt-1">
-            FMP calendar · price ≥ $5 · cap ≥ $2B · no pharma/biotech
-          </p>
+          <p className="text-xs text-fg-subtle mt-1">{discoveryFilterSummary()}</p>
         </div>
         <div className="flex flex-wrap gap-2 shrink-0">
           <button

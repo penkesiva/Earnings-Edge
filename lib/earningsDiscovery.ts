@@ -3,6 +3,7 @@ import { addCalendarDays, earningsSessionDate } from '@/lib/earningsDate';
 import {
   calendarTiming,
   EARNINGS_DISCOVERY_DAYS,
+  isNonCommonEquitySymbol,
   passesDiscoveryFilter,
   type DiscoveryProfile,
 } from '@/lib/earningsDiscoveryFilter';
@@ -76,11 +77,22 @@ export async function fetchAndStoreEarningsCandidates(
 
   const calendar = await getEarningsCalendar(today, to);
   const deduped = dedupeCalendar(calendar);
-  const uniqueTickers = [...new Set(deduped.map(r => r.symbol.toUpperCase()))];
+  const rejected: Record<string, number> = {};
 
+  // Drop preferreds/warrants/units before quote calls — FMP lists many BAC-P* clones.
+  const equityRows = deduped.filter(row => {
+    const ticker = row.symbol.toUpperCase();
+    if (isNonCommonEquitySymbol(ticker)) {
+      rejected.non_common_equity = (rejected.non_common_equity ?? 0) + 1;
+      return false;
+    }
+    return true;
+  });
+
+  const uniqueTickers = [...new Set(equityRows.map(r => r.symbol.toUpperCase()))];
   const quotes = await getQuotesBatch(uniqueTickers);
 
-  // First pass: price + market cap from batch quotes (fast).
+  // First pass: price + market cap + volume from batch quotes (fast).
   const needsProfile = new Set<string>();
   const quoteProfileByTicker = new Map<string, DiscoveryProfile>();
 
@@ -93,6 +105,7 @@ export async function fetchAndStoreEarningsCandidates(
       industry: null,
       price: q?.price ?? null,
       marketCap: q?.marketCap ?? null,
+      avgVolume: q?.avgVolume ?? null,
     };
     quoteProfileByTicker.set(ticker, draft);
 
@@ -103,6 +116,8 @@ export async function fetchAndStoreEarningsCandidates(
     }
     if (
       result.reason === 'pharma_excluded' ||
+      result.reason === 'non_common_equity' ||
+      result.reason === 'low_volume' ||
       result.reason === 'missing_market_cap' ||
       (result.reason === 'small_cap' && draft.marketCap != null)
     ) {
@@ -131,11 +146,11 @@ export async function fetchAndStoreEarningsCandidates(
       industry: profile.industry,
       price: profile.price ?? base.price,
       marketCap: profile.marketCap ?? base.marketCap,
+      avgVolume: base.avgVolume,
     });
   }
 
-  const rejected: Record<string, number> = {};
-  const filtered = deduped.filter(row => {
+  const filtered = equityRows.filter(row => {
     const profile = quoteProfileByTicker.get(row.symbol.toUpperCase());
     if (!profile) return false;
     const result = passesDiscoveryFilter(profile);
