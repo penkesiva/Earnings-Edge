@@ -205,13 +205,19 @@ export async function fetchUpcomingEarningsAction(): Promise<DiscoveryActionStat
     const stats = await fetchAndStoreEarningsCandidates(sb, user.id);
     revalidatePath('/watchlist');
     const rejectedTotal = Object.values(stats.rejected).reduce((a, b) => a + b, 0);
+    const topRejects = Object.entries(stats.rejected)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([k, v]) => `${k} ${v}`)
+      .join(', ');
     const skipBits = [
       stats.skippedAdded ? `${stats.skippedAdded} already on watchlist` : null,
       stats.skippedDismissed ? `${stats.skippedDismissed} dismissed` : null,
+      topRejects ? `rejects: ${topRejects}` : null,
     ].filter(Boolean);
-    const skipNote = skipBits.length ? ` · ${skipBits.join(', ')}` : '';
+    const skipNote = skipBits.length ? ` · ${skipBits.join(' · ')}` : '';
     return {
-      success: `Found ${stats.pendingShown} names for the next 14 days (${rejectedTotal} filtered out)${skipNote}.`,
+      success: `Found ${stats.pendingShown} US-listed names (${rejectedTotal} filtered)${skipNote}.`,
       stats,
     };
   } catch (e) {

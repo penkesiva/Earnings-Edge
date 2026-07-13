@@ -1,9 +1,9 @@
-/** Discovery filters — liquid common equity only (no preferreds / warrants / units). */
+/** Discovery filters — US-listed liquid common equity (no preferreds / OTC / foreign). */
 
 export const EARNINGS_DISCOVERY_DAYS = 14;
 export const MIN_DISCOVERY_PRICE = 5;
-/** Large/mid-cap floor — cuts thin names that clutter the 14-day list. */
-export const MIN_DISCOVERY_MARKET_CAP = 5_000_000_000;
+/** Mid-cap+ floor once the name is confirmed US-listed. */
+export const MIN_DISCOVERY_MARKET_CAP = 2_000_000_000;
 
 const EXCLUDED_INDUSTRY_RE =
   /pharma|biotech|biopharm|therapeutic|drug manufacturer|medicinal|oncology|clinical[- ]stage|biologics/i;
@@ -12,6 +12,26 @@ const EXCLUDED_INDUSTRY_RE =
 const PREFERRED_NAME_RE =
   /\b(preferred\s+(stock|shares?)|pref\.?\s*shares?|depositary\s+shares?|dep(?:ository)?\.?\s*shares?)\b/i;
 
+const US_EXCHANGE_ALLOW = new Set([
+  'NYSE',
+  'NASDAQ',
+  'AMEX',
+  'NYSEARCA',
+  'NYSE AMERICAN',
+  'NYSE ARCA',
+  'BATS',
+  'CBOE',
+  'ARCA',
+  'NASDAQGS',
+  'NASDAQGM',
+  'NASDAQCM',
+  'NASDAQ GLOBAL SELECT',
+  'NASDAQ GLOBAL MARKET',
+  'NASDAQ CAPITAL MARKET',
+  'NEW YORK STOCK EXCHANGE',
+  'NYSE MKT',
+]);
+
 export type DiscoveryProfile = {
   ticker: string;
   companyName: string | null;
@@ -19,6 +39,9 @@ export type DiscoveryProfile = {
   industry: string | null;
   price: number | null;
   marketCap: number | null;
+  exchange?: string | null;
+  isEtf?: boolean;
+  isFund?: boolean;
 };
 
 export type DiscoveryFilterReject =
@@ -26,8 +49,11 @@ export type DiscoveryFilterReject =
   | 'small_cap'
   | 'pharma_excluded'
   | 'non_common_equity'
+  | 'non_us_listed'
+  | 'etf_or_fund'
   | 'missing_price'
-  | 'missing_market_cap';
+  | 'missing_market_cap'
+  | 'missing_exchange';
 
 /**
  * Drop preferred shares, warrants, units, rights — keeps common class shares
@@ -50,6 +76,14 @@ export function isNonCommonEquitySymbol(ticker: string): boolean {
   return false;
 }
 
+/** Cheap reject for common OTC ADR patterns (e.g. CWQXY) before profile calls. */
+export function isLikelyOtcticker(ticker: string): boolean {
+  const t = ticker.toUpperCase().trim();
+  // 5-letter tickers ending in Y/F are usually OTC foreign / ADR junk on the FMP calendar.
+  if (/^[A-Z]{5}[YF]$/.test(t)) return true;
+  return false;
+}
+
 export function isPreferredShareName(companyName: string | null): boolean {
   if (!companyName?.trim()) return false;
   return PREFERRED_NAME_RE.test(companyName);
@@ -61,19 +95,50 @@ export function isPharmaOrTherapeutic(sector: string | null, industry: string | 
   return EXCLUDED_INDUSTRY_RE.test(hay);
 }
 
+/** NYSE / Nasdaq / Amex / Arca — drops OTC foreign listings like CWQXY. */
+export function isUsListedExchange(exchange: string | null | undefined): boolean {
+  if (!exchange?.trim()) return false;
+  const e = exchange.trim().toUpperCase();
+  if (/OTC|PINK|GREY|GRAY|EXPERT|TOKYO|LONDON|STOCKHOLM|TSX|EURONEXT|FRANKFURT/i.test(e)) {
+    return false;
+  }
+  if (US_EXCHANGE_ALLOW.has(e)) return true;
+  if (/^NYSE\b/.test(e) || /^NASDAQ\b/.test(e) || /^AMEX\b/.test(e)) return true;
+  return false;
+}
+
+export function normalizeMarketCap(value: number | null | undefined): number | null {
+  if (value == null || !Number.isFinite(value) || value <= 0) return null;
+  return value;
+}
+
 export function passesDiscoveryFilter(
   profile: DiscoveryProfile,
 ): { ok: true } | { ok: false; reason: DiscoveryFilterReject } {
   if (isNonCommonEquitySymbol(profile.ticker) || isPreferredShareName(profile.companyName)) {
     return { ok: false, reason: 'non_common_equity' };
   }
+  if (profile.isEtf || profile.isFund) {
+    return { ok: false, reason: 'etf_or_fund' };
+  }
+  if (profile.exchange != null && profile.exchange !== '') {
+    if (!isUsListedExchange(profile.exchange)) {
+      return { ok: false, reason: 'non_us_listed' };
+    }
+  } else if (profile.exchange === null || profile.exchange === '') {
+    // Profile was loaded but exchange missing — do not keep OTC unknowns.
+    return { ok: false, reason: 'missing_exchange' };
+  }
+  // When exchange is undefined, quote-only draft — caller should load profile before final pass.
+
   if (profile.price == null || profile.price < MIN_DISCOVERY_PRICE) {
     return { ok: false, reason: profile.price == null ? 'missing_price' : 'penny_stock' };
   }
-  if (profile.marketCap == null || profile.marketCap < MIN_DISCOVERY_MARKET_CAP) {
+  const mcap = normalizeMarketCap(profile.marketCap);
+  if (mcap == null || mcap < MIN_DISCOVERY_MARKET_CAP) {
     return {
       ok: false,
-      reason: profile.marketCap == null ? 'missing_market_cap' : 'small_cap',
+      reason: mcap == null ? 'missing_market_cap' : 'small_cap',
     };
   }
   if (isPharmaOrTherapeutic(profile.sector, profile.industry)) {
@@ -91,5 +156,5 @@ export function calendarTiming(raw: string): 'BMO' | 'AMC' | 'UNK' {
 
 /** Short label for the Watchlist discovery panel. */
 export function discoveryFilterSummary(): string {
-  return `FMP calendar · common equity · price ≥ $5 · cap ≥ $5B · no pharma/biotech`;
+  return `FMP calendar · US-listed common · price ≥ $5 · cap ≥ $2B · no pharma/biotech`;
 }

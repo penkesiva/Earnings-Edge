@@ -346,7 +346,10 @@ export async function getQuotesBatch(
       const rawName = raw.name ?? raw.companyName;
       out.set(symbol, {
         price: num(raw.price),
-        marketCap: num(raw.marketCap ?? raw.market_cap),
+        marketCap: (() => {
+          const m = num(raw.marketCap ?? raw.market_cap);
+          return m != null && m > 0 ? m : null;
+        })(),
         name: typeof rawName === 'string' && rawName.trim() ? rawName.trim() : null,
       });
     }
@@ -360,6 +363,9 @@ export async function getCompanyProfile(ticker: string): Promise<{
   industry: string | null;
   price: number | null;
   marketCap: number | null;
+  exchange: string | null;
+  isEtf: boolean;
+  isFund: boolean;
 }> {
   const profile = await fmp(`profile?symbol=${encodeURIComponent(ticker)}`);
   const row = Array.isArray(profile) ? profile[0] : null;
@@ -370,7 +376,19 @@ export async function getCompanyProfile(ticker: string): Promise<{
   const industry = typeof row?.industry === 'string' ? row.industry : null;
   const price = num(row?.price);
   const marketCap = num(row?.marketCap ?? row?.mktCap);
-  return { companyName, sector, industry, price, marketCap };
+  const rawExchange = row?.exchangeShortName ?? row?.exchange;
+  const exchange =
+    typeof rawExchange === 'string' && rawExchange.trim() ? rawExchange.trim() : null;
+  return {
+    companyName,
+    sector,
+    industry,
+    price,
+    marketCap: marketCap != null && marketCap > 0 ? marketCap : null,
+    exchange,
+    isEtf: Boolean(row?.isEtf),
+    isFund: Boolean(row?.isFund),
+  };
 }
 
 export async function getCompanyName(ticker: string): Promise<string | null> {

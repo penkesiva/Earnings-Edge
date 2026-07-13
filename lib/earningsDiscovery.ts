@@ -3,7 +3,10 @@ import { addCalendarDays, earningsSessionDate } from '@/lib/earningsDate';
 import {
   calendarTiming,
   EARNINGS_DISCOVERY_DAYS,
+  isLikelyOtcticker,
   isNonCommonEquitySymbol,
+  MIN_DISCOVERY_MARKET_CAP,
+  MIN_DISCOVERY_PRICE,
   passesDiscoveryFilter,
   type DiscoveryProfile,
 } from '@/lib/earningsDiscoveryFilter';
@@ -79,10 +82,10 @@ export async function fetchAndStoreEarningsCandidates(
   const deduped = dedupeCalendar(calendar);
   const rejected: Record<string, number> = {};
 
-  // Drop preferreds/warrants/units before quote calls — FMP lists many BAC-P* clones.
+  // Drop preferreds/warrants/units/OTC ADR patterns before quote calls.
   const equityRows = deduped.filter(row => {
     const ticker = row.symbol.toUpperCase();
-    if (isNonCommonEquitySymbol(ticker)) {
+    if (isNonCommonEquitySymbol(ticker) || isLikelyOtcticker(ticker)) {
       rejected.non_common_equity = (rejected.non_common_equity ?? 0) + 1;
       return false;
     }
@@ -92,8 +95,10 @@ export async function fetchAndStoreEarningsCandidates(
   const uniqueTickers = [...new Set(equityRows.map(r => r.symbol.toUpperCase()))];
   const quotes = await getQuotesBatch(uniqueTickers);
 
-  // First pass: price + market cap from batch quotes (fast).
-  const needsProfile = new Set<string>();
+  // Quote pass: drop pennies / tiny caps; profile the rest for US exchange confirmation.
+  const softMinCap = Math.min(MIN_DISCOVERY_MARKET_CAP, 1_500_000_000);
+  const needsProfile: string[] = [];
+  const needsProfileSet = new Set<string>();
   const quoteProfileByTicker = new Map<string, DiscoveryProfile>();
 
   for (const ticker of uniqueTickers) {
@@ -105,30 +110,23 @@ export async function fetchAndStoreEarningsCandidates(
       industry: null,
       price: q?.price ?? null,
       marketCap: q?.marketCap ?? null,
+      exchange: undefined,
     };
     quoteProfileByTicker.set(ticker, draft);
 
-    const result = passesDiscoveryFilter(draft);
-    if (result.ok) {
-      // Still need sector/industry for the pharma gate.
-      needsProfile.add(ticker);
+    if (draft.price != null && draft.price < MIN_DISCOVERY_PRICE) {
+      rejected.penny_stock = (rejected.penny_stock ?? 0) + 1;
       continue;
     }
-    if (result.reason === 'non_common_equity') {
+    if (draft.marketCap != null && draft.marketCap < softMinCap) {
+      rejected.small_cap = (rejected.small_cap ?? 0) + 1;
       continue;
     }
-    if (result.reason === 'pharma_excluded') {
-      continue;
-    }
-    if (result.reason === 'penny_stock' || result.reason === 'small_cap') {
-      // Hard rejects from known quote fields — no need for profile.
-      continue;
-    }
-    // missing_price / missing_market_cap — try company profile before giving up.
-    needsProfile.add(ticker);
+    needsProfile.push(ticker);
+    needsProfileSet.add(ticker);
   }
 
-  const profileExtras = await mapPool([...needsProfile], 8, async ticker => {
+  const profileExtras = await mapPool(needsProfile, 6, async ticker => {
     try {
       return { ticker, profile: await getCompanyProfile(ticker) };
     } catch {
@@ -137,8 +135,12 @@ export async function fetchAndStoreEarningsCandidates(
   });
 
   for (const { ticker, profile } of profileExtras) {
-    if (!profile) continue;
     const base = quoteProfileByTicker.get(ticker)!;
+    if (!profile) {
+      // Mark exchange as explicitly missing so we don't keep quote-only OTC names.
+      quoteProfileByTicker.set(ticker, { ...base, exchange: null });
+      continue;
+    }
     quoteProfileByTicker.set(ticker, {
       ticker,
       companyName: profile.companyName ?? base.companyName,
@@ -146,11 +148,16 @@ export async function fetchAndStoreEarningsCandidates(
       industry: profile.industry,
       price: profile.price ?? base.price,
       marketCap: profile.marketCap ?? base.marketCap,
+      exchange: profile.exchange,
+      isEtf: profile.isEtf,
+      isFund: profile.isFund,
     });
   }
 
   const filtered = equityRows.filter(row => {
-    const profile = quoteProfileByTicker.get(row.symbol.toUpperCase());
+    const ticker = row.symbol.toUpperCase();
+    if (!needsProfileSet.has(ticker)) return false;
+    const profile = quoteProfileByTicker.get(ticker);
     if (!profile) return false;
     const result = passesDiscoveryFilter(profile);
     if (result.ok) return true;
