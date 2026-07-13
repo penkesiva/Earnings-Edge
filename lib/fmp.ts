@@ -330,26 +330,8 @@ const SECTOR_ETFS: Record<string, string> = {
 // ----- Quote batch (discovery + dashboards) -----
 export async function getQuotesBatch(
   tickers: string[],
-): Promise<
-  Map<
-    string,
-    {
-      price: number | null;
-      marketCap: number | null;
-      name: string | null;
-      avgVolume: number | null;
-    }
-  >
-> {
-  const out = new Map<
-    string,
-    {
-      price: number | null;
-      marketCap: number | null;
-      name: string | null;
-      avgVolume: number | null;
-    }
-  >();
+): Promise<Map<string, { price: number | null; marketCap: number | null; name: string | null }>> {
+  const out = new Map<string, { price: number | null; marketCap: number | null; name: string | null }>();
   if (!tickers.length) return out;
 
   const chunkSize = 50;
@@ -366,7 +348,6 @@ export async function getQuotesBatch(
         price: num(raw.price),
         marketCap: num(raw.marketCap ?? raw.market_cap),
         name: typeof rawName === 'string' && rawName.trim() ? rawName.trim() : null,
-        avgVolume: num(raw.avgVolume ?? raw.averageVolume ?? raw.avgvolume),
       });
     }
   }

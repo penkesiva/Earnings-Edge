@@ -4,14 +4,13 @@ export const EARNINGS_DISCOVERY_DAYS = 14;
 export const MIN_DISCOVERY_PRICE = 5;
 /** Large/mid-cap floor — cuts thin names that clutter the 14-day list. */
 export const MIN_DISCOVERY_MARKET_CAP = 5_000_000_000;
-/** Prefer names with real trading interest (FMP quote avgVolume when present). */
-export const MIN_DISCOVERY_AVG_VOLUME = 500_000;
 
 const EXCLUDED_INDUSTRY_RE =
   /pharma|biotech|biopharm|therapeutic|drug manufacturer|medicinal|oncology|clinical[- ]stage|biologics/i;
 
+/** Prefer clear preferred-share names — avoid loose "pref" matches on common names. */
 const PREFERRED_NAME_RE =
-  /\b(preferred|pref\.?|depositary shares?|dep(?:ository)?\.?\s*shares?)\b/i;
+  /\b(preferred\s+(stock|shares?)|pref\.?\s*shares?|depositary\s+shares?|dep(?:ository)?\.?\s*shares?)\b/i;
 
 export type DiscoveryProfile = {
   ticker: string;
@@ -20,13 +19,11 @@ export type DiscoveryProfile = {
   industry: string | null;
   price: number | null;
   marketCap: number | null;
-  avgVolume?: number | null;
 };
 
 export type DiscoveryFilterReject =
   | 'penny_stock'
   | 'small_cap'
-  | 'low_volume'
   | 'pharma_excluded'
   | 'non_common_equity'
   | 'missing_price'
@@ -79,13 +76,6 @@ export function passesDiscoveryFilter(
       reason: profile.marketCap == null ? 'missing_market_cap' : 'small_cap',
     };
   }
-  if (
-    profile.avgVolume != null &&
-    profile.avgVolume > 0 &&
-    profile.avgVolume < MIN_DISCOVERY_AVG_VOLUME
-  ) {
-    return { ok: false, reason: 'low_volume' };
-  }
   if (isPharmaOrTherapeutic(profile.sector, profile.industry)) {
     return { ok: false, reason: 'pharma_excluded' };
   }
@@ -101,5 +91,5 @@ export function calendarTiming(raw: string): 'BMO' | 'AMC' | 'UNK' {
 
 /** Short label for the Watchlist discovery panel. */
 export function discoveryFilterSummary(): string {
-  return `FMP calendar · common equity · price ≥ $5 · cap ≥ $5B · avg vol ≥ 500k · no pharma/biotech`;
+  return `FMP calendar · common equity · price ≥ $5 · cap ≥ $5B · no pharma/biotech`;
 }

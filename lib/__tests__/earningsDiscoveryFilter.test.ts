@@ -23,8 +23,9 @@ for (const t of ['BAC', 'BRK.B', 'BF-B', 'GOOGL', 'AAPL', 'JPM']) {
   assert(!isNonCommonEquitySymbol(t), `expected common: ${t}`);
 }
 
-assert(isPreferredShareName('Bank of America Corp Preferred Series K'), 'name preferred');
+assert(isPreferredShareName('Bank of America Corp Preferred Shares Series K'), 'name preferred');
 assert(!isPreferredShareName('Bank of America Corporation'), 'name common');
+assert(!isPreferredShareName('Prefabricated Home Builders Inc'), 'loose pref must not match');
 
 const bacOk = passesDiscoveryFilter({
   ticker: 'BAC',
@@ -33,18 +34,16 @@ const bacOk = passesDiscoveryFilter({
   industry: 'Banks',
   price: 40,
   marketCap: 300_000_000_000,
-  avgVolume: 40_000_000,
 });
 assert(bacOk.ok, 'BAC should pass');
 
 const bacPref = passesDiscoveryFilter({
   ticker: 'BAC-PK',
-  companyName: 'Bank of America Preferred K',
+  companyName: 'Bank of America Preferred Shares K',
   sector: 'Financial Services',
   industry: 'Banks',
   price: 25,
   marketCap: 300_000_000_000,
-  avgVolume: 100_000,
 });
 assert(!bacPref.ok && bacPref.reason === 'non_common_equity', 'BAC-PK rejected');
 
@@ -55,19 +54,17 @@ const small = passesDiscoveryFilter({
   industry: 'Software',
   price: 20,
   marketCap: MIN_DISCOVERY_MARKET_CAP - 1,
-  avgVolume: 2_000_000,
 });
 assert(!small.ok && small.reason === 'small_cap', 'under $5B rejected');
 
-const thin = passesDiscoveryFilter({
-  ticker: 'THIN',
-  companyName: 'Thin Liquidity Inc',
-  sector: 'Tech',
-  industry: 'Software',
-  price: 50,
-  marketCap: 20_000_000_000,
-  avgVolume: 100_000,
+const missingCap = passesDiscoveryFilter({
+  ticker: 'BAC',
+  companyName: 'Bank of America Corporation',
+  sector: null,
+  industry: null,
+  price: 40,
+  marketCap: null,
 });
-assert(!thin.ok && thin.reason === 'low_volume', 'low volume rejected');
+assert(!missingCap.ok && missingCap.reason === 'missing_market_cap', 'missing cap');
 
 console.log('earningsDiscoveryFilter.test.ts: ok');

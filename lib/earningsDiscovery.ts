@@ -92,7 +92,7 @@ export async function fetchAndStoreEarningsCandidates(
   const uniqueTickers = [...new Set(equityRows.map(r => r.symbol.toUpperCase()))];
   const quotes = await getQuotesBatch(uniqueTickers);
 
-  // First pass: price + market cap + volume from batch quotes (fast).
+  // First pass: price + market cap from batch quotes (fast).
   const needsProfile = new Set<string>();
   const quoteProfileByTicker = new Map<string, DiscoveryProfile>();
 
@@ -105,26 +105,26 @@ export async function fetchAndStoreEarningsCandidates(
       industry: null,
       price: q?.price ?? null,
       marketCap: q?.marketCap ?? null,
-      avgVolume: q?.avgVolume ?? null,
     };
     quoteProfileByTicker.set(ticker, draft);
 
     const result = passesDiscoveryFilter(draft);
     if (result.ok) {
+      // Still need sector/industry for the pharma gate.
       needsProfile.add(ticker);
       continue;
     }
-    if (
-      result.reason === 'pharma_excluded' ||
-      result.reason === 'non_common_equity' ||
-      result.reason === 'low_volume' ||
-      result.reason === 'missing_market_cap' ||
-      (result.reason === 'small_cap' && draft.marketCap != null)
-    ) {
-      // Final answer known from quote-only data.
+    if (result.reason === 'non_common_equity') {
       continue;
     }
-    // Missing fields — try full profile once.
+    if (result.reason === 'pharma_excluded') {
+      continue;
+    }
+    if (result.reason === 'penny_stock' || result.reason === 'small_cap') {
+      // Hard rejects from known quote fields — no need for profile.
+      continue;
+    }
+    // missing_price / missing_market_cap — try company profile before giving up.
     needsProfile.add(ticker);
   }
 
@@ -146,7 +146,6 @@ export async function fetchAndStoreEarningsCandidates(
       industry: profile.industry,
       price: profile.price ?? base.price,
       marketCap: profile.marketCap ?? base.marketCap,
-      avgVolume: base.avgVolume,
     });
   }
 
