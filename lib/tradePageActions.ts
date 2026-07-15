@@ -9,6 +9,7 @@ import {
   updateAutomationSettings,
 } from '@/lib/automationSettings';
 import { executeAutoTrades } from '@/lib/autoTradeExecutor';
+import { closeTradeOrderById } from '@/lib/tradeCloser';
 import { loadGoTradeCandidates } from '@/lib/goTradeCandidates';
 import { listAlpacaAccountSummaries } from '@/lib/alpacaCredentials';
 
@@ -139,6 +140,23 @@ export async function runAutoTradeNowAction(
       return { success: msg };
     }
     return { success: msg };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+export async function closeTradeOrderAction(
+  _prev: TradePageState,
+  formData: FormData,
+): Promise<TradePageState> {
+  const orderId = String(formData.get('order_id') ?? '').trim();
+  if (!orderId) return { error: 'Missing order id.' };
+
+  const { sb, user } = await requireAuthSession();
+  try {
+    const result = await closeTradeOrderById(sb, user.id, orderId);
+    revalidatePath('/trade');
+    return result.ok ? { success: result.detail } : { error: result.detail };
   } catch (e) {
     return { error: e instanceof Error ? e.message : String(e) };
   }

@@ -26,7 +26,7 @@ export type ServerEnvRequirement = {
 
 export const SYSTEM_STATUS_MANIFEST = {
   /** Bump when you change phases, migrations, or env requirements below. */
-  manifestVersion: '2026-07-14',
+  manifestVersion: '2026-07-15',
 
   phases: [
     {
@@ -81,6 +81,13 @@ export const SYSTEM_STATUS_MANIFEST = {
       route: '/trade',
       status: 'shipped',
     },
+    {
+      id: 'trade-exit',
+      name: 'Position close-out — reaction-day cron + manual Close, realized P&L',
+      route: '/trade',
+      migration: '0020',
+      status: 'shipped',
+    },
   ] satisfies SystemPhase[],
 
   migrations: [
@@ -103,6 +110,11 @@ export const SYSTEM_STATUS_MANIFEST = {
       id: '0019',
       file: '0019_automation_trade.sql',
       summary: 'Auto-trade settings + order log',
+    },
+    {
+      id: '0020',
+      file: '0020_trade_exits.sql',
+      summary: 'Exit price, realized P&L, closed status on trade_orders',
     },
   ] satisfies SystemMigration[],
 

@@ -13,6 +13,7 @@ Google sign-in (Supabase Auth). Per-user watchlists and Alpaca keys (RLS). Hoste
 | Home briefs + Top 10 | `/` | Daily scan briefs, year-round Top 10, Scan All |
 | Multi-LLM consensus | brief + Scan All | OpenAI / Gemini / Claude → GO / NO-GO |
 | Paper auto-trade | `/trade` | Consensus GO, kill switch, order log; pre-close cron (3pm ET) enters today's AMC + next-day BMO when Auto is ON |
+| Trade exits | `/trade` | Close-out cron (3:50pm ET) flattens positions on the reaction day with realized P&L; manual Close per row |
 | History / outcomes | `/history` | Log beat/miss + next-day move |
 | System health | `/status` | Login-only · phases, env, table probes |
 
@@ -26,7 +27,7 @@ Live checklist for agents/ops: `lib/systemStatusManifest.ts` (also drives `/stat
 - **Alpaca** — prices, options, paper/live trading (per-user keys in Settings; env fallback)
 - **Resend** — optional morning email (`NOTIFY_EMAIL`)
 - **Twilio WhatsApp** — optional auto-trade run summaries (`TWILIO_*`, `NOTIFY_WHATSAPP_TO`)
-- **Vercel Cron** — weekday daily scan (`0 13 * * 1-5` UTC ≈ 6am PT), Sunday calendar refresh, weekday auto-trade (`0 19 * * 1-5` UTC ≈ 3pm ET, ~1h before close)
+- **Vercel Cron** — weekday daily scan (`0 13 * * 1-5` UTC ≈ 6am PT), Sunday calendar refresh, weekday auto-trade (`0 19 * * 1-5` UTC ≈ 3pm ET), weekday close-out (`50 19 * * 1-5` UTC ≈ 3:50pm ET)
 
 ## Quick start
 
@@ -40,7 +41,7 @@ cp .env.example .env.local   # fill keys — see .env.example
 On a **fresh** project:
 
 1. Run `supabase/schema.sql`
-2. Run migrations in order under `supabase/migrations/` (at least `0012`–`0019`)
+2. Run migrations in order under `supabase/migrations/` (at least `0012`–`0020`)
 
 `schema.sql` alone is not enough for multi-user auth, discovery, or trade tables. Prefer applying every file in `supabase/migrations/`.
 
@@ -122,7 +123,8 @@ supabase/migrations/              # Incremental (0012–0019+)
 ## Caveats
 
 - Whisper EPS is not wired into the daily scan yet (weight is currently wasted).
-- Auto-trade places **equity** market orders, not the options structures from `structure.ts`. With Auto ON it runs on the pre-close cron; "Run now" on `/trade` is always available. Cron time is fixed UTC, so it drifts an hour vs ET when DST changes.
+- Auto-trade places **equity** market orders, not the options structures from `structure.ts`. With Auto ON it runs on the pre-close cron; "Run now" on `/trade` is always available. Cron times are fixed UTC, so they drift an hour vs ET when DST changes.
+- Exits: positions are flattened at the reaction day's close (BMO → same day, AMC → next trading day) by the close-out cron; the kill switch blocks new entries but not exits. Realized P&L is an estimate from fill/snapshot prices.
 - Push notifications need VAPID keys; there is no in-app push subscribe UI yet.
 - Email alerts go to global `NOTIFY_EMAIL`, not each user’s Google address.
 - Not financial advice — decision support only.

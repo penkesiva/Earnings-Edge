@@ -8,6 +8,7 @@ import { DirectionIndicator } from '@/components/DirectionIndicator';
 import type { AutomationSettings, TradeOrderRow } from '@/lib/automationSettings';
 import type { GoTradeCandidate } from '@/lib/goTradeCandidates';
 import {
+  closeTradeOrderAction,
   enableLiveTradingAction,
   runAutoTradeNowAction,
   toggleAutoTradeAction,
@@ -104,6 +105,7 @@ export function TradeAutomationPanel({
   const [liveState, liveAction] = useFormState(enableLiveTradingAction, {});
   const [notionalState, notionalAction] = useFormState(updateMaxNotionalAction, {});
   const [runState, runAction] = useFormState(runAutoTradeNowAction, {});
+  const [closeState, closeAction] = useFormState(closeTradeOrderAction, {});
   const [showLiveConfirm, setShowLiveConfirm] = useState(false);
 
   const flash = useMemo(() => {
@@ -115,8 +117,10 @@ export function TradeAutomationPanel({
           ? liveState
           : notionalState.error || notionalState.success
             ? notionalState
-            : runState;
-  }, [autoState, killState, liveState, notionalState, runState]);
+            : closeState.error || closeState.success
+              ? closeState
+              : runState;
+  }, [autoState, killState, liveState, notionalState, closeState, runState]);
 
   const accountMode = settings.liveTradingEnabled ? 'live' : 'paper';
 
@@ -314,43 +318,77 @@ export function TradeAutomationPanel({
                   <th className="px-3 py-2 font-medium">Qty</th>
                   <th className="px-3 py-2 font-medium">Env</th>
                   <th className="px-3 py-2 font-medium">Status</th>
+                  <th className="px-3 py-2 font-medium text-right">P&amp;L</th>
+                  <th className="px-3 py-2 font-medium"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-subtle">
-                {orders.map(order => (
-                  <tr key={order.id} className="text-fg-subtle">
-                    <td className="px-3 py-2 whitespace-nowrap tabular-nums">
-                      {new Date(order.createdAt).toLocaleString(undefined, {
-                        month: 'short',
-                        day: 'numeric',
-                        hour: 'numeric',
-                        minute: '2-digit',
-                      })}
-                    </td>
-                    <td className="px-3 py-2 font-bold text-fg">{order.ticker}</td>
-                    <td className="px-3 py-2 uppercase">{order.side}</td>
-                    <td className="px-3 py-2 tabular-nums">{order.qty > 0 ? order.qty : '—'}</td>
-                    <td className="px-3 py-2 uppercase">{order.environment}</td>
-                    <td className="px-3 py-2">
-                      <span
-                        className={
-                          order.status === 'filled' || order.status === 'submitted'
-                            ? 'text-signal-buy'
-                            : order.status === 'failed'
-                              ? 'text-signal-sell'
-                              : 'text-fg-dim'
-                        }
-                      >
-                        {order.status}
-                      </span>
-                      {order.errorMessage ? (
-                        <span className="block text-[10px] text-fg-dim mt-0.5 max-w-xs truncate">
-                          {order.errorMessage}
+                {orders.map(order => {
+                  const isOpen =
+                    (order.status === 'submitted' || order.status === 'filled') && !order.closedAt;
+                  return (
+                    <tr key={order.id} className="text-fg-subtle">
+                      <td className="px-3 py-2 whitespace-nowrap tabular-nums">
+                        {new Date(order.createdAt).toLocaleString(undefined, {
+                          month: 'short',
+                          day: 'numeric',
+                          hour: 'numeric',
+                          minute: '2-digit',
+                        })}
+                      </td>
+                      <td className="px-3 py-2 font-bold text-fg">{order.ticker}</td>
+                      <td className="px-3 py-2 uppercase">{order.side}</td>
+                      <td className="px-3 py-2 tabular-nums">{order.qty > 0 ? order.qty : '—'}</td>
+                      <td className="px-3 py-2 uppercase">{order.environment}</td>
+                      <td className="px-3 py-2">
+                        <span
+                          className={
+                            order.status === 'filled' || order.status === 'submitted'
+                              ? 'text-signal-buy'
+                              : order.status === 'failed'
+                                ? 'text-signal-sell'
+                                : order.status === 'closed'
+                                  ? 'text-fg'
+                                  : 'text-fg-dim'
+                          }
+                        >
+                          {order.status}
                         </span>
-                      ) : null}
-                    </td>
-                  </tr>
-                ))}
+                        {order.errorMessage ? (
+                          <span className="block text-[10px] text-fg-dim mt-0.5 max-w-xs truncate">
+                            {order.errorMessage}
+                          </span>
+                        ) : null}
+                      </td>
+                      <td className="px-3 py-2 text-right tabular-nums whitespace-nowrap">
+                        {order.realizedPnlUsd != null ? (
+                          <span
+                            className={
+                              order.realizedPnlUsd >= 0 ? 'text-signal-buy' : 'text-signal-sell'
+                            }
+                          >
+                            {order.realizedPnlUsd >= 0 ? '+' : ''}${order.realizedPnlUsd.toFixed(2)}
+                          </span>
+                        ) : (
+                          <span className="text-fg-dim">—</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        {isOpen ? (
+                          <form action={closeAction}>
+                            <input type="hidden" name="order_id" value={order.id} />
+                            <button
+                              type="submit"
+                              className="text-[10px] tracking-widest uppercase px-2 py-1 border border-border text-fg-muted hover:border-signal-sell hover:text-signal-sell"
+                            >
+                              Close
+                            </button>
+                          </form>
+                        ) : null}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

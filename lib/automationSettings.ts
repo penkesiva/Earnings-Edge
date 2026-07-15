@@ -25,6 +25,9 @@ export type TradeOrderRow = {
   status: string;
   errorMessage: string | null;
   createdAt: string;
+  exitPrice: number | null;
+  realizedPnlUsd: number | null;
+  closedAt: string | null;
 };
 
 const DEFAULT_SETTINGS = (userId: string): AutomationSettings => ({
@@ -60,6 +63,9 @@ type OrderRow = {
   status: string;
   error_message: string | null;
   created_at: string;
+  exit_price?: number | null;
+  realized_pnl_usd?: number | null;
+  closed_at?: string | null;
 };
 
 function mapSettings(row: SettingsRow): AutomationSettings {
@@ -89,6 +95,9 @@ function mapOrder(row: OrderRow): TradeOrderRow {
     status: row.status,
     errorMessage: row.error_message,
     createdAt: row.created_at,
+    exitPrice: row.exit_price != null ? Number(row.exit_price) : null,
+    realizedPnlUsd: row.realized_pnl_usd != null ? Number(row.realized_pnl_usd) : null,
+    closedAt: row.closed_at ?? null,
   };
 }
 

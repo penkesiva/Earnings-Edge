@@ -62,6 +62,29 @@ export async function getTradingAccount(
   }
 }
 
+/** Fetch one order (fill price/status) after placement. */
+export async function getOrderFill(
+  auth: AlpacaAuth,
+  orderId: string,
+): Promise<{ status: string; filledAvgPrice: number | null } | null> {
+  const base = resolveTradingBase(auth);
+  try {
+    const res = await fetch(`${base}/v2/orders/${encodeURIComponent(orderId)}`, {
+      headers: tradingHeaders(auth),
+      cache: 'no-store',
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { status?: string; filled_avg_price?: string | null };
+    const avg = data.filled_avg_price != null ? Number(data.filled_avg_price) : NaN;
+    return {
+      status: data.status ?? 'unknown',
+      filledAvgPrice: Number.isFinite(avg) && avg > 0 ? avg : null,
+    };
+  } catch {
+    return null;
+  }
+}
+
 /** Market order on underlying equity — directional proxy for consensus GO trades. */
 export async function placeMarketOrder(
   auth: AlpacaAuth,

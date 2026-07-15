@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/auto-trade",
       "schedule": "0 19 * * 1-5"
+    },
+    {
+      "path": "/api/cron/close-trades",
+      "schedule": "50 19 * * 1-5"
     }
   ]
 }
