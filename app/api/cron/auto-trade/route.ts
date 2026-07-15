@@ -14,6 +14,7 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { executeAutoTrades } from '@/lib/autoTradeExecutor';
 import { earningsSessionDate } from '@/lib/earningsDate';
 import { isTradingDay } from '@/lib/usMarketCalendar';
+import { sendWhatsAppMessage, whatsappConfigured } from '@/lib/whatsapp';
 
 export const maxDuration = 300;
 
@@ -69,5 +70,23 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ date: today, users: userIds.length, results });
+  // WhatsApp summary to the owner (NOTIFY_WHATSAPP_TO) — one message per run.
+  let whatsapp: string | null = null;
+  if (whatsappConfigured() && results.length > 0) {
+    const totalSubmitted = results.reduce((a, r) => a + r.submitted, 0);
+    const totalFailed = results.reduce((a, r) => a + r.failed, 0);
+    const headline =
+      totalSubmitted > 0
+        ? `${totalSubmitted} paper order(s) placed${totalFailed ? `, ${totalFailed} failed` : ''}`
+        : totalFailed > 0
+          ? `No orders placed — ${totalFailed} failed`
+          : 'No trades this run';
+    const detailLines = results.flatMap(r => r.messages).slice(0, 12);
+    const body = [`Earnings Edge · ${today}`, `Auto-trade: ${headline}`, '', ...detailLines].join('\n');
+
+    const sent = await sendWhatsAppMessage(body);
+    whatsapp = sent.ok ? 'sent' : `error: ${sent.error}`;
+  }
+
+  return NextResponse.json({ date: today, users: userIds.length, results, whatsapp });
 }

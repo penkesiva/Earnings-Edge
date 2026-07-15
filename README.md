@@ -25,6 +25,7 @@ Live checklist for agents/ops: `lib/systemStatusManifest.ts` (also drives `/stat
 - **FMP** — earnings calendar, fundamentals, surprises
 - **Alpaca** — prices, options, paper/live trading (per-user keys in Settings; env fallback)
 - **Resend** — optional morning email (`NOTIFY_EMAIL`)
+- **Twilio WhatsApp** — optional auto-trade run summaries (`TWILIO_*`, `NOTIFY_WHATSAPP_TO`)
 - **Vercel Cron** — weekday daily scan (`0 13 * * 1-5` UTC ≈ 6am PT), Sunday calendar refresh, weekday auto-trade (`0 19 * * 1-5` UTC ≈ 3pm ET, ~1h before close)
 
 ## Quick start

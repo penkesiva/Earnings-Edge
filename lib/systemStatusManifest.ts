@@ -143,5 +143,26 @@ export const SYSTEM_STATUS_MANIFEST = {
       required: false,
       summary: 'Bearer token for /api/cron/* routes',
     },
+    {
+      key: 'TWILIO_ACCOUNT_SID',
+      required: false,
+      summary: 'Twilio account for WhatsApp trade notifications',
+    },
+    {
+      key: 'TWILIO_AUTH_TOKEN',
+      required: false,
+      secret: true,
+      summary: 'Twilio auth token (WhatsApp notifications)',
+    },
+    {
+      key: 'TWILIO_WHATSAPP_FROM',
+      required: false,
+      summary: 'WhatsApp-enabled Twilio sender number',
+    },
+    {
+      key: 'NOTIFY_WHATSAPP_TO',
+      required: false,
+      summary: 'Owner WhatsApp number for auto-trade summaries',
+    },
   ] satisfies ServerEnvRequirement[],
 } as const;

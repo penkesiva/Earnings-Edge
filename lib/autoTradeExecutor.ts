@@ -77,16 +77,10 @@ export async function executeAutoTrades(
   for (const candidate of candidates) {
     result.attempted += 1;
     const outcome = await executeOneTrade(sb, userId, settings, auth, candidate);
-    if (outcome === 'submitted') result.submitted += 1;
-    else if (outcome === 'failed') result.failed += 1;
+    result.messages.push(outcome.detail);
+    if (outcome.status === 'submitted') result.submitted += 1;
+    else if (outcome.status === 'failed') result.failed += 1;
     else result.skipped += 1;
-  }
-
-  if (result.submitted > 0) {
-    result.messages.push(`Submitted ${result.submitted} paper order(s).`);
-  }
-  if (result.failed > 0) {
-    result.messages.push(`${result.failed} order(s) failed — see log below.`);
   }
 
   return result;
@@ -99,17 +93,23 @@ async function resolveTradeAuth(userId: string, settings: AutomationSettings) {
   return resolveAlpacaAuthForUser(userId, 'paper');
 }
 
+type TradeOutcome = {
+  status: 'submitted' | 'failed' | 'skipped';
+  /** One-line summary for the Trade page flash and WhatsApp notification. */
+  detail: string;
+};
+
 async function executeOneTrade(
   sb: SupabaseClient,
   userId: string,
   settings: AutomationSettings,
   auth: NonNullable<Awaited<ReturnType<typeof resolveTradeAuth>>>,
   candidate: GoTradeCandidate,
-): Promise<'submitted' | 'failed' | 'skipped'> {
+): Promise<TradeOutcome> {
   const environment = auth.environment ?? 'paper';
   if (!settings.liveTradingEnabled && environment === 'live') {
     await insertSkippedOrder(sb, userId, candidate, environment, 'Live trading not enabled.');
-    return 'skipped';
+    return { status: 'skipped', detail: `${candidate.ticker}: skipped — live trading not enabled.` };
   }
 
   let price: number;
@@ -117,31 +117,21 @@ async function executeOneTrade(
     const snap = await getStockSnapshot(candidate.ticker, auth);
     price = snap.price;
   } catch (e) {
-    await insertFailedOrder(
-      sb,
-      userId,
-      candidate,
-      environment,
-      e instanceof Error ? e.message : String(e),
-    );
-    return 'failed';
+    const msg = e instanceof Error ? e.message : String(e);
+    await insertFailedOrder(sb, userId, candidate, environment, msg);
+    return { status: 'failed', detail: `${candidate.ticker}: failed — ${msg}` };
   }
 
   if (!price || price <= 0) {
     await insertFailedOrder(sb, userId, candidate, environment, 'Could not fetch live price.');
-    return 'failed';
+    return { status: 'failed', detail: `${candidate.ticker}: failed — no live price.` };
   }
 
   const qty = Math.floor(settings.maxNotionalUsd / price);
   if (qty < 1) {
-    await insertSkippedOrder(
-      sb,
-      userId,
-      candidate,
-      environment,
-      `Notional $${settings.maxNotionalUsd} too small at $${price.toFixed(2)}.`,
-    );
-    return 'skipped';
+    const reason = `Notional $${settings.maxNotionalUsd} too small at $${price.toFixed(2)}.`;
+    await insertSkippedOrder(sb, userId, candidate, environment, reason);
+    return { status: 'skipped', detail: `${candidate.ticker}: skipped — ${reason}` };
   }
 
   const side = candidate.direction === 'UP' ? 'buy' : 'sell';
@@ -153,7 +143,7 @@ async function executeOneTrade(
 
   if (!placed.ok) {
     await insertFailedOrder(sb, userId, candidate, environment, placed.error);
-    return 'failed';
+    return { status: 'failed', detail: `${candidate.ticker}: failed — ${placed.error.slice(0, 120)}` };
   }
 
   const notional = Math.round(qty * price * 100) / 100;
@@ -177,11 +167,12 @@ async function executeOneTrade(
     status,
   });
 
+  const detail = `${candidate.ticker}: ${side.toUpperCase()} ${qty} @ ~$${price.toFixed(2)} (~$${notional}) ${status} [${environment}]`;
   if (error) {
-    return 'failed';
+    return { status: 'failed', detail: `${detail} — order log write failed: ${error.message}` };
   }
 
-  return 'submitted';
+  return { status: 'submitted', detail };
 }
 
 async function insertFailedOrder(
