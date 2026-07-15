@@ -26,7 +26,7 @@ export type ServerEnvRequirement = {
 
 export const SYSTEM_STATUS_MANIFEST = {
   /** Bump when you change phases, migrations, or env requirements below. */
-  manifestVersion: '2026-06-03',
+  manifestVersion: '2026-07-14',
 
   phases: [
     {
@@ -73,6 +73,12 @@ export const SYSTEM_STATUS_MANIFEST = {
       name: 'Auto-trade (consensus GO, paper default, kill switch)',
       route: '/trade',
       migration: '0019',
+      status: 'shipped',
+    },
+    {
+      id: 'trade-cron',
+      name: 'Scheduled auto-trade — pre-close cron (AMC today + BMO next day)',
+      route: '/trade',
       status: 'shipped',
     },
   ] satisfies SystemPhase[],

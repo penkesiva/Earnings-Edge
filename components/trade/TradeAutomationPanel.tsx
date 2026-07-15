@@ -141,6 +141,10 @@ export function TradeAutomationPanel({
             <p className="text-xs text-fg-subtle mt-1">
               Consensus GO only · directional equity orders · one per brief
             </p>
+            <p className="text-xs text-fg-dim mt-1">
+              Auto ON → cron runs weekdays ~1h before close (3pm ET): enters today&apos;s AMC and
+              next-morning BMO names.
+            </p>
           </div>
           <div className="flex flex-wrap gap-2">
             <StatusPill
@@ -242,7 +246,7 @@ export function TradeAutomationPanel({
           <div>
             <p className="text-sm font-bold">{candidates.length} GO candidate(s)</p>
             <p className="text-xs text-fg-subtle mt-1">
-              Active watchlist · earnings in next 2 trading days · not yet traded
+              Active watchlist · today AMC + next-day BMO · not yet traded
             </p>
           </div>
           <form action={runAction}>
@@ -272,6 +276,9 @@ export function TradeAutomationPanel({
                   {row.ticker}
                 </Link>
                 <FinalVerdictBadge verdict="GO" direction={row.direction} />
+                <span className="text-[10px] font-bold tracking-widest text-fg-dim border border-border-subtle px-1 py-0.5">
+                  {row.earningsDate} {row.timing}
+                </span>
                 <span className="text-xs text-fg-dim tabular-nums ml-auto">
                   score {Math.round(row.compositeScore)}
                 </span>

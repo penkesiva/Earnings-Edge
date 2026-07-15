@@ -8,6 +8,7 @@ export type GoTradeCandidate = {
   briefId: string;
   ticker: string;
   earningsDate: string;
+  timing: 'BMO' | 'AMC' | 'UNK';
   direction: 'UP' | 'DOWN';
   compositeScore: number;
   confidence: string | null;
@@ -20,7 +21,13 @@ type BriefRow = {
   composite_score: number;
 };
 
-/** Active watchlist briefs with consensus GO + direction in the next 2 trading days. */
+/**
+ * Active watchlist briefs with consensus GO + direction, filtered to the
+ * pre-close entry window:
+ *   - reporting today AMC (or unknown timing) → enter before today's close
+ *   - reporting next trading day BMO → enter today for the morning print
+ * Today-BMO names already reported pre-market and are excluded.
+ */
 export async function loadGoTradeCandidates(
   sb: SupabaseClient,
   userId: string,
@@ -47,9 +54,32 @@ export async function loadGoTradeCandidates(
 
   if (briefErr) throw new Error(briefErr.message);
 
-  const eligibleBriefs = (briefs ?? []).filter(
+  const preFiltered = (briefs ?? []).filter(
     b => activeTickers.has(b.ticker),
   ) as BriefRow[];
+  if (preFiltered.length === 0) return [];
+
+  // Timing lookup so we only enter names that haven't reported yet.
+  const { data: events } = await sb
+    .from('earnings_events')
+    .select('ticker, earnings_date, timing')
+    .eq('user_id', userId)
+    .in('earnings_date', focusDates)
+    .in('ticker', [...activeTickers]);
+
+  const timingByKey = new Map(
+    (events ?? []).map(e => [`${e.ticker}:${e.earnings_date}`, (e.timing ?? 'UNK') as 'BMO' | 'AMC' | 'UNK']),
+  );
+
+  const today = focusDates[0];
+  const eligibleBriefs = preFiltered.filter(b => {
+    const timing = timingByKey.get(`${b.ticker}:${b.earnings_date}`) ?? 'UNK';
+    // Today's BMO names already printed pre-market — nothing to front-run.
+    if (b.earnings_date === today && timing === 'BMO') return false;
+    // Next-day AMC names don't need entry until tomorrow's window.
+    if (b.earnings_date !== today && timing === 'AMC') return false;
+    return true;
+  });
   if (eligibleBriefs.length === 0) return [];
 
   const briefIds = eligibleBriefs.map(b => b.id);
@@ -76,6 +106,7 @@ export async function loadGoTradeCandidates(
       briefId: brief.id,
       ticker: brief.ticker,
       earningsDate: brief.earnings_date,
+      timing: timingByKey.get(`${brief.ticker}:${brief.earnings_date}`) ?? 'UNK',
       direction,
       compositeScore: brief.composite_score ?? 0,
       confidence: parsed.confidence,

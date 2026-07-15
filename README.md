@@ -12,7 +12,7 @@ Google sign-in (Supabase Auth). Per-user watchlists and Alpaca keys (RLS). Hoste
 | Watchlist + earnings discovery | `/watchlist` | FMP 14d calendar · US-listed common · ≥$5 · ≥$2B · no pharma · dismiss memory |
 | Home briefs + Top 10 | `/` | Daily scan briefs, year-round Top 10, Scan All |
 | Multi-LLM consensus | brief + Scan All | OpenAI / Gemini / Claude → GO / NO-GO |
-| Paper auto-trade | `/trade` | Consensus GO, kill switch, order log (manual run; equity orders) |
+| Paper auto-trade | `/trade` | Consensus GO, kill switch, order log; pre-close cron (3pm ET) enters today's AMC + next-day BMO when Auto is ON |
 | History / outcomes | `/history` | Log beat/miss + next-day move |
 | System health | `/status` | Login-only · phases, env, table probes |
 
@@ -25,7 +25,7 @@ Live checklist for agents/ops: `lib/systemStatusManifest.ts` (also drives `/stat
 - **FMP** — earnings calendar, fundamentals, surprises
 - **Alpaca** — prices, options, paper/live trading (per-user keys in Settings; env fallback)
 - **Resend** — optional morning email (`NOTIFY_EMAIL`)
-- **Vercel Cron** — weekday daily scan (`0 13 * * 1-5` UTC ≈ 6am PT), Sunday calendar refresh
+- **Vercel Cron** — weekday daily scan (`0 13 * * 1-5` UTC ≈ 6am PT), Sunday calendar refresh, weekday auto-trade (`0 19 * * 1-5` UTC ≈ 3pm ET, ~1h before close)
 
 ## Quick start
 
@@ -121,7 +121,7 @@ supabase/migrations/              # Incremental (0012–0019+)
 ## Caveats
 
 - Whisper EPS is not wired into the daily scan yet (weight is currently wasted).
-- Auto-trade places **equity** market orders, not the options structures from `structure.ts`; run is **manual** on `/trade` (not on cron).
+- Auto-trade places **equity** market orders, not the options structures from `structure.ts`. With Auto ON it runs on the pre-close cron; "Run now" on `/trade` is always available. Cron time is fixed UTC, so it drifts an hour vs ET when DST changes.
 - Push notifications need VAPID keys; there is no in-app push subscribe UI yet.
 - Email alerts go to global `NOTIFY_EMAIL`, not each user’s Google address.
 - Not financial advice — decision support only.
