@@ -19,6 +19,10 @@ import {
 const FIELD =
   'w-full h-10 box-border bg-bg border border-border px-3 text-sm font-mono focus:outline-none focus:border-accent';
 
+/** Compact button base — intentionally NOT built on FIELD (w-full made buttons stretch). */
+const BTN =
+  'inline-flex items-center justify-center h-9 box-border bg-bg border border-border px-4 text-xs tracking-widest whitespace-nowrap font-mono focus:outline-none disabled:opacity-50';
+
 function ActionButton({
   label,
   pendingLabel,
@@ -31,10 +35,10 @@ function ActionButton({
   const { pending } = useFormStatus();
   const cls =
     variant === 'danger'
-      ? `${FIELD} h-9 w-auto px-3 text-xs tracking-widest border-signal-sell text-signal-sell hover:bg-signal-sell/10`
+      ? `${BTN} border-signal-sell text-signal-sell hover:bg-signal-sell/10`
       : variant === 'ghost'
-        ? `${FIELD} h-9 w-auto px-3 text-xs tracking-widest text-fg-muted hover:border-fg-subtle`
-        : `${FIELD} h-9 w-auto px-3 text-xs font-bold tracking-widest border-accent text-accent hover:bg-accent-muted`;
+        ? `${BTN} text-fg-muted hover:border-fg-subtle`
+        : `${BTN} font-bold border-accent text-accent hover:bg-accent-muted`;
 
   return (
     <button type="submit" disabled={pending} className={cls}>
@@ -186,8 +190,11 @@ export function TradeAutomationPanel({
 
         <div className="px-4 py-4 border-t border-border-subtle">
           <form action={notionalAction} className="flex flex-col sm:flex-row gap-3 sm:items-end">
-            <div className="flex-1 space-y-1">
-              <label htmlFor="max_notional_usd" className="text-xs text-fg-dim uppercase tracking-widest">
+            <div className="space-y-1.5">
+              <label
+                htmlFor="max_notional_usd"
+                className="block text-xs text-fg-dim uppercase tracking-widest whitespace-nowrap"
+              >
                 Max notional per trade (USD)
               </label>
               <input
@@ -198,7 +205,7 @@ export function TradeAutomationPanel({
                 max={100000}
                 step={100}
                 defaultValue={settings.maxNotionalUsd}
-                className={FIELD}
+                className={`${FIELD} sm:w-44 tabular-nums`}
               />
             </div>
             <ActionButton label="Save" pendingLabel="Saving…" />
@@ -225,7 +232,7 @@ export function TradeAutomationPanel({
                 <button
                   type="button"
                   onClick={() => setShowLiveConfirm(false)}
-                  className={`${FIELD} h-9 w-auto px-3 text-xs tracking-widest text-fg-muted`}
+                  className={`${BTN} text-fg-muted`}
                 >
                   Cancel
                 </button>
@@ -235,7 +242,7 @@ export function TradeAutomationPanel({
             <button
               type="button"
               onClick={() => setShowLiveConfirm(true)}
-              className={`${FIELD} h-9 w-auto px-3 text-xs tracking-widest text-fg-muted hover:border-fg-subtle`}
+              className={`${BTN} text-fg-muted hover:border-fg-subtle`}
             >
               Enable live trading…
             </button>

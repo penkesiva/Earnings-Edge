@@ -13,6 +13,10 @@ import {
 const FIELD =
   'w-full h-10 box-border bg-bg border border-border px-3 text-sm font-mono focus:outline-none focus:border-accent';
 
+/** Compact button base — intentionally NOT built on FIELD (w-full made buttons stretch). */
+const BTN =
+  'inline-flex items-center justify-center h-9 box-border bg-bg border border-border px-4 text-xs tracking-widest whitespace-nowrap font-mono focus:outline-none disabled:opacity-50';
+
 function SubmitButton({
   label,
   pendingLabel,
@@ -25,10 +29,10 @@ function SubmitButton({
   const { pending } = useFormStatus();
   const className =
     variant === 'danger'
-      ? `${FIELD} h-9 w-auto px-3 text-xs tracking-widest border-signal-sell text-signal-sell hover:bg-signal-sell/10`
+      ? `${BTN} border-signal-sell text-signal-sell hover:bg-signal-sell/10`
       : variant === 'ghost'
-        ? `${FIELD} h-9 w-auto px-3 text-xs tracking-widest text-fg-muted hover:border-fg-subtle`
-        : `${FIELD} h-9 w-auto px-3 text-xs font-bold tracking-widest border-accent text-accent hover:bg-accent-muted`;
+        ? `${BTN} text-fg-muted hover:border-fg-subtle`
+        : `${BTN} font-bold border-accent text-accent hover:bg-accent-muted`;
 
   return (
     <button type="submit" disabled={pending} className={className}>
