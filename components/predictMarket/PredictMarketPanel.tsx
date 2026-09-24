@@ -16,6 +16,10 @@ const TIMELINE = [
   { label: 'FINAL GRADE', time: '1:15 PM PT' },
 ] as const;
 
+function displayDirection(row: Record<string, unknown> | null | undefined): string {
+  return (row?.direction as string) ?? '—';
+}
+
 function fmtPct(n: number | null | undefined) {
   if (n == null || Number.isNaN(n)) return '—';
   return `${n.toFixed(0)}%`;
