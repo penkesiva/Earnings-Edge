@@ -45,6 +45,8 @@ const SYSTEM = `You are PredictMarket — an SPX session research engine for the
 Rules:
 - Use web search for fresh macro/news/calendar only when needed; cite real sources.
 - NEVER invent live prices. Use MARKET_DATA for numbers; null if missing.
+- expected_low / expected_high must use MARKET_DATA.technical.spx_index_estimate as anchor (SPX index level, not SPY).
+- If you provide a range, expected_low and expected_high must be positive and bracket spx_index_estimate.
 - Technical levels in key_levels must come from MARKET_DATA.technical or be null.
 - Output exactly one JSON object inside a fenced \`\`\`json block, then a short REASONING section.
 - direction: GREEN | RED | NEUTRAL. trade_bias: CALL | PUT | NO_TRADE.
@@ -255,7 +257,8 @@ function clampConfidence(v: unknown): number {
 
 function numOrNull(v: unknown): number | null {
   const n = Number(v);
-  return Number.isFinite(n) ? n : null;
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return n;
 }
 
 function strOrNull(v: unknown): string | null {

@@ -1,6 +1,10 @@
 import Link from 'next/link';
 import { formatDayHeader } from '@/lib/earningsDate';
 import type { PredictMarketPageData } from '@/lib/predictMarket/loadPredictMarketPageData';
+import {
+  directionTextCls,
+  displayRangeFromPrediction,
+} from '@/lib/predictMarket/enrichForecastRange';
 
 const TIMELINE = [
   { label: 'NIGHT FORECAST', time: '9:00 PM PT' },
@@ -12,11 +16,6 @@ const TIMELINE = [
   { label: 'FINAL GRADE', time: '1:15 PM PT' },
 ] as const;
 
-function displayVal(v: unknown): string {
-  if (v == null || v === '') return '—';
-  return String(v);
-}
-
 function fmtPct(n: number | null | undefined) {
   if (n == null || Number.isNaN(n)) return '—';
   return `${n.toFixed(0)}%`;
@@ -26,6 +25,8 @@ export function PredictMarketPanel({ data }: { data: PredictMarketPageData }) {
   const nextLabel = formatDayHeader(data.nextSessionDate);
   const night = data.latestSession?.night;
   const pre = data.latestSession?.premarket;
+  const primary = (pre ?? night) as Record<string, unknown> | null | undefined;
+  const direction = displayDirection(primary);
 
   return (
     <div className="space-y-8 max-w-3xl">
@@ -46,15 +47,14 @@ export function PredictMarketPanel({ data }: { data: PredictMarketPageData }) {
           {night || pre ? (
             <>
               <p className="text-2xl font-bold tracking-tight">
-                {(pre?.direction as string) ?? (night?.direction as string) ?? '—'}{' '}
+                <span className={directionTextCls(direction)}>{direction}</span>{' '}
                 <span className="text-fg-subtle text-base font-normal">
                   {fmtPct((pre?.confidence as number) ?? (night?.confidence as number))} confidence
                 </span>
               </p>
               <p className="text-xs text-fg-subtle">
-                Expected SPX range (when forecast exists): low{' '}
-                {displayVal(pre?.expected_low ?? night?.expected_low)} · high{' '}
-                {displayVal(pre?.expected_high ?? night?.expected_high)}
+                Expected SPX range (SPY×10 proxy):{' '}
+                {displayRangeFromPrediction(pre ?? night, data.latestSession?.spxAnchor)}
               </p>
               <p className="text-xs text-fg-subtle">
                 Bias: {(pre?.trade_bias as string) ?? (night?.trade_bias as string) ?? '—'}

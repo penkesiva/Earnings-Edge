@@ -10,6 +10,11 @@ import { defaultMarketDataProvider } from '@/lib/predictMarket/providers/alpacaM
 import { buildHistoricalStatsContext } from '@/lib/predictMarket/analytics/historicalContext';
 import { generatePredictMarketForecast } from '@/lib/predictMarket/llm/openAiPredictMarketForecast';
 import { gradePredictMarketSession } from '@/lib/predictMarket/gradeSession';
+import { enrichForecastRange } from '@/lib/predictMarket/enrichForecastRange';
+import { evaluateCheckpoint } from '@/lib/predictMarket/intraday/evaluateCheckpoint';
+import { evaluateEntryWindow } from '@/lib/predictMarket/intraday/evaluateEntry';
+import { evaluateOpenThesis } from '@/lib/predictMarket/intraday/evaluateOpenThesis';
+import { loadActiveThesis } from '@/lib/predictMarket/intraday/sessionContext';
 import {
   persistForecast,
   predictionExists,
@@ -78,13 +83,14 @@ async function runForecastPhase(
   if (snapErr) throw new Error(snapErr.message);
 
   const historicalStats = await buildHistoricalStatsContext(sb);
-  const forecast = await generatePredictMarketForecast({
+  let forecast = await generatePredictMarketForecast({
     predictionType,
     sessionDate,
     asOfPt,
     market: bundle,
     historicalStats,
   });
+  forecast = enrichForecastRange(forecast, bundle);
 
   await persistForecast(sb, sessionId, forecast, snapRow.id as string, now.toISOString());
 
@@ -121,41 +127,91 @@ export async function runPredictMarketPhase(
         { sessionDate, asOfPt, asOfInstant: now },
         null,
       );
+      const thesis = await loadActiveThesis(sb, sessionId);
+      const openCheck = evaluateOpenThesis(thesis, bundle);
       await sb.from('pm_market_snapshots').insert({
         session_id: sessionId,
         snapshot_kind: 'OPEN',
         as_of_pt: now.toISOString(),
-        payload: bundle,
+        payload: { ...bundle, open_thesis: openCheck },
       });
-      return { phase, sessionDate, ok: true, message: 'Open snapshot stored.' };
+      return {
+        phase,
+        sessionDate,
+        ok: true,
+        message: openCheck.summary,
+      };
     }
 
     if (phase === 'entry') {
-      await sb.from('pm_trade_signals').insert({
-        session_id: sessionId,
-        recommended_side: 'WAIT',
-        decision_time_pt: now.toISOString(),
-        confidence: null,
-        reasoning: 'Entry confirmation rules — Phase 3.',
-        structured: { phase: 'entry', stub: true },
-      });
-      return { phase, sessionDate, ok: true, message: 'Entry evaluation placeholder stored.' };
+      const bundle = await defaultMarketDataProvider.collect(
+        { sessionDate, asOfPt, asOfInstant: now },
+        null,
+      );
+      const thesis = await loadActiveThesis(sb, sessionId);
+      const { data: openSnap } = await sb
+        .from('pm_market_snapshots')
+        .select('payload')
+        .eq('session_id', sessionId)
+        .eq('snapshot_kind', 'OPEN')
+        .order('as_of_pt', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const openPayload = openSnap?.payload as { open_thesis?: { confirming?: boolean | null } } | null;
+      const entry = evaluateEntryWindow(
+        thesis,
+        bundle,
+        openPayload?.open_thesis?.confirming ?? null,
+      );
+
+      await sb.from('pm_trade_signals').upsert(
+        {
+          session_id: sessionId,
+          recommended_side: entry.recommendedSide,
+          decision_time_pt: now.toISOString(),
+          spx_price: entry.spxPrice,
+          confidence: entry.confidence,
+          confirmation_signals: entry.confirmationSignals,
+          invalidation_level: entry.invalidationLevel,
+          reasoning: entry.reasoning,
+          structured: { phase: 'entry', signals: entry.confirmationSignals },
+        },
+        { onConflict: 'session_id' },
+      );
+
+      return {
+        phase,
+        sessionDate,
+        ok: true,
+        message: `Entry: ${entry.recommendedSide} — ${entry.reasoning.slice(0, 80)}`,
+      };
     }
 
     if (phase === 'validate_7am' || phase === 'validate_10am') {
       const kind = phase === 'validate_7am' ? 'FIRST_7AM' : 'MIDDAY_10AM';
+      const bundle = await defaultMarketDataProvider.collect(
+        { sessionDate, asOfPt, asOfInstant: now },
+        null,
+      );
+      const thesis = await loadActiveThesis(sb, sessionId);
+      const result = evaluateCheckpoint(thesis, bundle, kind);
       await sb.from('pm_validation_checkpoints').upsert(
         {
           session_id: sessionId,
           checkpoint_kind: kind,
           as_of_pt: now.toISOString(),
-          thesis_status: 'PENDING',
-          metrics: { stub: true },
-          reasoning: 'Checkpoint logic — Phase 3.',
+          thesis_status: result.thesisStatus,
+          metrics: result.metrics,
+          reasoning: result.reasoning,
         },
         { onConflict: 'session_id,checkpoint_kind' },
       );
-      return { phase, sessionDate, ok: true, message: `${kind} checkpoint stored.` };
+      return {
+        phase,
+        sessionDate,
+        ok: true,
+        message: `${kind}: ${result.thesisStatus} — ${result.reasoning.slice(0, 80)}`,
+      };
     }
 
     if (phase === 'grade') {

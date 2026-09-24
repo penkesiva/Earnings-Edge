@@ -9,6 +9,7 @@ export type PredictMarketPageData = {
     sessionDate: string;
     night: Record<string, unknown> | null;
     premarket: Record<string, unknown> | null;
+    spxAnchor: number | null;
   } | null;
   performance: Awaited<ReturnType<typeof loadPredictMarketPerformance>>;
 };
@@ -43,6 +44,7 @@ export async function loadPredictMarketPageData(
 
   let night: Record<string, unknown> | null = null;
   let premarket: Record<string, unknown> | null = null;
+  let spxAnchor: number | null = null;
 
   if (session) {
     const { data: preds } = await sb
@@ -53,6 +55,16 @@ export async function loadPredictMarketPageData(
       if (p.prediction_type === 'NIGHT') night = p as Record<string, unknown>;
       if (p.prediction_type === 'PREMARKET') premarket = p as Record<string, unknown>;
     }
+
+    const { data: snap } = await sb
+      .from('pm_market_snapshots')
+      .select('payload')
+      .eq('session_id', session.id)
+      .order('as_of_pt', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const payload = snap?.payload as { technical?: { spx_index_estimate?: number } } | null;
+    spxAnchor = payload?.technical?.spx_index_estimate ?? null;
   }
 
   const performance = await loadPredictMarketPerformance(sb);
@@ -65,6 +77,7 @@ export async function loadPredictMarketPageData(
           sessionDate: session.session_date as string,
           night,
           premarket,
+          spxAnchor,
         }
       : null,
     performance,

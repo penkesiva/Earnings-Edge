@@ -26,6 +26,10 @@ export class AlpacaMarketDataProvider implements MarketDataProvider {
 
     const spxPrice = spy?.price ?? null;
     const prevClose = spy?.prevClose ?? null;
+    const spxEst =
+      spxPrice != null && spxPrice > 0 ? Math.round(spxPrice * 10 * 100) / 100 : null;
+    const prevSpx =
+      prevClose != null && prevClose > 0 ? Math.round(prevClose * 10 * 100) / 100 : null;
 
     return {
       provenance: 'ACTUAL',
@@ -48,6 +52,8 @@ export class AlpacaMarketDataProvider implements MarketDataProvider {
       dxy: { level: null, changePct: null },
       technical: {
         previous_close: prevClose,
+        previous_close_spx: prevSpx,
+        spx_index_estimate: spxEst,
         distance_from_previous_close_pct:
           spxPrice != null && prevClose ? ((spxPrice - prevClose) / prevClose) * 100 : null,
       },
