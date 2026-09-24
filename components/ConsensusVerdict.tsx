@@ -5,6 +5,7 @@ import type { AiBriefPayload } from '@/components/AiBriefAnalysis';
 import { CopyIconButton } from '@/components/CopyIconButton';
 import { DirectionIndicator } from '@/components/DirectionIndicator';
 import { ResponseTimeStamp } from '@/components/ResponseTimeStamp';
+import { SYNTHESIS_MODEL_UI_LABEL } from '@/lib/scanAllModelLabels';
 import {
   buildAlignmentChips,
   finalVerdictPanelBorder,
@@ -257,6 +258,7 @@ export function ConsensusVerdict({
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2">
           <span className="final-verdict-label">Final verdict</span>
+          <span className="text-[10px] text-fg-dim tracking-widest">{SYNTHESIS_MODEL_UI_LABEL}</span>
           {parsed.direction && <DirectionIndicator direction={parsed.direction} />}
         </div>
         <div className="flex items-center gap-2">

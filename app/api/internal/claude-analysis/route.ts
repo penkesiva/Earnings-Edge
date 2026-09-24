@@ -13,6 +13,7 @@ import type { AiBriefPayload } from '@/components/AiBriefAnalysis';
 import { buildAiBriefUserMessage } from '@/lib/aiBriefMessage';
 import { parseScanRequestBody } from '@/lib/parseScanRequest';
 import { assertScanRunAllowed } from '@/lib/tickerScanLock';
+import { CLAUDE_SCAN_ALL_MODEL } from '@/lib/llmModels';
 import { isAuthApiResult, requireAuthApi } from '@/lib/authServer';
 
 export const maxDuration = 120;
@@ -141,7 +142,7 @@ export async function POST(req: NextRequest) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'claude-opus-4-7',
+        model: CLAUDE_SCAN_ALL_MODEL,
         max_tokens: 1500,
         system: SYSTEM_PROMPT,
         messages: [{ role: 'user', content: userMessage }],

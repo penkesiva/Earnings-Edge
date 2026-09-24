@@ -6,8 +6,25 @@ export const GEMINI_VISION_OCR_MODEL = 'gemini-2.5-flash';
 /** Lightweight JSON/text classifiers (news tags, overhangs). */
 export const GEMINI_FLASH_LITE_MODEL = 'gemini-2.5-flash-lite';
 
-/** Scan All earnings analysis panel. */
-export const GEMINI_ANALYSIS_MODEL = 'gemini-3.1-pro-preview';
+/** Scan All earnings analysis panel. Override: GEMINI_ANALYSIS_MODEL */
+export const GEMINI_ANALYSIS_MODEL = envGeminiModel(
+  'GEMINI_ANALYSIS_MODEL',
+  'gemini-3.1-pro-preview',
+);
+
+function envGeminiModel(name: string, fallback: string): string {
+  const value = process.env[name]?.trim();
+  return value || fallback;
+}
+
+/** UI label for Scan All Gemini panel. */
+export function geminiScanAllLabel(): string {
+  const id = GEMINI_ANALYSIS_MODEL.toLowerCase();
+  if (id.includes('3.8-flash')) return 'GEMINI 3.8 FLASH';
+  if (id.includes('3.1-pro')) return 'GEMINI 3.1 PRO';
+  if (id.includes('3-pro')) return 'GEMINI 3 PRO';
+  return 'GEMINI';
+}
 
 export function geminiGenerateContentUrl(model: string, apiKey: string): string {
   return `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;

@@ -2,7 +2,7 @@
  * LLM-based headline classifier — risks + per-headline sentiment + overall bias
  * in a single batch call (shared by overhangDetector.ts).
  *
- * Provider: Gemini 2.5 Flash Lite > OpenAI GPT-4o-mini
+ * Provider: Gemini 2.5 Flash Lite > OpenAI (OPENAI_CLASSIFIER_MODEL, default gpt-4o-mini)
  * Cache: llm_scan_cache per (user_id, ticker, scan_date)
  */
 
@@ -12,6 +12,7 @@ import {
   GEMINI_VISION_OCR_MODEL,
   geminiGenerateContentUrl,
 } from '@/lib/geminiModels';
+import { OPENAI_CLASSIFIER_MODEL } from '@/lib/llmModels';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabaseAdmin } from '@/lib/supabase';
 import type {
@@ -235,7 +236,7 @@ async function callLlm(
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'gpt-4o-mini',
+      model: OPENAI_CLASSIFIER_MODEL,
       response_format: { type: 'json_object' },
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },

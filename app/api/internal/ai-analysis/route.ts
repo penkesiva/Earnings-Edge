@@ -2,7 +2,7 @@
  * POST /api/internal/ai-analysis
  *
  * Receives brief data, builds a comprehensive trading prompt, and streams
- * a GPT-4o response back via Server-Sent Events.
+ * a GPT Scan All model response back via Server-Sent Events.
  *
  * Called only from the brief page on demand — never during batch scans.
  */
@@ -11,6 +11,7 @@ import type { AiBriefPayload } from '@/components/AiBriefAnalysis';
 import { buildAiBriefUserMessage } from '@/lib/aiBriefMessage';
 import { parseScanRequestBody } from '@/lib/parseScanRequest';
 import { assertScanRunAllowed } from '@/lib/tickerScanLock';
+import { OPENAI_SCAN_ALL_MODEL } from '@/lib/llmModels';
 import { isAuthApiResult, requireAuthApi } from '@/lib/authServer';
 
 export const maxDuration = 120;
@@ -138,7 +139,7 @@ export async function POST(req: NextRequest) {
       'Content-Type': 'application/json',
     },
       body: JSON.stringify({
-        model: 'gpt-5.5',
+        model: OPENAI_SCAN_ALL_MODEL,
         stream: true,
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },

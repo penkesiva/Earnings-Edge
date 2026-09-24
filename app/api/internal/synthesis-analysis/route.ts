@@ -2,7 +2,7 @@
  * POST /api/internal/synthesis-analysis
  *
  * Meta-judge: combines system signals + OpenAI/Gemini/Claude analyses into one GO/NO-GO verdict.
- * Non-streaming JSON response for a compact final card.
+ * Synthesis model: OPENAI_SYNTHESIS_MODEL (default gpt-6-astra).
  */
 import { NextRequest, NextResponse } from 'next/server';
 import type { AiBriefPayload } from '@/components/AiBriefAnalysis';
@@ -13,6 +13,7 @@ import {
 } from '@/lib/aiConsensus';
 import { parseScanRequestBody } from '@/lib/parseScanRequest';
 import { assertScanRunAllowed } from '@/lib/tickerScanLock';
+import { OPENAI_SYNTHESIS_MODEL, openAiSynthesisLabel } from '@/lib/llmModels';
 import { isAuthApiResult, requireAuthApi } from '@/lib/authServer';
 
 export const maxDuration = 60;
@@ -239,7 +240,7 @@ export async function POST(req: NextRequest) {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'gpt-5.5',
+      model: OPENAI_SYNTHESIS_MODEL,
       stream: false,
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
@@ -266,5 +267,10 @@ export async function POST(req: NextRequest) {
 
   const text = guardSynthesisText(rawText, brief, analyses, pre);
 
-  return NextResponse.json({ text, preVote: pre });
+  return NextResponse.json({
+    text,
+    preVote: pre,
+    synthesisModel: OPENAI_SYNTHESIS_MODEL,
+    synthesisLabel: openAiSynthesisLabel(),
+  });
 }

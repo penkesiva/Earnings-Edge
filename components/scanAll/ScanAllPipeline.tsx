@@ -21,9 +21,10 @@ import {
   latestScanTimestamp,
   msUntilAiScanAllowed,
 } from '@/lib/aiScanCooldown';
+import { msUntilIso } from '@/lib/tickerScanLock';
 import { buildScanSignalStrip, type ScanSignalChip } from '@/lib/scanSignalStrip';
 import { splitAiFinalCall } from '@/lib/aiAnalysisDisplay';
-import { msUntilIso } from '@/lib/tickerScanLock';
+import { SCAN_ALL_PROVIDER_LABELS } from '@/lib/scanAllModelLabels';
 
 type PanelState = 'idle' | 'loading' | 'streaming' | 'done' | 'error';
 type Provider = 'openai' | 'gemini' | 'claude';
@@ -50,8 +51,8 @@ interface ProviderConfig {
 
 const CONFIGS: Record<Provider, ProviderConfig> = {
   openai: {
-    label: 'GPT-5.5 ANALYSIS',
-    shortLabel: 'GPT-5.5',
+    label: SCAN_ALL_PROVIDER_LABELS.openai.long,
+    shortLabel: SCAN_ALL_PROVIDER_LABELS.openai.short,
     endpoint: '/api/internal/ai-analysis',
     parseChunk(payload) {
       if (payload === '[DONE]') return null;
@@ -71,8 +72,8 @@ const CONFIGS: Record<Provider, ProviderConfig> = {
     },
   },
   gemini: {
-    label: 'GEMINI 3.1 PRO ANALYSIS',
-    shortLabel: 'GEMINI',
+    label: SCAN_ALL_PROVIDER_LABELS.gemini.long,
+    shortLabel: SCAN_ALL_PROVIDER_LABELS.gemini.short,
     endpoint: '/api/internal/gemini-analysis',
     parseChunk(payload) {
       try {
@@ -91,8 +92,8 @@ const CONFIGS: Record<Provider, ProviderConfig> = {
     },
   },
   claude: {
-    label: 'CLAUDE OPUS 4.7 ANALYSIS',
-    shortLabel: 'CLAUDE',
+    label: SCAN_ALL_PROVIDER_LABELS.claude.long,
+    shortLabel: SCAN_ALL_PROVIDER_LABELS.claude.short,
     endpoint: '/api/internal/claude-analysis',
     parseChunk(payload) {
       try {
