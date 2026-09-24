@@ -145,49 +145,69 @@ export function TradeAutomationPanel({
           migrationRequired ? 'opacity-60 pointer-events-none' : ''
         }`}
       >
-        <div className="px-4 py-3 flex flex-wrap items-center gap-2 justify-between bg-bg-elevated">
-          <div>
-            <h2 className="text-sm font-bold tracking-wide">Automation</h2>
-            <p className="text-xs text-fg-subtle mt-1">
-              Consensus GO only · directional equity orders · one per brief
-            </p>
-            <p className="text-xs text-fg-dim mt-1">
-              Auto ON → cron runs weekdays ~1h before close (3pm ET): enters today&apos;s AMC and
-              next-morning BMO names.
-            </p>
+        {/* At a glance */}
+        <div className="px-4 py-4 bg-bg-elevated space-y-3">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-bold tracking-wide">Automation controls</h2>
+              <p className="text-xs text-fg-subtle mt-1 max-w-xl">
+                Places Alpaca orders from Scan All <strong className="text-fg font-normal">Final verdict</strong>{' '}
+                on your active watchlist (GO equity/options, WATCH options). One order per earnings brief.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <StatusPill
+                label={settings.autoTradeEnabled ? 'Schedule ON' : 'Schedule OFF'}
+                tone={settings.autoTradeEnabled ? 'ok' : 'off'}
+              />
+              <StatusPill
+                label={settings.killSwitch ? 'Kill ON' : 'Kill OFF'}
+                tone={settings.killSwitch ? 'danger' : 'off'}
+              />
+              <StatusPill
+                label={accountMode === 'paper' ? 'Paper' : 'Live'}
+                tone={accountMode === 'paper' ? 'warn' : 'danger'}
+              />
+            </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <StatusPill
-              label={settings.autoTradeEnabled ? 'Auto ON' : 'Auto OFF'}
-              tone={settings.autoTradeEnabled ? 'ok' : 'off'}
-            />
-            <StatusPill
-              label={settings.killSwitch ? 'Kill ON' : 'Kill OFF'}
-              tone={settings.killSwitch ? 'danger' : 'off'}
-            />
-            <StatusPill
-              label={accountMode === 'paper' ? 'Paper only' : 'Live enabled'}
-              tone={accountMode === 'paper' ? 'warn' : 'danger'}
-            />
+          <div className="text-[11px] text-fg-dim border border-border-subtle bg-bg px-3 py-2 space-y-1">
+            <p>
+              <span className="text-fg-subtle font-bold tracking-wide">Schedule ON</span> — weekday cron
+              ~3pm ET places trades for today AMC + tomorrow BMO (before the close).
+            </p>
+            <p>
+              <span className="text-fg-subtle font-bold tracking-wide">Run now</span> — same rules, once,
+              immediately (works even if Schedule is OFF; still blocked if Kill is ON).
+            </p>
+            <p>
+              <span className="text-fg-subtle font-bold tracking-wide">Kill ON</span> — blocks all new orders
+              (cron and Run now) until you release it.
+            </p>
           </div>
         </div>
 
-        <div className="px-4 py-4 grid sm:grid-cols-2 gap-4">
-          <form action={autoAction} className="space-y-2">
-            <p className="text-xs text-fg-dim uppercase tracking-widest">Auto-trade</p>
+        <div className="px-4 py-4 grid sm:grid-cols-2 gap-6">
+          <form action={autoAction} className="space-y-2 border border-border-subtle px-3 py-3">
+            <p className="text-xs font-bold tracking-wide">Scheduled auto-trade</p>
+            <p className="text-[11px] text-fg-dim leading-relaxed">
+              Let the weekday cron submit orders before the close. Default is off until you turn it on.
+            </p>
             <input type="hidden" name="enabled" value={String(!settings.autoTradeEnabled)} />
             <ActionButton
-              label={settings.autoTradeEnabled ? 'Turn OFF' : 'Turn ON (paper)'}
+              label={settings.autoTradeEnabled ? 'Turn schedule OFF' : 'Turn schedule ON (paper)'}
               pendingLabel="Saving…"
               variant={settings.autoTradeEnabled ? 'ghost' : 'primary'}
             />
           </form>
 
-          <form action={killAction} className="space-y-2">
-            <p className="text-xs text-fg-dim uppercase tracking-widest">Kill switch</p>
+          <form action={killAction} className="space-y-2 border border-border-subtle px-3 py-3">
+            <p className="text-xs font-bold tracking-wide">Emergency kill switch</p>
+            <p className="text-[11px] text-fg-dim leading-relaxed">
+              Use if something looks wrong. Stops new orders; does not close open positions.
+            </p>
             <input type="hidden" name="on" value={String(!settings.killSwitch)} />
             <ActionButton
-              label={settings.killSwitch ? 'Release kill switch' : 'STOP all new orders'}
+              label={settings.killSwitch ? 'Release kill switch' : 'Activate kill switch'}
               pendingLabel="Saving…"
               variant={settings.killSwitch ? 'primary' : 'danger'}
             />
@@ -196,13 +216,16 @@ export function TradeAutomationPanel({
 
         <div className="px-4 py-4 border-t border-border-subtle">
           <form action={notionalAction} className="flex flex-col sm:flex-row gap-3 sm:items-end">
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 flex-1">
               <label
                 htmlFor="max_notional_usd"
-                className="block text-xs text-fg-dim uppercase tracking-widest whitespace-nowrap"
+                className="block text-xs font-bold tracking-wide"
               >
-                Max notional per trade (USD)
+                Max size per trade (USD)
               </label>
+              <p className="text-[11px] text-fg-dim">
+                Cap for each order — stock notional or option premium budget (contracts sized from this).
+              </p>
               <input
                 id="max_notional_usd"
                 name="max_notional_usd"
@@ -211,15 +234,21 @@ export function TradeAutomationPanel({
                 max={100000}
                 step={100}
                 defaultValue={settings.maxNotionalUsd}
-                className={`${FIELD} sm:w-44 tabular-nums`}
+                className={`${FIELD} sm:w-44 tabular-nums mt-1`}
               />
             </div>
-            <ActionButton label="Save" pendingLabel="Saving…" />
+            <ActionButton label="Save size" pendingLabel="Saving…" />
           </form>
         </div>
 
-        <div className="px-4 py-4 border-t border-border-subtle space-y-3">
-          <p className="text-xs text-fg-dim uppercase tracking-widest">Live trading (opt-in)</p>
+        <div className="px-4 py-4 border-t border-border-subtle space-y-3 border-l-2 border-l-signal-watch/50">
+          <div>
+            <p className="text-xs font-bold tracking-wide">Real-money trading (optional)</p>
+            <p className="text-[11px] text-fg-dim mt-1">
+              While off, only your Paper Alpaca keys in Settings are used. Live requires a separate opt-in
+              below.
+            </p>
+          </div>
           {settings.liveTradingEnabled ? (
             <form action={liveAction}>
               <input type="hidden" name="enable" value="false" />
@@ -255,28 +284,31 @@ export function TradeAutomationPanel({
           )}
         </div>
 
-        <div className="px-4 py-4 border-t border-border-subtle flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
-          <div>
-            <p className="text-sm font-bold">
-              {candidates.length} trade candidate(s)
-              {candidates.length > 0 ? (
-                <span className="text-fg-subtle font-normal">
-                  {' '}
-                  · {goCount} GO · {watchCount} WATCH
-                </span>
-              ) : null}
-            </p>
-            <p className="text-xs text-fg-subtle mt-1">
-              Active watchlist · today AMC + next-day BMO · GO equity or options · WATCH options
-            </p>
+        <div className="px-4 py-4 border-t border-border-subtle bg-bg-elevated/50">
+          <div className="flex flex-col sm:flex-row sm:items-start gap-4 justify-between">
+            <div className="space-y-2">
+              <h3 className="text-sm font-bold tracking-wide">
+                Ready to trade now
+                {candidates.length > 0 ? (
+                  <span className="text-fg-subtle font-normal">
+                    {' '}
+                    — {candidates.length} in queue ({goCount} GO · {watchCount} WATCH)
+                  </span>
+                ) : null}
+              </h3>
+              <p className="text-xs text-fg-subtle max-w-lg">
+                Queue = watchlist names with Final verdict GO or WATCH (UP/DOWN), earnings window
+                (today AMC or next-day BMO), not already traded. See list below.
+              </p>
+            </div>
+            <form action={runAction} className="shrink-0">
+              <ActionButton
+                label="Run now"
+                pendingLabel="Placing orders…"
+                variant="primary"
+              />
+            </form>
           </div>
-          <form action={runAction}>
-            <ActionButton
-              label="Run now"
-              pendingLabel="Placing orders…"
-              variant="primary"
-            />
-          </form>
         </div>
       </section>
 
@@ -284,6 +316,9 @@ export function TradeAutomationPanel({
         <h2 className="text-sm font-bold tracking-wide">
           <span className="page-chevron">›</span> TRADE QUEUE
         </h2>
+        <p className="text-[11px] text-fg-dim -mt-1">
+          These names would be sent on the next Run now or scheduled cron (if Schedule ON and Kill OFF).
+        </p>
         {candidates.length === 0 ? (
           <p className="text-xs text-fg-subtle border border-border px-4 py-6 text-center">
             No eligible trades. Run Scan All until Final verdict is GO or WATCH with UP/DOWN (options legs).

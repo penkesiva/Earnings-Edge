@@ -14,8 +14,9 @@ export default async function TradePage() {
         <h1 className="text-2xl sm:text-3xl font-bold tracking-tight mb-2">
           <span className="page-chevron">›</span> TRADE
         </h1>
-        <p className="text-sm text-fg-subtle">
-          Auto-trade GO (equity or options) and WATCH (consensus options) on your watchlist — paper by default
+        <p className="text-sm text-fg-subtle max-w-2xl">
+          Alpaca auto-execution from Scan All verdicts on your watchlist. Paper by default — not
+          PredictMarket (research only).
         </p>
       </div>
 
