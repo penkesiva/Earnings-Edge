@@ -26,7 +26,7 @@ export type ServerEnvRequirement = {
 
 export const SYSTEM_STATUS_MANIFEST = {
   /** Bump when you change phases, migrations, or env requirements below. */
-  manifestVersion: '2026-09-26',
+  manifestVersion: '2026-09-27',
 
   phases: [
     {
@@ -202,6 +202,11 @@ export const SYSTEM_STATUS_MANIFEST = {
       key: 'OPENAI_SCAN_ALL_MODEL',
       required: false,
       summary: 'Scan All OpenAI panel (default gpt-5.5)',
+    },
+    {
+      key: 'OPENAI_PREDICTMARKET_MODEL',
+      required: false,
+      summary: 'PredictMarket Responses API + web_search (default gpt-5.5)',
     },
   ] satisfies ServerEnvRequirement[],
 } as const;

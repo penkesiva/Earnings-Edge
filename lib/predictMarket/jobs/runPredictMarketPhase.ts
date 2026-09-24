@@ -7,6 +7,14 @@ import {
   pacificIsoTimestamp,
 } from '@/lib/predictMarket/sessionCalendar';
 import { defaultMarketDataProvider } from '@/lib/predictMarket/providers/alpacaMarketDataProvider';
+import { buildHistoricalStatsContext } from '@/lib/predictMarket/analytics/historicalContext';
+import { generatePredictMarketForecast } from '@/lib/predictMarket/llm/openAiPredictMarketForecast';
+import { gradePredictMarketSession } from '@/lib/predictMarket/gradeSession';
+import {
+  persistForecast,
+  predictionExists,
+  writeNightPremarketComparison,
+} from '@/lib/predictMarket/persistForecast';
 
 export type PredictMarketJobResult = {
   phase: PredictMarketPhase;
@@ -34,7 +42,65 @@ async function ensureSession(sb: SupabaseClient, sessionDate: string) {
   return data.id as string;
 }
 
-/** Phase 1 runner — wires cron phases to persistence (LLM steps stubbed next). */
+async function runForecastPhase(
+  sb: SupabaseClient,
+  sessionId: string,
+  sessionDate: string,
+  phase: 'night' | 'premarket',
+  now: Date,
+): Promise<PredictMarketJobResult> {
+  const predictionType = phase === 'night' ? 'NIGHT' : 'PREMARKET';
+  if (await predictionExists(sb, sessionId, predictionType)) {
+    return {
+      phase,
+      sessionDate,
+      ok: true,
+      message: `${predictionType} prediction already stored (immutable).`,
+    };
+  }
+
+  const asOfPt = pacificIsoTimestamp(now);
+  const bundle = await defaultMarketDataProvider.collect(
+    { sessionDate, asOfPt, asOfInstant: now },
+    null,
+  );
+  const snapshotKind = phase === 'night' ? 'NIGHT_INPUT' : 'PREMARKET_INPUT';
+  const { data: snapRow, error: snapErr } = await sb
+    .from('pm_market_snapshots')
+    .insert({
+      session_id: sessionId,
+      snapshot_kind: snapshotKind,
+      as_of_pt: now.toISOString(),
+      payload: bundle,
+    })
+    .select('id')
+    .single();
+  if (snapErr) throw new Error(snapErr.message);
+
+  const historicalStats = await buildHistoricalStatsContext(sb);
+  const forecast = await generatePredictMarketForecast({
+    predictionType,
+    sessionDate,
+    asOfPt,
+    market: bundle,
+    historicalStats,
+  });
+
+  await persistForecast(sb, sessionId, forecast, snapRow.id as string, now.toISOString());
+
+  if (phase === 'premarket') {
+    await writeNightPremarketComparison(sb, sessionId);
+  }
+
+  return {
+    phase,
+    sessionDate,
+    ok: true,
+    message: `${predictionType} ${forecast.structured.direction} @ ${forecast.structured.confidence}% (${forecast.structured.trade_bias}).`,
+  };
+}
+
+/** Cron phase runner — snapshots, OpenAI+web_search forecasts, checkpoints, grading. */
 export async function runPredictMarketPhase(
   sb: SupabaseClient,
   phase: PredictMarketPhase,
@@ -47,24 +113,7 @@ export async function runPredictMarketPhase(
     const sessionId = await ensureSession(sb, sessionDate);
 
     if (phase === 'night' || phase === 'premarket') {
-      const bundle = await defaultMarketDataProvider.collect(
-        { sessionDate, asOfPt, asOfInstant: now },
-        null,
-      );
-      const snapshotKind = phase === 'night' ? 'NIGHT_INPUT' : 'PREMARKET_INPUT';
-      await sb.from('pm_market_snapshots').insert({
-        session_id: sessionId,
-        snapshot_kind: snapshotKind,
-        as_of_pt: now.toISOString(),
-        payload: bundle,
-      });
-
-      return {
-        phase,
-        sessionDate,
-        ok: true,
-        message: `${phase}: snapshot stored (LLM forecast wiring pending). Missing: ${bundle.missing.slice(0, 4).join(', ')}…`,
-      };
+      return runForecastPhase(sb, sessionId, sessionDate, phase, now);
     }
 
     if (phase === 'open') {
@@ -87,7 +136,7 @@ export async function runPredictMarketPhase(
         recommended_side: 'WAIT',
         decision_time_pt: now.toISOString(),
         confidence: null,
-        reasoning: 'Phase 1 placeholder — confirmation logic not wired yet.',
+        reasoning: 'Entry confirmation rules — Phase 3.',
         structured: { phase: 'entry', stub: true },
       });
       return { phase, sessionDate, ok: true, message: 'Entry evaluation placeholder stored.' };
@@ -102,7 +151,7 @@ export async function runPredictMarketPhase(
           as_of_pt: now.toISOString(),
           thesis_status: 'PENDING',
           metrics: { stub: true },
-          reasoning: 'Phase 1 placeholder checkpoint.',
+          reasoning: 'Checkpoint logic — Phase 3.',
         },
         { onConflict: 'session_id,checkpoint_kind' },
       );
@@ -110,12 +159,8 @@ export async function runPredictMarketPhase(
     }
 
     if (phase === 'grade') {
-      return {
-        phase,
-        sessionDate,
-        ok: true,
-        message: 'Final grading job registered — outcome + score writers pending.',
-      };
+      const msg = await gradePredictMarketSession(sb, sessionId, sessionDate, now.toISOString());
+      return { phase, sessionDate, ok: true, message: msg };
     }
 
     return { phase, sessionDate, ok: false, message: 'Unknown phase.' };

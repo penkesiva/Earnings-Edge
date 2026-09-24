@@ -20,6 +20,9 @@ export const CLAUDE_SCAN_ALL_MODEL = envModel('CLAUDE_SCAN_ALL_MODEL', 'claude-o
 /** Cheap JSON/text classifiers (news tags, etc.). */
 export const OPENAI_CLASSIFIER_MODEL = envModel('OPENAI_CLASSIFIER_MODEL', 'gpt-4o-mini');
 
+/** PredictMarket forecasts (Responses API + web_search). */
+export const OPENAI_PREDICTMARKET_MODEL = envModel('OPENAI_PREDICTMARKET_MODEL', 'gpt-5.5');
+
 /** Human-readable labels for UI (match model family, not exact snapshot). */
 export function openAiScanAllLabel(): string {
   return modelFamilyLabel(OPENAI_SCAN_ALL_MODEL, 'GPT');
