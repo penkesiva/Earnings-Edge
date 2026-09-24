@@ -15,7 +15,7 @@ export default async function TradePage() {
           <span className="page-chevron">›</span> TRADE
         </h1>
         <p className="text-sm text-fg-subtle">
-          Auto-trade consensus GO signals on your watchlist — paper by default
+          Auto-trade GO (equity or options) and WATCH (consensus options) on your watchlist — paper by default
         </p>
       </div>
 

@@ -123,6 +123,8 @@ export function TradeAutomationPanel({
   }, [autoState, killState, liveState, notionalState, closeState, runState]);
 
   const accountMode = settings.liveTradingEnabled ? 'live' : 'paper';
+  const goCount = candidates.filter(c => c.verdict === 'GO').length;
+  const watchCount = candidates.filter(c => c.verdict === 'WATCH').length;
 
   return (
     <div className="space-y-6">
@@ -255,9 +257,17 @@ export function TradeAutomationPanel({
 
         <div className="px-4 py-4 border-t border-border-subtle flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
           <div>
-            <p className="text-sm font-bold">{candidates.length} GO candidate(s)</p>
+            <p className="text-sm font-bold">
+              {candidates.length} trade candidate(s)
+              {candidates.length > 0 ? (
+                <span className="text-fg-subtle font-normal">
+                  {' '}
+                  · {goCount} GO · {watchCount} WATCH
+                </span>
+              ) : null}
+            </p>
             <p className="text-xs text-fg-subtle mt-1">
-              Active watchlist · today AMC + next-day BMO · not yet traded
+              Active watchlist · today AMC + next-day BMO · GO equity or options · WATCH options
             </p>
           </div>
           <form action={runAction}>
@@ -272,11 +282,11 @@ export function TradeAutomationPanel({
 
       <section className="space-y-3">
         <h2 className="text-sm font-bold tracking-wide">
-          <span className="page-chevron">›</span> GO QUEUE
+          <span className="page-chevron">›</span> TRADE QUEUE
         </h2>
         {candidates.length === 0 ? (
           <p className="text-xs text-fg-subtle border border-border px-4 py-6 text-center">
-            No eligible trades. Run Scan All on upcoming briefs until consensus shows GO + direction.
+            No eligible trades. Run Scan All until Final verdict is GO or WATCH with UP/DOWN (options legs).
           </p>
         ) : (
           <ul className="border border-border divide-y divide-border-subtle">
@@ -286,7 +296,12 @@ export function TradeAutomationPanel({
                 <Link href={`/briefs/${row.briefId}`} className="font-bold text-sm hover:text-accent">
                   {row.ticker}
                 </Link>
-                <FinalVerdictBadge verdict="GO" direction={row.direction} />
+                <FinalVerdictBadge verdict={row.verdict} direction={row.direction} />
+                {row.legSummary ? (
+                  <span className="text-[10px] text-fg-dim truncate max-w-[140px]" title={row.legSummary}>
+                    {row.executionMode === 'equity' ? 'equity' : row.legSummary}
+                  </span>
+                ) : null}
                 <span className="text-[10px] font-bold tracking-widest text-fg-dim border border-border-subtle px-1 py-0.5">
                   {row.earningsDate} {row.timing}
                 </span>

@@ -26,7 +26,7 @@ export type ServerEnvRequirement = {
 
 export const SYSTEM_STATUS_MANIFEST = {
   /** Bump when you change phases, migrations, or env requirements below. */
-  manifestVersion: '2026-09-24',
+  manifestVersion: '2026-09-25',
 
   phases: [
     {
@@ -70,7 +70,7 @@ export const SYSTEM_STATUS_MANIFEST = {
     },
     {
       id: 'trade',
-      name: 'Auto-trade (consensus GO, paper default, kill switch)',
+      name: 'Auto-trade (consensus GO/WATCH, options + equity proxy, paper default)',
       route: '/trade',
       migration: '0019',
       status: 'shipped',
@@ -115,6 +115,11 @@ export const SYSTEM_STATUS_MANIFEST = {
       id: '0020',
       file: '0020_trade_exits.sql',
       summary: 'Exit price, realized P&L, closed status on trade_orders',
+    },
+    {
+      id: '0021',
+      file: '0021_trade_option_legs.sql',
+      summary: 'Option leg metadata on trade_orders for WATCH/GO options auto-trade',
     },
   ] satisfies SystemMigration[],
 

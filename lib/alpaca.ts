@@ -202,6 +202,22 @@ function parseOccSymbol(symbol: string) {
   };
 }
 
+/** Build Alpaca OCC option symbol (same format as parseOccSymbol). */
+export function buildOccSymbol(
+  root: string,
+  expiryIso: string,
+  type: 'call' | 'put',
+  strike: number,
+): string {
+  const [y, m, d] = expiryIso.split('-');
+  if (!y || !m || !d) throw new Error(`Invalid expiry ${expiryIso}`);
+  const yy = y.slice(-2);
+  const cp = type === 'call' ? 'C' : 'P';
+  const strikeInt = Math.round(strike * 1000);
+  const strikeStr = String(strikeInt).padStart(8, '0');
+  return `${root.toUpperCase()}${yy}${m}${d}${cp}${strikeStr}`;
+}
+
 export function computeIvRank(currentIv: number, ivHistory: number[]): number {
   if (ivHistory.length === 0) return 50;
   const min = Math.min(...ivHistory);

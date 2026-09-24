@@ -1,4 +1,14 @@
-import { parseSynthesisResponse, type Direction } from '@/lib/aiConsensus';
+import {
+  parseSynthesisResponse,
+  type Direction,
+  type ParsedTradePlan,
+  type VerdictCall,
+} from '@/lib/aiConsensus';
+import {
+  canAutoTradeOptions,
+  formatLegSummary,
+  resolveTradeLegsForAutoTrade,
+} from '@/lib/consensusOptionExecution';
 import { loadDashboardBriefAiByIds } from '@/lib/loadDashboardBriefAi';
 import { getPreMarketFocusDates } from '@/lib/topEarningsPicks';
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -10,8 +20,18 @@ export type GoTradeCandidate = {
   earningsDate: string;
   timing: 'BMO' | 'AMC' | 'UNK';
   direction: 'UP' | 'DOWN';
+  verdict: VerdictCall;
   compositeScore: number;
   confidence: string | null;
+  /** equity = GO without option legs; options = consensus / system legs */
+  executionMode: 'equity' | 'options';
+  tradePlan: ParsedTradePlan | null;
+  legSummary: string | null;
+  suggestedStructure: {
+    legs?: Array<{ side: 'BUY' | 'SELL'; type: 'CALL' | 'PUT'; strike: number; expiry?: string }>;
+    preferredExpiry?: string;
+    action?: string;
+  } | null;
 };
 
 type BriefRow = {
@@ -19,14 +39,17 @@ type BriefRow = {
   ticker: string;
   earnings_date: string;
   composite_score: number;
+  suggested_structure: GoTradeCandidate['suggestedStructure'];
 };
 
 /**
- * Active watchlist briefs with consensus GO + direction, filtered to the
+ * Active watchlist briefs with consensus GO or WATCH + direction, filtered to the
  * pre-close entry window:
  *   - reporting today AMC (or unknown timing) → enter before today's close
  *   - reporting next trading day BMO → enter today for the morning print
  * Today-BMO names already reported pre-market and are excluded.
+ *
+ * GO without option legs → equity proxy. GO/WATCH with legs → options auto-trade.
  */
 export async function loadGoTradeCandidates(
   sb: SupabaseClient,
@@ -47,7 +70,7 @@ export async function loadGoTradeCandidates(
 
   const { data: briefs, error: briefErr } = await sb
     .from('earnings_briefs')
-    .select('id, ticker, earnings_date, composite_score')
+    .select('id, ticker, earnings_date, composite_score, suggested_structure')
     .eq('user_id', userId)
     .in('earnings_date', focusDates)
     .order('composite_score', { ascending: false });
@@ -59,7 +82,6 @@ export async function loadGoTradeCandidates(
   ) as BriefRow[];
   if (preFiltered.length === 0) return [];
 
-  // Timing lookup so we only enter names that haven't reported yet.
   const { data: events } = await sb
     .from('earnings_events')
     .select('ticker, earnings_date, timing')
@@ -74,9 +96,7 @@ export async function loadGoTradeCandidates(
   const today = focusDates[0];
   const eligibleBriefs = preFiltered.filter(b => {
     const timing = timingByKey.get(`${b.ticker}:${b.earnings_date}`) ?? 'UNK';
-    // Today's BMO names already printed pre-market — nothing to front-run.
     if (b.earnings_date === today && timing === 'BMO') return false;
-    // Next-day AMC names don't need entry until tomorrow's window.
     if (b.earnings_date !== today && timing === 'AMC') return false;
     return true;
   });
@@ -97,23 +117,74 @@ export async function loadGoTradeCandidates(
     if (!consensusText?.trim()) continue;
 
     const parsed = parseSynthesisResponse(consensusText);
-    if (parsed.verdict !== 'GO') continue;
+    if (parsed.verdict !== 'GO' && parsed.verdict !== 'WATCH') continue;
 
     const direction = normalizeDirection(parsed.direction);
     if (direction !== 'UP' && direction !== 'DOWN') continue;
 
-    candidates.push({
-      briefId: brief.id,
-      ticker: brief.ticker,
-      earningsDate: brief.earnings_date,
-      timing: timingByKey.get(`${brief.ticker}:${brief.earnings_date}`) ?? 'UNK',
+    const structure = brief.suggested_structure ?? null;
+    const tradeLegs = resolveTradeLegsForAutoTrade(
+      parsed.verdict,
       direction,
-      compositeScore: brief.composite_score ?? 0,
-      confidence: parsed.confidence,
-    });
+      parsed.tradePlan,
+      structure,
+    );
+
+    if (parsed.verdict === 'WATCH' && !canAutoTradeOptions(parsed.verdict, tradeLegs)) {
+      continue;
+    }
+
+    const useOptions = tradeLegs.length > 0;
+    if (parsed.verdict === 'GO' && !useOptions) {
+      candidates.push(
+        buildCandidate(brief, timingByKey, parsed, direction, 'equity', null, tradeLegs, structure),
+      );
+      continue;
+    }
+
+    if (useOptions) {
+      candidates.push(
+        buildCandidate(
+          brief,
+          timingByKey,
+          parsed,
+          direction,
+          'options',
+          parsed.tradePlan,
+          tradeLegs,
+          structure,
+        ),
+      );
+    }
   }
 
   return candidates.sort((a, b) => b.compositeScore - a.compositeScore);
+}
+
+function buildCandidate(
+  brief: BriefRow,
+  timingByKey: Map<string, 'BMO' | 'AMC' | 'UNK'>,
+  parsed: ReturnType<typeof parseSynthesisResponse>,
+  direction: 'UP' | 'DOWN',
+  executionMode: 'equity' | 'options',
+  tradePlan: ParsedTradePlan | null,
+  tradeLegs: ReturnType<typeof resolveTradeLegsForAutoTrade>,
+  suggestedStructure: BriefRow['suggested_structure'],
+): GoTradeCandidate {
+  return {
+    briefId: brief.id,
+    ticker: brief.ticker,
+    earningsDate: brief.earnings_date,
+    timing: timingByKey.get(`${brief.ticker}:${brief.earnings_date}`) ?? 'UNK',
+    direction,
+    verdict: parsed.verdict,
+    compositeScore: brief.composite_score ?? 0,
+    confidence: parsed.confidence,
+    executionMode,
+    tradePlan,
+    legSummary: tradeLegs.length ? formatLegSummary(tradeLegs) : null,
+    suggestedStructure,
+  };
 }
 
 function normalizeDirection(direction: Direction | null): 'UP' | 'DOWN' | null {

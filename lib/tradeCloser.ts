@@ -10,7 +10,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { resolveAlpacaAuthForUser, type AlpacaEnvironment } from '@/lib/alpacaCredentials';
 import { getStockSnapshot } from '@/lib/alpaca';
-import { getOrderFill, placeMarketOrder } from '@/lib/alpacaTrading';
+import { getOrderFill, placeMarketOrder, placeOptionMarketOrder, placeOptionMultiLegOrder } from '@/lib/alpacaTrading';
 import { addCalendarDays, earningsSessionDate } from '@/lib/earningsDate';
 import { isTradingDay } from '@/lib/usMarketCalendar';
 
@@ -30,6 +30,8 @@ type OpenOrderRow = {
   side: 'buy' | 'sell';
   qty: number;
   notional_usd: number | null;
+  instrument_type?: string | null;
+  option_legs?: Array<{ symbol: string; side: 'buy' | 'sell' }> | null;
 };
 
 export function nextTradingDayAfter(iso: string): string {
@@ -46,7 +48,9 @@ export function tradeExitDate(earningsDate: string, timing: 'BMO' | 'AMC' | 'UNK
 async function loadOpenOrders(sb: SupabaseClient, userId: string): Promise<OpenOrderRow[]> {
   const { data, error } = await sb
     .from('trade_orders')
-    .select('id, user_id, ticker, earnings_date, environment, side, qty, notional_usd, closed_at, status')
+    .select(
+      'id, user_id, ticker, earnings_date, environment, side, qty, notional_usd, closed_at, status, instrument_type, option_legs',
+    )
     .eq('user_id', userId)
     .in('status', ['submitted', 'filled'])
     .is('closed_at', null)
@@ -87,22 +91,39 @@ export async function closeTradeOrder(
     return { ok: false, detail: `${order.ticker}: no ${order.environment} Alpaca keys.` };
   }
 
-  const closeSide = order.side === 'buy' ? 'sell' : 'buy';
-  const placed = await placeMarketOrder(auth, {
-    symbol: order.ticker,
-    qty: order.qty,
-    side: closeSide,
-  });
+  const instrument = order.instrument_type ?? 'equity';
+  const placed =
+    instrument === 'option_single' && order.option_legs?.[0]
+      ? await placeOptionMarketOrder(auth, {
+          symbol: order.option_legs[0].symbol,
+          qty: order.qty,
+          side: order.option_legs[0].side === 'buy' ? 'sell' : 'buy',
+        })
+      : instrument === 'option_mleg' && order.option_legs && order.option_legs.length >= 2
+        ? await placeOptionMultiLegOrder(auth, {
+            qty: order.qty,
+            legs: order.option_legs.map(leg => ({
+              symbol: leg.symbol,
+              side: leg.side === 'buy' ? 'sell' : 'buy',
+            })),
+          })
+        : await (async () => {
+            const closeSide = order.side === 'buy' ? 'sell' : 'buy';
+            return placeMarketOrder(auth, {
+              symbol: order.ticker,
+              qty: order.qty,
+              side: closeSide,
+            });
+          })();
 
   if (!placed.ok) {
     return { ok: false, detail: `${order.ticker}: close failed — ${placed.error.slice(0, 120)}` };
   }
 
-  // Give the market order a moment to fill, then read the fill price.
   await new Promise(r => setTimeout(r, 1500));
   const fill = await getOrderFill(auth, placed.order.id);
   let exitPrice = fill?.filledAvgPrice ?? null;
-  if (exitPrice == null) {
+  if (exitPrice == null && instrument === 'equity') {
     try {
       const snap = await getStockSnapshot(order.ticker, auth);
       exitPrice = snap.price > 0 ? snap.price : null;
@@ -120,6 +141,8 @@ export async function closeTradeOrder(
         ? (exitPrice - entryPrice) * order.qty
         : (entryPrice - exitPrice) * order.qty;
     pnl = Math.round(raw * 100) / 100;
+  } else if (instrument !== 'equity' && order.notional_usd != null) {
+    pnl = null;
   }
 
   const { error } = await sb
@@ -156,7 +179,9 @@ export async function closeTradeOrderById(
 ): Promise<{ ok: boolean; detail: string }> {
   const { data, error } = await sb
     .from('trade_orders')
-    .select('id, user_id, ticker, earnings_date, environment, side, qty, notional_usd, status, closed_at')
+    .select(
+      'id, user_id, ticker, earnings_date, environment, side, qty, notional_usd, status, closed_at, instrument_type, option_legs',
+    )
     .eq('id', orderId)
     .eq('user_id', userId)
     .maybeSingle();

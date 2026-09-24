@@ -64,7 +64,9 @@ TRADE LIMIT: [limit price: ~$X.XX credit/debit per spread + max risk, or —]
 
 TRADE rules:
 - Use dollar strikes anchored to spot ± expected move from the system brief. Prefer system suggested_structure legs when they fit the verdict.
-- NO-GO or WATCH → TRADE TYPE: NONE and all legs/limit as —.
+- NO-GO → TRADE TYPE: NONE and all legs/limit as —.
+- WATCH with UP or DOWN → include a small defined-risk structure (prefer system suggested_structure legs); do not use NONE unless direction is NEUTRAL.
+- GO → full structure per IV/direction rules above.
 - No prose ("such as", "sized small"). Only executable legs and a limit hint.
 - IV rank ≥ 80: prefer credit spreads / premium sell over naked long options unless unanimous high-confidence directional GO.
 
@@ -132,7 +134,7 @@ function guardSynthesisText(
       'WHY',
       'System skip/asymmetric-risk guard blocks GO despite directional model alignment.'
     );
-    out = noneTrade(out);
+    if (action === 'SKIP_CONFLICT') out = noneTrade(out);
   } else if (parsed.verdict === 'GO' && lowQualityGo) {
     out = replaceLine(out, 'VERDICT', 'WATCH');
     out = replaceLine(out, 'CONFIDENCE', `${Math.min(6, Math.max(3, Math.round(avgConfidence || 5)))}/10`);
@@ -141,7 +143,6 @@ function guardSynthesisText(
       'WHY',
       'Directional lean is not strong enough for GO with a sub-70 beat score.'
     );
-    out = noneTrade(out);
   }
 
   if (isDebitSpread && premiumSellVotes >= 2) {
@@ -149,9 +150,8 @@ function guardSynthesisText(
     out = replaceLine(
       out,
       'WHY',
-      'Premium-selling consensus blocks debit-spread entry; wait or use the system credit structure.'
+      'Premium-selling consensus blocks debit-spread entry; prefer system credit structure at smaller size.'
     );
-    out = noneTrade(out);
   }
 
   return out;
