@@ -62,8 +62,11 @@ export function PredictMarketPanel({ data }: { data: PredictMarketPageData }) {
             </>
           ) : (
             <p className="text-sm text-fg-subtle">
-              No forecasts yet. Phase 1 cron will store snapshots first; LLM predictions ship in the
-              next increment.
+              No forecasts yet for this session. Vercel cron runs on the timeline below (Pacific).
+              Night runs ~9:00 PM PT; premarket ~6:10 AM PT. Or trigger manually:{' '}
+              <code className="font-mono text-[10px]">
+                /api/cron/predict-market?phase=night&amp;force=1
+              </code>
             </p>
           )}
           {data.latestSession ? (
