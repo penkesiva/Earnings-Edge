@@ -15,6 +15,34 @@
     {
       "path": "/api/cron/close-trades",
       "schedule": "50 19 * * 1-5"
+    },
+    {
+      "path": "/api/cron/predict-market?phase=night",
+      "schedule": "0 4 * * 1-5"
+    },
+    {
+      "path": "/api/cron/predict-market?phase=premarket",
+      "schedule": "10 13 * * 1-5"
+    },
+    {
+      "path": "/api/cron/predict-market?phase=open",
+      "schedule": "30 13 * * 1-5"
+    },
+    {
+      "path": "/api/cron/predict-market?phase=entry",
+      "schedule": "45 13 * * 1-5"
+    },
+    {
+      "path": "/api/cron/predict-market?phase=validate_7am",
+      "schedule": "0 14 * * 1-5"
+    },
+    {
+      "path": "/api/cron/predict-market?phase=validate_10am",
+      "schedule": "0 17 * * 1-5"
+    },
+    {
+      "path": "/api/cron/predict-market?phase=grade",
+      "schedule": "15 20 * * 1-5"
     }
   ]
 }

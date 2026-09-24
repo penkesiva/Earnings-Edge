@@ -12,6 +12,7 @@ const PRIMARY_LINKS: NavLink[] = [
   { href: '/', label: 'Home' },
   { href: '/watchlist', label: 'Watchlist' },
   { href: '/trade', label: 'Trade' },
+  { href: '/predictmarket', label: 'PredictMarket' },
 ];
 
 const SECONDARY_LINKS: NavLink[] = [

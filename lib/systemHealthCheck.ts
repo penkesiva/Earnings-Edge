@@ -87,6 +87,7 @@ export async function runSystemHealthChecks(
     { table: 'user_alpaca_credentials', label: 'user_alpaca_credentials table', migration: '0017' },
     { table: 'automation_settings', label: 'automation_settings table', migration: '0019' },
     { table: 'trade_orders', label: 'trade_orders table', migration: '0019' },
+    { table: 'pm_market_sessions', label: 'pm_market_sessions (PredictMarket)', migration: '0022' },
   ];
 
   for (const t of tableChecks) {

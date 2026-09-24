@@ -26,7 +26,7 @@ export type ServerEnvRequirement = {
 
 export const SYSTEM_STATUS_MANIFEST = {
   /** Bump when you change phases, migrations, or env requirements below. */
-  manifestVersion: '2026-09-25',
+  manifestVersion: '2026-09-26',
 
   phases: [
     {
@@ -88,6 +88,13 @@ export const SYSTEM_STATUS_MANIFEST = {
       migration: '0020',
       status: 'shipped',
     },
+    {
+      id: 'predictmarket',
+      name: 'PredictMarket — SPX forecast, validation, learning (Phase 1)',
+      route: '/predictmarket',
+      migration: '0022',
+      status: 'shipped',
+    },
   ] satisfies SystemPhase[],
 
   migrations: [
@@ -120,6 +127,11 @@ export const SYSTEM_STATUS_MANIFEST = {
       id: '0021',
       file: '0021_trade_option_legs.sql',
       summary: 'Option leg metadata on trade_orders for WATCH/GO options auto-trade',
+    },
+    {
+      id: '0022',
+      file: '0022_predict_market.sql',
+      summary: 'PredictMarket sessions, snapshots, predictions, outcomes, scores',
     },
   ] satisfies SystemMigration[],
 
