@@ -1,9 +1,11 @@
 export const INTRADAY_STRATEGY_VWAP_OR_V1 = 'vwap_opening_range_v1' as const;
 export const INTRADAY_STRATEGY_BUY_WEAK_SELL_STRONG_V1 = 'buy_weak_sell_strong_v1' as const;
+export const INTRADAY_STRATEGY_EMA_TREND_DAY_V1 = 'ema_trend_day_v1' as const;
 
 export type IntradayStrategyId =
   | typeof INTRADAY_STRATEGY_VWAP_OR_V1
-  | typeof INTRADAY_STRATEGY_BUY_WEAK_SELL_STRONG_V1;
+  | typeof INTRADAY_STRATEGY_BUY_WEAK_SELL_STRONG_V1
+  | typeof INTRADAY_STRATEGY_EMA_TREND_DAY_V1;
 
 export type IntradayRunMode = 'backtest' | 'paper' | 'live';
 
@@ -25,7 +27,9 @@ export type SetupType =
   | 'or_breakout'
   | 'or_retest'
   | 'vwap_dip'
-  | 'deep_dip';
+  | 'deep_dip'
+  | 'ema_cross_up'
+  | 'ema_pullback';
 
 export type MinuteBar = {
   t: string;
@@ -74,7 +78,25 @@ export type BuyWeakStrategyConfig = {
   minConfidence: number;
 };
 
-export type TradeExitReason = 'strength' | 'stop' | 'target' | 'eod_flat' | 'session_end';
+/** Intraday 9/20 EMA session trend (from RTH bars only). */
+export type EmaTrendDayConfig = {
+  warmupBars: number;
+  cooldownMinutes: number;
+  maxTradesPerDay: number;
+  allowPullbackEntry: boolean;
+  pullbackTouchPct: number;
+  exitOnCloseBelowFast: boolean;
+  noNewEntriesAfterEt: string;
+  forceFlatEt: string;
+};
+
+export type TradeExitReason =
+  | 'strength'
+  | 'stop'
+  | 'target'
+  | 'eod_flat'
+  | 'session_end'
+  | 'ema_cross_down';
 
 export type BacktestTrade = {
   sessionDate: string;

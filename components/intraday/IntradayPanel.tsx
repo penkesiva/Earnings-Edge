@@ -70,6 +70,7 @@ function exitReasonTag(exitReason: string | undefined, pnl: number): string {
   if (exitReason === 'stop') return ' · stop';
   if (exitReason === 'target') return ' · target';
   if (exitReason === 'session_end') return ' · session end';
+  if (exitReason === 'ema_cross_down') return ' · 9↓20 exit';
   if (pnl < 0 && exitReason == null) return ' · exit';
   return '';
 }
