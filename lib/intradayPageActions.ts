@@ -9,7 +9,10 @@ import {
   DEFAULT_INTRADAY_CONFIG,
 } from '@/lib/intraday/config/defaults';
 import { runIntradayBacktest } from '@/lib/intraday/backtest/runBacktest';
-import { compareEmaTrendDayBacktest } from '@/lib/intraday/backtest/compareEmaTrend';
+import {
+  compareEmaTrendDayBacktest,
+  formatCompareMetricsLine,
+} from '@/lib/intraday/backtest/compareEmaTrend';
 import { validateTradingBudget } from '@/lib/intraday/sizing/computeShares';
 import { INTRADAY_STRATEGIES, strategyLabel } from '@/lib/intraday/strategies/registry';
 import { validateIntradayTicker, normalizeTickerInput } from '@/lib/intraday/validateIntradayTicker';
@@ -327,16 +330,23 @@ export async function compareEmaTrendBacktestAction(
       auth,
     });
     const v1 = cmp.v1;
-    const v2 = cmp.v2;
-    const msg =
-      `EMA v1 vs v2 (${cmp.daysWithData} sessions, ${validated.ticker.symbol}): ` +
-      `v1 P&L $${v1.totalPnlUsd.toFixed(2)}, ${v1.trades} trades, WR ${v1.winRate?.toFixed(1) ?? '—'}%, PF ${v1.profitFactor?.toFixed(2) ?? '—'}. ` +
-      `v2 P&L $${v2.totalPnlUsd.toFixed(2)}, ${v2.trades} trades, WR ${v2.winRate?.toFixed(1) ?? '—'}%, PF ${v2.profitFactor?.toFixed(2) ?? '—'}, ` +
-      `rejected signals ${v2.rejectedSignals ?? 0}, expectancy $${v2.expectancyPerTrade?.toFixed(2) ?? '—'}/trade.`;
+    const lines = [
+      `EMA compare (${cmp.daysWithData} sessions, ${validated.ticker.symbol})`,
+      formatCompareMetricsLine('v1', v1),
+      formatCompareMetricsLine('v2 EMA_ONLY', cmp.v2Modes.EMA_ONLY),
+      formatCompareMetricsLine('v2 EMA_REGIME', cmp.v2Modes.EMA_REGIME),
+      formatCompareMetricsLine('v2 EMA_REGIME_MOMENTUM', cmp.v2Modes.EMA_REGIME_MOMENTUM),
+      'Momentum threshold sensitivity (EMA_REGIME_MOMENTUM):',
+      ...cmp.momentumSensitivity.map(
+        s =>
+          `  min ${s.minMomentumScore}: ${s.metrics.trades} tr, P&L $${s.metrics.totalPnlUsd.toFixed(2)}, WR ${s.metrics.winRate?.toFixed(1) ?? '—'}%, PF ${s.metrics.profitFactor?.toFixed(2) ?? '—'}, exp $${s.metrics.expectancyPerTrade?.toFixed(2) ?? '—'}, DD $${s.metrics.maxDrawdownUsd.toFixed(2)}`,
+      ),
+    ];
+    const bestV2 = cmp.v2Modes.EMA_REGIME_MOMENTUM;
     return {
-      success: msg,
+      success: lines.join('\n'),
       successTone:
-        v2.totalPnlUsd > v1.totalPnlUsd ? 'profit' : v2.totalPnlUsd < v1.totalPnlUsd ? 'loss' : 'neutral',
+        bestV2.totalPnlUsd > v1.totalPnlUsd ? 'profit' : bestV2.totalPnlUsd < v1.totalPnlUsd ? 'loss' : 'neutral',
     };
   } catch (e) {
     return { error: e instanceof Error ? e.message : String(e) };

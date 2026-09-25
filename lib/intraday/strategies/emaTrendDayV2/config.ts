@@ -1,4 +1,4 @@
-import type { EmaTrendDayV2Config } from '@/lib/intraday/types';
+import type { EmaTrendDayV2Config, EmaV2EntryMode } from '@/lib/intraday/types';
 
 /** Baseline v2 — not optimized; for comparison vs ema_trend_day_v1. */
 export const DEFAULT_EMA_TREND_DAY_V2_CONFIG: EmaTrendDayV2Config = {
@@ -47,4 +47,24 @@ export const DEFAULT_EMA_TREND_DAY_V2_CONFIG: EmaTrendDayV2Config = {
   minScoreAfterLoss: 68,
 
   marketContextFilter: 'OFF',
+
+  entryMode: 'EMA_REGIME_MOMENTUM',
+  minMomentumScore: 60,
+  minCloseLocation: 0.65,
+  microBreakoutBars: 2,
+  microBreakRequiredForPullback: false,
+  volumeMomentumMode: 'SCORE_ONLY',
+  momentumWeightPrice: 20,
+  momentumWeightCandle: 15,
+  momentumWeightMicroBreak: 20,
+  momentumWeightVolume: 15,
+  momentumWeightEma: 20,
+  momentumWeightVwap: 10,
 };
+
+export function emaV2ConfigWithEntryMode(
+  entryMode: EmaV2EntryMode,
+  overrides: Partial<EmaTrendDayV2Config> = {},
+): EmaTrendDayV2Config {
+  return { ...DEFAULT_EMA_TREND_DAY_V2_CONFIG, entryMode, ...overrides };
+}

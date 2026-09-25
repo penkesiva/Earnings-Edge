@@ -100,6 +100,8 @@ export type VolumeFilterMode = 'OFF' | 'PREFER' | 'REQUIRE';
 export type ProfitProtectMode = 'NONE' | 'EMA9' | 'SWING_LOW' | 'TRAILING_PERCENT' | 'PROFIT_GIVEBACK';
 export type MarketContextFilter = 'OFF' | 'SCORE_ONLY' | 'REQUIRE';
 export type EmaInitialization = 'SESSION_ONLY' | 'PRIOR_BARS_SEEDED';
+export type EmaV2EntryMode = 'EMA_ONLY' | 'EMA_REGIME' | 'EMA_REGIME_MOMENTUM';
+export type VolumeMomentumMode = 'OFF' | 'SCORE_ONLY' | 'REQUIRE';
 
 export type EmaTrendDayV2Config = {
   warmupBars: number;
@@ -137,6 +139,20 @@ export type EmaTrendDayV2Config = {
   requireStrongerAfterLoss: boolean;
   minScoreAfterLoss: number;
   marketContextFilter: MarketContextFilter;
+
+  /** Backtest entry variant (v2 only). */
+  entryMode: EmaV2EntryMode;
+  minMomentumScore: number;
+  minCloseLocation: number;
+  microBreakoutBars: number;
+  microBreakRequiredForPullback: boolean;
+  volumeMomentumMode: VolumeMomentumMode;
+  momentumWeightPrice: number;
+  momentumWeightCandle: number;
+  momentumWeightMicroBreak: number;
+  momentumWeightVolume: number;
+  momentumWeightEma: number;
+  momentumWeightVwap: number;
 };
 
 export type SignalLogEntry = {
@@ -155,6 +171,7 @@ export type SignalLogEntry = {
   regime: MarketRegime;
   signalType: string;
   score: number;
+  momentumScore?: number;
   scoreLines: string[];
   accepted: boolean;
   rejectionReason?: string;

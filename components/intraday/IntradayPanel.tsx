@@ -41,7 +41,7 @@ function Flash({ state }: { state: IntradayPageState }) {
   const successProfit = !state.error && state.successTone === 'profit';
   return (
     <p
-      className={`text-xs px-3 py-2 border ${
+      className={`text-xs px-3 py-2 border whitespace-pre-wrap ${
         state.error || successLoss
           ? 'border-signal-sell/40 text-signal-sell'
           : successProfit
@@ -310,7 +310,7 @@ export function IntradayPanel({
             formAction={compareAction}
             className="ml-2 inline-flex h-9 items-center justify-center border border-border px-4 text-xs font-bold tracking-wide text-fg-subtle hover:border-accent hover:text-accent"
           >
-            Compare EMA v1 vs v2
+            Compare EMA v1 vs v2 modes
           </button>
         </form>
       </section>

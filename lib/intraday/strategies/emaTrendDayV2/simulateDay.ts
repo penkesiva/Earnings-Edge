@@ -1,7 +1,18 @@
 import { applyLongExitPrice, applyLongFillPrice, commissionCost } from '@/lib/intraday/backtest/executionCost';
 import { barEtHHMM, etHHMMToMinutes } from '@/lib/intraday/indicators/engine';
 import { DEFAULT_EMA_TREND_DAY_V2_CONFIG } from '@/lib/intraday/strategies/emaTrendDayV2/config';
+import {
+  detectEmaOnlyEntry,
+  detectMomentumCrossEntry,
+  detectMomentumPullbackEntry,
+  detectRegimeEntry,
+} from '@/lib/intraday/strategies/emaTrendDayV2/entryLogic';
 import { buildBarContexts, swingLow, type BarContext } from '@/lib/intraday/strategies/emaTrendDayV2/indicators';
+import {
+  evaluateMomentum,
+  passesMomentumGate,
+} from '@/lib/intraday/strategies/emaTrendDayV2/momentumEngine';
+import { PullbackStateMachine } from '@/lib/intraday/strategies/emaTrendDayV2/pullbackState';
 import { classifyRegime } from '@/lib/intraday/strategies/emaTrendDayV2/regime';
 import {
   distPctFromEma9,
@@ -60,6 +71,7 @@ export function simulateEmaTrendDayV2(
   let lastExitWasLoss = false;
   let mfeUsd = 0;
   let maeUsd = 0;
+  const pullbackFsm = new PullbackStateMachine();
 
   const noNewEntriesAfter = etHHMMToMinutes(config.noNewEntriesAfterEt);
   const forceFlatAfter = etHHMMToMinutes(config.forceFlatEt);
@@ -74,6 +86,7 @@ export function simulateEmaTrendDayV2(
     scoreLines: string[],
     accepted: boolean,
     rejectionReason?: string,
+    momentumScore?: number,
   ) => {
     signalLog.push({
       sessionDate,
@@ -91,6 +104,7 @@ export function simulateEmaTrendDayV2(
       regime,
       signalType,
       score,
+      momentumScore,
       scoreLines,
       accepted,
       rejectionReason,
@@ -197,11 +211,57 @@ export function simulateEmaTrendDayV2(
         ? config.minScoreAfterLoss
         : config.minScoreToEnter;
 
-    const candidate = detectEntry(b, prev, ctx, ctxPrev, config);
+    const entryMode = config.entryMode ?? 'EMA_REGIME_MOMENTUM';
+    if (entryMode === 'EMA_REGIME_MOMENTUM' && config.allowPullbackEntry) {
+      pullbackFsm.tick(b, prev, ctx, config);
+    }
+    const candidate = resolveEntryCandidate(
+      b,
+      prev,
+      ctx,
+      ctxPrev,
+      config,
+      entryMode,
+      pullbackFsm,
+    );
     if (!candidate) continue;
 
-    const scored = scoreEntryCandidate(candidate.type, b, ctx, regime, config);
-    logSignal(i, b, ctx, regime, candidate.type, scored.score, scored.lines, false);
+    const scored =
+      entryMode === 'EMA_ONLY'
+        ? { score: 100, lines: [`EMA_ONLY ${candidate.type}`] }
+        : scoreEntryCandidate(candidate.type, b, ctx, regime, config);
+
+    let momentumScore: number | undefined;
+    let momentumLines: string[] = [];
+    if (entryMode === 'EMA_REGIME_MOMENTUM') {
+      const mom = evaluateMomentum(bars, i, b, ctx, ctxPrev, config);
+      momentumScore = mom.score;
+      momentumLines = [`MOMENTUM SCORE: ${mom.score}`, ...mom.lines];
+      const gate = passesMomentumGate(
+        mom,
+        config,
+        config.microBreakRequiredForPullback,
+        candidate.isPullback,
+      );
+      if (!gate.ok) {
+        logSignal(
+          i,
+          b,
+          ctx,
+          regime,
+          candidate.type,
+          scored.score,
+          [...scored.lines, ...momentumLines],
+          false,
+          gate.reason,
+          momentumScore,
+        );
+        continue;
+      }
+    }
+
+    const allLines = [...scored.lines, ...momentumLines];
+    logSignal(i, b, ctx, regime, candidate.type, scored.score, allLines, false, undefined, momentumScore);
     const logIdx = signalLog.length - 1;
 
     const reject = (reason: string) => {
@@ -209,27 +269,29 @@ export function simulateEmaTrendDayV2(
       signalLog[logIdx].rejectionReason = reason;
     };
 
-    if (regime !== 'BULL_TREND') {
-      reject('CHOP_OR_NON_BULL_REGIME');
-      continue;
-    }
-    if (isPriceExtended(b, ctx, config)) {
-      reject('PRICE_EXTENDED');
-      continue;
-    }
-    if (!passesVolumeFilter(ctx, config)) {
-      reject('VOLUME_FILTER');
-      continue;
-    }
-    if (scored.score < minScore) {
-      reject('SCORE_BELOW_MIN');
-      continue;
+    if (entryMode !== 'EMA_ONLY') {
+      if (regime !== 'BULL_TREND') {
+        reject('CHOP_OR_NON_BULL_REGIME');
+        continue;
+      }
+      if (isPriceExtended(b, ctx, config)) {
+        reject('PRICE_EXTENDED');
+        continue;
+      }
+      if (!passesVolumeFilter(ctx, config)) {
+        reject('VOLUME_FILTER');
+        continue;
+      }
+      if (scored.score < minScore) {
+        reject('SCORE_BELOW_MIN');
+        continue;
+      }
     }
 
     signalLog[logIdx].accepted = true;
     entrySetup = candidate.type;
-    reasons = scored.lines;
-    confidence = scored.score;
+    reasons = allLines;
+    confidence = entryMode === 'EMA_ONLY' ? scored.score : scored.score;
     regimeAtEntry = regime;
     relVolEntry = ctx.relVolume;
     entryPrice = applyLongFillPrice(b.c, config);
@@ -243,6 +305,7 @@ export function simulateEmaTrendDayV2(
     peakUnrealizedPct = 0;
     mfeUsd = 0;
     maeUsd = 0;
+    pullbackFsm.reset();
     state = 'open';
   }
 
@@ -272,28 +335,37 @@ export function simulateEmaTrendDayV2(
   return { trades, signalLog };
 }
 
-function detectEntry(
+function resolveEntryCandidate(
   b: MinuteBar,
   prev: MinuteBar,
   ctx: BarContext,
   ctxPrev: BarContext,
   config: EmaTrendDayV2Config,
-): { type: 'ema_cross_up_confirmed' | 'ema_pullback_confirmed' } | null {
-  const bullCross =
-    ctxPrev.ema9 <= ctxPrev.ema20 &&
-    ctx.ema9 > ctx.ema20 &&
-    b.c > ctx.ema9 &&
-    b.c > ctx.vwap &&
-    ctx.ema9Slope > 0;
-  if (bullCross) return { type: 'ema_cross_up_confirmed' };
+  entryMode: EmaTrendDayV2Config['entryMode'],
+  pullbackFsm: PullbackStateMachine,
+): { type: 'ema_cross_up_confirmed' | 'ema_pullback_confirmed'; isPullback: boolean } | null {
+  if (entryMode === 'EMA_ONLY') {
+    const raw = detectEmaOnlyEntry(b, ctx, ctxPrev, config);
+    if (!raw) return null;
+    return {
+      type: raw.type === 'ema_cross_up' ? 'ema_cross_up_confirmed' : 'ema_pullback_confirmed',
+      isPullback: raw.type === 'ema_pullback',
+    };
+  }
 
-  if (!config.allowPullbackEntry) return null;
-  const zone = config.pullbackZonePct / 100;
-  const inZone = Math.abs(b.l - ctx.ema9) / ctx.ema9 <= zone;
-  const uptrend = ctx.ema9 > ctx.ema20 && ctx.ema9Slope > 0 && ctx.ema20Slope >= 0;
-  const vwapOk = b.c > ctx.vwap || (prev.c <= ctxPrev.vwap && b.c > ctx.vwap);
-  const rejection = b.c > ctx.ema9 && b.c > b.o && inZone;
-  if (uptrend && vwapOk && rejection) return { type: 'ema_pullback_confirmed' };
+  if (entryMode === 'EMA_REGIME') {
+    const raw = detectRegimeEntry(b, prev, ctx, ctxPrev, config);
+    if (!raw) return null;
+    return { type: raw.type, isPullback: raw.type === 'ema_pullback_confirmed' };
+  }
+
+  const cross = detectMomentumCrossEntry(b, ctx, ctxPrev);
+  if (cross) return { type: cross.type, isPullback: false };
+
+  if (config.allowPullbackEntry && pullbackFsm.readyForMomentumEntry()) {
+    const pb = detectMomentumPullbackEntry(b, ctx);
+    if (pb) return { type: pb.type, isPullback: true };
+  }
 
   return null;
 }
