@@ -1,4 +1,4 @@
-import { addCalendarDays } from '@/lib/earningsDate';
+import { addCalendarDays, isUsEquityWeekday, usEquityTimestamp } from '@/lib/earningsDate';
 import { getHistoricalBars } from '@/lib/alpaca';
 import type { AlpacaAuth } from '@/lib/alpaca';
 import type { MinuteBar } from '@/lib/intraday/types';
@@ -8,8 +8,8 @@ export async function fetchMinuteBarsForDay(
   sessionDate: string,
   auth: AlpacaAuth,
 ): Promise<MinuteBar[]> {
-  const start = `${sessionDate}T09:00:00-04:00`;
-  const end = `${sessionDate}T16:30:00-04:00`;
+  const start = usEquityTimestamp(sessionDate, 9, 0);
+  const end = usEquityTimestamp(sessionDate, 16, 30);
   const raw = (await getHistoricalBars(symbol, start, end, '1Min', auth)) as Array<{
     t?: string;
     o?: number;
@@ -35,8 +35,7 @@ export function listRecentTradingDates(endDate: string, calendarDays: number): s
   let d = endDate;
   let scanned = 0;
   while (out.length < calendarDays && scanned < calendarDays * 2 + 10) {
-    const dow = new Date(`${d}T12:00:00Z`).getUTCDay();
-    if (dow !== 0 && dow !== 6) out.push(d);
+    if (isUsEquityWeekday(d)) out.push(d);
     d = addCalendarDays(d, -1);
     scanned += 1;
   }

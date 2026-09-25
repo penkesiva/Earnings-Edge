@@ -9,8 +9,12 @@ import { supabaseAdmin } from '@/lib/supabase';
 export const maxDuration = 60;
 
 export async function GET(req: NextRequest) {
+  const secret = process.env.CRON_SECRET?.trim();
+  if (!secret) {
+    return NextResponse.json({ error: 'CRON_SECRET not configured' }, { status: 503 });
+  }
   const auth = req.headers.get('authorization');
-  if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (auth !== `Bearer ${secret}`) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
 

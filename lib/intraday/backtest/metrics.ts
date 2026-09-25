@@ -34,7 +34,8 @@ export function aggregateBacktestMetrics(trades: BacktestTrade[], tradingDays: n
     totalPnlUsd,
     avgWinnerUsd: wins.length ? grossWin / wins.length : null,
     avgLoserUsd: losses.length ? -grossLoss / losses.length : null,
-    profitFactor: grossLoss > 0 ? grossWin / grossLoss : grossWin > 0 ? null : null,
+    profitFactor:
+      grossLoss > 0 ? grossWin / grossLoss : grossWin > 0 ? 999 : null,
     maxDrawdownUsd: maxDd,
     avgHoldMinutes: holdMinutes.length
       ? holdMinutes.reduce((a, b) => a + b, 0) / holdMinutes.length

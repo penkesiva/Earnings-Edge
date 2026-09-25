@@ -1,4 +1,4 @@
-import { barEtHHMM, computeSessionIndicators, openingRange } from '@/lib/intraday/indicators/engine';
+import { barEtHHMM, computeSessionIndicators, etHHMMToMinutes, openingRange } from '@/lib/intraday/indicators/engine';
 import { scaleShares, sharesFromBudget } from '@/lib/intraday/sizing/computeShares';
 import type {
   BacktestTrade,
@@ -36,22 +36,28 @@ export function simulateVwapOrDay(
   let reasons: string[] = [];
   let confidence = 0;
 
+  const noNewEntriesAfter = etHHMMToMinutes(config.noNewEntriesAfterEt);
+  const forceFlatAfter = etHHMMToMinutes(config.forceFlatEt);
+  const maxStopFloor = 1 - config.maxStopPct / 100;
+
   for (let i = config.openingRangeMinutes; i < bars.length; i++) {
     const b = bars[i];
     const t = barEtHHMM(b.t);
-    if (t >= config.forceFlatEt && state === 'open') {
+    const tMin = etHHMMToMinutes(t);
+    if (tMin >= forceFlatAfter && state === 'open') {
       trades.push(closeTrade(sessionDate, entrySetup, entryTime, t, entryPrice, b.c, sharesHeld, reasons, confidence));
       state = 'flat';
       break;
     }
     if (state === 'flat' && i < cooldownUntilIdx) continue;
-    if (state === 'flat' && t >= config.noNewEntriesAfterEt) continue;
+    if (state === 'flat' && tMin >= noNewEntriesAfter) continue;
     if (state === 'flat' && tradesToday >= config.maxTradesPerDay) continue;
 
     const vwap = ind.vwap[i];
     const e9 = ind.ema9[i];
     const e20 = ind.ema20[i];
     const rv = ind.relVolume[i];
+    if (!Number.isFinite(vwap) || vwap <= 0) continue;
 
     if (state === 'open') {
       const pnlPct = ((b.c - entryPrice) / entryPrice) * 100;
@@ -84,7 +90,7 @@ export function simulateVwapOrDay(
     entryTime = t;
     sharesHeld = scaleShares(totalShares, config.scaleFirstPct);
     if (setup.addFull) sharesHeld = totalShares;
-    stop = Math.min(entryPrice * (1 - config.maxStopPct / 100), setup.stop);
+    stop = Math.max(entryPrice * maxStopFloor, setup.stop);
     state = 'open';
     tradesToday += 1;
   }

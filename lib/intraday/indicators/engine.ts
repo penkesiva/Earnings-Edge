@@ -23,9 +23,17 @@ export function barEtHHMM(iso: string): string {
     minute: '2-digit',
     hour12: false,
   }).formatToParts(d);
-  const h = parts.find(p => p.type === 'hour')?.value ?? '00';
+  let h = parts.find(p => p.type === 'hour')?.value ?? '00';
   const m = parts.find(p => p.type === 'minute')?.value ?? '00';
-  return `${h}:${m}`;
+  if (h === '24') h = '00';
+  return `${h.padStart(2, '0')}:${m}`;
+}
+
+/** Minutes since midnight ET for HH:MM (24h) config strings. */
+export function etHHMMToMinutes(hhmm: string): number {
+  const [h, m] = hhmm.split(':').map(Number);
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return 0;
+  return h * 60 + m;
 }
 
 export function computeSessionIndicators(bars: MinuteBar[]) {

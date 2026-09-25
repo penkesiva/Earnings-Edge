@@ -36,7 +36,7 @@ export async function loadIntradayPageData() {
     ? { data: [] }
     : await sb
         .from('intraday_backtest_runs')
-        .select('id, symbol, calendar_days, status, metrics, trades, started_at, completed_at')
+        .select('id, symbol, calendar_days, status, metrics, trades, error_message, started_at, completed_at')
         .eq('user_id', user.id)
         .order('started_at', { ascending: false })
         .limit(8);
@@ -84,6 +84,7 @@ export async function saveIntradaySettingsAction(
   } catch {
     return { error: 'Add Alpaca keys in Settings first.' };
   }
+  if (!auth) return { error: 'Add Alpaca keys in Settings first.' };
 
   const validated = await validateIntradayTicker(symbol, auth);
   if (!validated.ok) return { error: validated.error };
@@ -132,6 +133,10 @@ export async function runIntradayBacktestAction(
   );
   if (!budgetCheck.ok) return { error: budgetCheck.error };
 
+  if (!INTRADAY_STRATEGIES.some(s => s.id === strategyId)) {
+    return { error: 'Unknown strategy.' };
+  }
+
   let auth;
   try {
     auth = await resolveAlpacaAuthForUser(user.id);
@@ -166,6 +171,19 @@ export async function runIntradayBacktestAction(
       auth,
     });
 
+    if (result.daysWithData === 0) {
+      const hint = result.errors[0] ? ` ${result.errors[0]}` : '';
+      await sb
+        .from('intraday_backtest_runs')
+        .update({
+          status: 'failed',
+          error_message: `No sessions with enough bar data.${hint}`,
+          completed_at: new Date().toISOString(),
+        })
+        .eq('id', runRow.id);
+      return { error: `No trading days with data for ${validated.ticker.symbol}.${hint}` };
+    }
+
     await sb
       .from('intraday_backtest_runs')
       .update({
@@ -177,8 +195,10 @@ export async function runIntradayBacktestAction(
       .eq('id', runRow.id);
 
     revalidatePath('/intraday');
+    const errNote =
+      result.errors.length > 0 ? ` (${result.errors.length} day fetch warning(s).)` : '';
     return {
-      success: `Backtest done: ${result.metrics.trades} trades over ${result.daysWithData} sessions · P&L $${result.metrics.totalPnlUsd.toFixed(2)}.`,
+      success: `Backtest done: ${result.metrics.trades} trades over ${result.daysWithData} sessions · P&L $${result.metrics.totalPnlUsd.toFixed(2)}.${errNote}`,
     };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

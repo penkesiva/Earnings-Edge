@@ -1,5 +1,5 @@
 import type { AlpacaAuth } from '@/lib/alpaca';
-import { earningsSessionDate } from '@/lib/earningsDate';
+import { lastUsEquityBacktestEndDate } from '@/lib/earningsDate';
 import { DEFAULT_INTRADAY_CONFIG } from '@/lib/intraday/config/defaults';
 import { fetchMinuteBarsForDay, listRecentTradingDates } from '@/lib/intraday/data/bars';
 import { filterRegularSessionBars } from '@/lib/intraday/indicators/engine';
@@ -20,7 +20,7 @@ export async function runIntradayBacktest(input: {
   effectiveBudgetUsd: number;
   auth: AlpacaAuth;
 }): Promise<BacktestRunResult> {
-  const end = earningsSessionDate();
+  const end = lastUsEquityBacktestEndDate();
   const dates = listRecentTradingDates(end, input.calendarDays);
   const allTrades: BacktestTrade[] = [];
   const errors: string[] = [];

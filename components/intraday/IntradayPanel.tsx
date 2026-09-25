@@ -47,6 +47,7 @@ type RunRow = {
   metrics: Record<string, unknown> | null;
   started_at: string;
   trades?: unknown;
+  error_message?: string | null;
 };
 
 export function IntradayPanel({
@@ -284,6 +285,9 @@ function BacktestRunDetails({ run }: { run: RunRow }) {
         </span>
       </summary>
       <div className="mt-3 space-y-3 text-xs text-fg-subtle">
+        {run.status === 'failed' && run.error_message ? (
+          <p className="text-signal-sell border border-signal-sell/30 px-2 py-1">{run.error_message}</p>
+        ) : null}
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
           <Metric label="Trades" value={String(m.trades ?? '—')} />
           <Metric label="Win rate" value={fmtPct(m.winRate)} />
@@ -328,5 +332,8 @@ function fmtUsd(v: unknown) {
   return v == null || Number.isNaN(Number(v)) ? '—' : `$${Number(v).toFixed(2)}`;
 }
 function fmtNum(v: unknown) {
-  return v == null || Number.isNaN(Number(v)) ? '—' : Number(v).toFixed(2);
+  if (v == null || Number.isNaN(Number(v))) return '—';
+  const n = Number(v);
+  if (n >= 999) return '∞';
+  return n.toFixed(2);
 }
