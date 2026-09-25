@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useFormState, useFormStatus } from 'react-dom';
+import { useMemo, useState } from 'react';
 import {
   runIntradayBacktestAction,
   saveIntradaySettingsAction,
@@ -10,6 +11,11 @@ import {
 import { BACKTEST_DAY_PRESETS } from '@/lib/intraday/config/defaults';
 import { strategyLabel } from '@/lib/intraday/strategies/registry';
 import { INTRADAY_STRATEGY_BUY_WEAK_SELL_STRONG_V1 } from '@/lib/intraday/types';
+import type { BacktestTrade } from '@/lib/intraday/types';
+import {
+  ExpandChartIcon,
+  IntradayBacktestChartModal,
+} from '@/components/intraday/IntradayBacktestChartModal';
 
 const FIELD =
   'w-full h-10 box-border bg-bg border border-border px-3 text-sm font-mono focus:outline-none focus:border-accent';
@@ -314,16 +320,41 @@ export function IntradayPanel({
 
 function BacktestRunDetails({ run }: { run: RunRow }) {
   const m = run.metrics ?? {};
-  const trades = (run.trades as Array<Record<string, unknown>>) ?? [];
+  const trades = useMemo(() => parseBacktestTrades(run.trades), [run.trades]);
+  const [chartOpen, setChartOpen] = useState(false);
   const totalPnl = m.totalPnlUsd != null ? Number(m.totalPnlUsd) : null;
   const pnlLabel =
     totalPnl != null && Number.isFinite(totalPnl) ? fmtUsd(totalPnl) : null;
   const stratLabel = run.strategy_id ? strategyLabel(run.strategy_id) : 'Unknown strategy';
   const isBuyWeak = run.strategy_id === INTRADAY_STRATEGY_BUY_WEAK_SELL_STRONG_V1;
   return (
-    <details className="px-4 py-3 group">
-      <summary className="cursor-pointer text-xs font-bold tracking-wide list-none flex flex-wrap justify-between gap-x-2 gap-y-1">
-        <span>
+    <>
+      <IntradayBacktestChartModal
+        open={chartOpen}
+        onClose={() => setChartOpen(false)}
+        symbol={run.symbol}
+        strategyLabel={stratLabel}
+        trades={trades}
+      />
+      <details className="px-4 py-3 group">
+      <summary className="cursor-pointer text-xs font-bold tracking-wide list-none flex flex-wrap justify-between gap-x-2 gap-y-1 items-center">
+        <span className="flex items-center gap-2 min-w-0">
+          {run.status === 'completed' && trades.length > 0 ? (
+            <button
+              type="button"
+              title="Full-screen session chart"
+              aria-label="Open backtest chart"
+              className="shrink-0 p-1 border border-border-subtle text-fg-dim hover:text-accent hover:border-accent"
+              onClick={e => {
+                e.preventDefault();
+                e.stopPropagation();
+                setChartOpen(true);
+              }}
+            >
+              <ExpandChartIcon />
+            </button>
+          ) : null}
+          <span className="min-w-0">
           {run.symbol} · {stratLabel} · {run.calendar_days}d · {run.status}
           {pnlLabel ? (
             <>
@@ -331,6 +362,7 @@ function BacktestRunDetails({ run }: { run: RunRow }) {
               · <span className={pnlToneClass(totalPnl)}>{pnlLabel}</span>
             </>
           ) : null}
+          </span>
         </span>
         <span className="text-fg-dim font-normal tabular-nums">
           {new Date(run.started_at).toLocaleDateString()}
@@ -361,20 +393,17 @@ function BacktestRunDetails({ run }: { run: RunRow }) {
             ) : null}
             <ul className="max-h-48 overflow-auto divide-y divide-border-subtle border-t border-border-subtle">
               {trades.slice(0, 50).map((t, i) => {
-                const pnl = Number(t.pnlUsd);
+                const pnl = t.pnlUsd;
                 const exitReason =
-                  t.exitReason != null
-                    ? String(t.exitReason)
-                    : String(t.exitTimeEt ?? '').startsWith('15:5')
-                      ? 'eod_flat'
-                      : undefined;
+                  t.exitReason ??
+                  (String(t.exitTimeEt ?? '').startsWith('15:5') ? 'eod_flat' : undefined);
                 return (
                   <li
                     key={i}
                     className={`px-3 py-2 font-mono text-[10px] ${tradeLogLineClass(pnl, exitReason)}`}
                   >
-                    {String(t.sessionDate)} {String(t.setupType)} {String(t.entryTimeEt)}→
-                    {String(t.exitTimeEt)} ${Number.isFinite(pnl) ? pnl.toFixed(2) : '—'}
+                    {t.sessionDate} {t.setupType} {t.entryTimeEt}→
+                    {t.exitTimeEt} ${Number.isFinite(pnl) ? pnl.toFixed(2) : '—'}
                     {exitReasonTag(exitReason, pnl)}
                   </li>
                 );
@@ -384,7 +413,13 @@ function BacktestRunDetails({ run }: { run: RunRow }) {
         ) : null}
       </div>
     </details>
+    </>
   );
+}
+
+function parseBacktestTrades(raw: unknown): BacktestTrade[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter(t => t && typeof t === 'object') as BacktestTrade[];
 }
 
 function Metric({
