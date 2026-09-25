@@ -16,6 +16,10 @@ export type PredictMarketCalendarCell = {
   nightCorrect: boolean | null;
   graded: boolean;
   dailyReturnPercent: number | null;
+  priceTargetHit: boolean | null;
+  targetSpx: number | null;
+  targetSide: 'PUT' | 'CALL' | null;
+  morningThesisHit: boolean | null;
 };
 
 export type PredictMarketCalendarMonth = {
@@ -121,9 +125,13 @@ export async function loadSessionCalendarMonth(
     { actual_direction: string; daily_return_percent: number | null; payload?: unknown }
   >();
   const predsBySession = new Map<string, PredBundle>();
+  const priceBySession = new Map<
+    string,
+    { hit: boolean; spx: number; side: 'PUT' | 'CALL' }
+  >();
 
   if (sessionIds.length > 0) {
-    const [{ data: outcomes }, { data: preds }, { data: signals }, { data: cps7 }] =
+    const [{ data: outcomes }, { data: preds }, { data: signals }, { data: cps7 }, { data: priceTargets }] =
       await Promise.all([
       sb
         .from('pm_market_outcomes')
@@ -139,6 +147,10 @@ export async function loadSessionCalendarMonth(
         .select('session_id, thesis_status')
         .in('session_id', sessionIds)
         .eq('checkpoint_kind', 'FIRST_7AM'),
+      sb
+        .from('pm_price_target_evaluations')
+        .select('session_id, target_hit, target_spx, target_side')
+        .in('session_id', sessionIds),
     ]);
 
     for (const o of outcomes ?? []) {
@@ -156,6 +168,13 @@ export async function loadSessionCalendarMonth(
     const cp7BySession = new Map(
       (cps7 ?? []).map(c => [c.session_id as string, c.thesis_status as string]),
     );
+    for (const p of priceTargets ?? []) {
+      priceBySession.set(p.session_id as string, {
+        hit: p.target_hit as boolean,
+        spx: Number(p.target_spx),
+        side: p.target_side as 'PUT' | 'CALL',
+      });
+    }
 
     for (const id of sessionIds) {
       predsBySession.set(id, {
@@ -212,6 +231,8 @@ export async function loadSessionCalendarMonth(
         ? (scoreByPredId.get(bundle.night.id) ??
           directionMatch(bundle.night.direction, outcome?.actual_direction ?? null))
         : null;
+      (bundle as PredBundle & { morningThesisHit?: boolean | null }).morningThesisHit =
+        morningHit ?? computed.premarketHit;
     }
   }
 
@@ -223,6 +244,8 @@ export async function loadSessionCalendarMonth(
     const tradingDay = isTradingDay(date);
     const outcome = sessionId ? outcomeBySession.get(sessionId) : undefined;
     const preds = sessionId ? predsBySession.get(sessionId) : undefined;
+    const price = sessionId ? priceBySession.get(sessionId) : undefined;
+    const ext = preds as PredBundle & { morningThesisHit?: boolean | null } | undefined;
 
     cells.push({
       date,
@@ -236,6 +259,10 @@ export async function loadSessionCalendarMonth(
       nightCorrect: preds?.nightCorrect ?? null,
       graded: Boolean(outcome),
       dailyReturnPercent: outcome?.daily_return_percent ?? null,
+      priceTargetHit: price != null ? price.hit : null,
+      targetSpx: price?.spx ?? null,
+      targetSide: price?.side ?? null,
+      morningThesisHit: ext?.morningThesisHit ?? null,
     });
   }
 
@@ -266,6 +293,10 @@ function buildEmptyWeeks(year: number, month: number): Array<Array<PredictMarket
       nightCorrect: null,
       graded: false,
       dailyReturnPercent: null,
+      priceTargetHit: null,
+      targetSpx: null,
+      targetSide: null,
+      morningThesisHit: null,
     });
   }
   return packWeeks(cells, year, month);

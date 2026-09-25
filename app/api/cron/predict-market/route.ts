@@ -18,6 +18,7 @@ const PHASES: PredictMarketPhase[] = [
   'entry',
   'validate_7am',
   'validate_10am',
+  'validate_price_2h',
   'grade',
 ];
 
@@ -67,6 +68,8 @@ function phaseTimeGuard(phase: PredictMarketPhase): boolean {
       return isPacificTimeNear(7, 0);
     case 'validate_10am':
       return isPacificTimeNear(10, 0);
+    case 'validate_price_2h':
+      return isPacificTimeNear(8, 31);
     case 'grade':
       return isPacificTimeNear(13, 15);
     default:

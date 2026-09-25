@@ -16,6 +16,9 @@ import { evaluateEntryWindow } from '@/lib/predictMarket/intraday/evaluateEntry'
 import { evaluateOpenThesis } from '@/lib/predictMarket/intraday/evaluateOpenThesis';
 import { loadActiveThesis } from '@/lib/predictMarket/intraday/sessionContext';
 import {
+  evaluatePremarketPriceTargetTwoHour,
+} from '@/lib/predictMarket/priceTarget/evaluatePriceTargetTwoHour';
+import {
   persistForecast,
   predictionExists,
   writeNightPremarketComparison,
@@ -211,6 +214,16 @@ export async function runPredictMarketPhase(
         sessionDate,
         ok: true,
         message: `${kind}: ${result.thesisStatus} — ${result.reasoning.slice(0, 80)}`,
+      };
+    }
+
+    if (phase === 'validate_price_2h') {
+      const result = await evaluatePremarketPriceTargetTwoHour(sb, sessionId, sessionDate, now);
+      return {
+        phase,
+        sessionDate,
+        ok: result.ok,
+        message: result.message,
       };
     }
 

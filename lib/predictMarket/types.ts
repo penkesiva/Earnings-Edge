@@ -15,6 +15,7 @@ export type PredictMarketPhase =
   | 'entry'
   | 'validate_7am'
   | 'validate_10am'
+  | 'validate_price_2h'
   | 'grade';
 
 export type PredictionRecord = {

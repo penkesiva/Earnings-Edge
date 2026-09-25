@@ -115,6 +115,12 @@ export async function gradePredictMarketSession(
     .select('*')
     .eq('session_id', sessionId);
 
+  const { data: priceEval } = await sb
+    .from('pm_price_target_evaluations')
+    .select('target_hit, target_spx, target_side')
+    .eq('session_id', sessionId)
+    .maybeSingle();
+
   for (const p of preds ?? []) {
     const predicted = p.direction as string;
     const predictionType = p.prediction_type as string;
@@ -137,25 +143,29 @@ export async function gradePredictMarketSession(
 
     const conf = Number(p.confidence);
 
-    await sb.from('pm_prediction_scores').upsert(
-      {
-        session_id: sessionId,
-        prediction_id: p.id,
-        direction_correct: directionCorrect,
-        open_direction_correct: null,
-        range_mae_high: maeHigh,
-        range_mae_low: maeLow,
-        range_coverage: rangeCoverage,
-        confidence_bucket: confidenceBucket(conf),
-        metrics: {
-          actual_direction: actualDirection,
-          daily_return_percent: dailyReturn,
-          morning_thesis_status: morning.status,
-          eod_direction_correct: eodCorrect,
-        },
+    const scoreRow: Record<string, unknown> = {
+      session_id: sessionId,
+      prediction_id: p.id,
+      direction_correct: directionCorrect,
+      open_direction_correct: null,
+      range_mae_high: maeHigh,
+      range_mae_low: maeLow,
+      range_coverage: rangeCoverage,
+      confidence_bucket: confidenceBucket(conf),
+      metrics: {
+        actual_direction: actualDirection,
+        daily_return_percent: dailyReturn,
+        morning_thesis_status: morning.status,
+        eod_direction_correct: eodCorrect,
+        price_target_spx: priceEval?.target_spx ?? null,
+        price_target_hit: priceEval?.target_hit ?? null,
       },
-      { onConflict: 'prediction_id' },
-    );
+    };
+    if (p.prediction_type === 'PREMARKET' && priceEval) {
+      scoreRow.price_target_hit = priceEval.target_hit;
+    }
+
+    await sb.from('pm_prediction_scores').upsert(scoreRow, { onConflict: 'prediction_id' });
   }
 
   return `Graded ${preds?.length ?? 0} prediction(s); morning ${morning.status}; EOD ${actualDirection} ${dailyReturn.toFixed(2)}% (${PROXY}).`;

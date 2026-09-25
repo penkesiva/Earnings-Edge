@@ -6,6 +6,7 @@ export const PM_TIMELINE_STEPS = [
   { key: 'open', label: 'Open thesis check', timePt: '6:30 AM PT' },
   { key: 'entry', label: 'Entry signal', timePt: '6:31–7:00 AM PT' },
   { key: 'validate_7am', label: 'First intraday check', timePt: '7:00 AM PT' },
+  { key: 'validate_price_2h', label: '2-hour price target ($ HIT)', timePt: '8:30 AM PT window · cron ~8:31 AM PT' },
   { key: 'validate_10am', label: 'Midday check', timePt: '10:00 AM PT' },
   { key: 'grade', label: 'Morning thesis grade (primary)', timePt: 'After 7 AM check · scored at 1:15 PM PT' },
   { key: 'eod_reference', label: 'Full session close (reference)', timePt: '1:15 PM PT' },

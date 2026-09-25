@@ -40,6 +40,7 @@ export default async function PredictMarketSessionPage({
     { data: checkpoints },
     { data: outcome },
     { data: anchorSnap },
+    { data: priceTargetRow },
   ] = await Promise.all([
     sb.from('pm_predictions').select('*').eq('session_id', session.id).order('as_of_pt'),
     sb
@@ -62,6 +63,11 @@ export default async function PredictMarketSessionPage({
       .eq('session_id', session.id)
       .order('as_of_pt', { ascending: false })
       .limit(1)
+      .maybeSingle(),
+    sb
+      .from('pm_price_target_evaluations')
+      .select('target_spx, target_side, target_hit, window_low_spx, window_high_spx')
+      .eq('session_id', session.id)
       .maybeSingle(),
   ]);
 
@@ -110,6 +116,23 @@ export default async function PredictMarketSessionPage({
                 payload: outcome.payload as {
                   morning_thesis?: import('@/lib/predictMarket/morningThesisGrade').MorningThesisGrade;
                 } | null,
+              }
+            : null
+        }
+        priceTarget={
+          priceTargetRow
+            ? {
+                target_spx: Number(priceTargetRow.target_spx),
+                target_side: priceTargetRow.target_side as 'PUT' | 'CALL',
+                target_hit: Boolean(priceTargetRow.target_hit),
+                window_low_spx:
+                  priceTargetRow.window_low_spx != null
+                    ? Number(priceTargetRow.window_low_spx)
+                    : null,
+                window_high_spx:
+                  priceTargetRow.window_high_spx != null
+                    ? Number(priceTargetRow.window_high_spx)
+                    : null,
               }
             : null
         }

@@ -9,6 +9,7 @@ import {
   morningGradeLabel,
   type MorningThesisGrade,
 } from '@/lib/predictMarket/morningThesisGrade';
+import { formatTargetLabel } from '@/lib/predictMarket/priceTarget/derivePremarketTarget';
 import { PM_TIMELINE_STEPS, snapshotKindLabel } from '@/lib/predictMarket/sessionUiLabels';
 
 type PredictionRow = Record<string, unknown>;
@@ -79,6 +80,7 @@ export function PredictMarketSessionTimeline({
   signals,
   checkpoints,
   outcome,
+  priceTarget,
 }: {
   spxAnchor: number | null;
   predictions: PredictionRow[];
@@ -86,6 +88,13 @@ export function PredictMarketSessionTimeline({
   signals: SignalRow[];
   checkpoints: CheckpointRow[];
   outcome: OutcomeRow | null;
+  priceTarget: {
+    target_spx: number;
+    target_side: 'PUT' | 'CALL';
+    target_hit: boolean;
+    window_low_spx: number | null;
+    window_high_spx: number | null;
+  } | null;
 }) {
   const night = predictions.find(p => p.prediction_type === 'NIGHT');
   const pre = predictions.find(p => p.prediction_type === 'PREMARKET');
@@ -234,6 +243,26 @@ export function PredictMarketSessionTimeline({
           title={PM_TIMELINE_STEPS[5].label}
           timePt={PM_TIMELINE_STEPS[5].timePt}
           status={
+            priceTarget ? (
+              <span className={priceTarget.target_hit ? 'text-signal-buy' : 'text-signal-sell'}>
+                {formatTargetLabel(priceTarget.target_spx, priceTarget.target_side)}{' '}
+                {priceTarget.target_hit ? 'HIT' : 'MISS'}
+                <HitMark ok={priceTarget.target_hit} />
+              </span>
+            ) : (
+              <span className="text-fg-dim font-normal">Pending (~8:31 AM PT)</span>
+            )
+          }
+          detail={
+            priceTarget
+              ? `Premarket locked SPX ${priceTarget.target_spx.toFixed(0)} (${priceTarget.target_side}). Window 6:30–8:30 AM PT: low ${priceTarget.window_low_spx?.toFixed(0) ?? '—'} / high ${priceTarget.window_high_spx?.toFixed(0) ?? '—'} (SPY×10 proxy).`
+              : undefined
+          }
+        />
+        <Step
+          title={PM_TIMELINE_STEPS[6].label}
+          timePt={PM_TIMELINE_STEPS[6].timePt}
+          status={
             cp10 ? (
               <span>{String(cp10.thesis_status)}</span>
             ) : (
@@ -243,8 +272,8 @@ export function PredictMarketSessionTimeline({
           detail={cp10?.reasoning ? String(cp10.reasoning).slice(0, 160) : undefined}
         />
         <Step
-          title={PM_TIMELINE_STEPS[6].label}
-          timePt={PM_TIMELINE_STEPS[6].timePt}
+          title={PM_TIMELINE_STEPS[7].label}
+          timePt={PM_TIMELINE_STEPS[7].timePt}
           status={
             morning.status === 'VALIDATED' ? (
               <span className="text-signal-buy">
@@ -260,8 +289,8 @@ export function PredictMarketSessionTimeline({
           detail={morning.summary}
         />
         <Step
-          title={PM_TIMELINE_STEPS[7].label}
-          timePt={PM_TIMELINE_STEPS[7].timePt}
+          title={PM_TIMELINE_STEPS[8].label}
+          timePt={PM_TIMELINE_STEPS[8].timePt}
           muted
           status={
             outcome ? (

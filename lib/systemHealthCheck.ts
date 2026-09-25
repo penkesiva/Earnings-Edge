@@ -88,6 +88,11 @@ export async function runSystemHealthChecks(
     { table: 'automation_settings', label: 'automation_settings table', migration: '0019' },
     { table: 'trade_orders', label: 'trade_orders table', migration: '0019' },
     { table: 'pm_market_sessions', label: 'pm_market_sessions (PredictMarket)', migration: '0022' },
+    {
+      table: 'pm_price_target_evaluations',
+      label: 'pm_price_target_evaluations (PredictMarket $ HIT)',
+      migration: '0025',
+    },
   ];
 
   for (const t of tableChecks) {

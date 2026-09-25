@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { GeneratedForecast } from '@/lib/predictMarket/llm/openAiPredictMarketForecast';
 import type { PredictionType } from '@/lib/predictMarket/types';
+import { enrichStructuredWithPriceTarget } from '@/lib/predictMarket/priceTarget/evaluatePriceTargetTwoHour';
 
 export async function predictionExists(
   sb: SupabaseClient,
@@ -24,6 +25,16 @@ export async function persistForecast(
   asOfIso: string,
 ): Promise<string> {
   const s = forecast.structured;
+  let structured: Record<string, unknown> = { ...s, llm_excerpt: forecast.rawResponseExcerpt };
+  if (s.prediction_type === 'PREMARKET') {
+    structured = enrichStructuredWithPriceTarget(
+      structured,
+      s.direction,
+      s.trade_bias,
+      s.expected_low ?? null,
+      s.expected_high ?? null,
+    );
+  }
   const { data, error } = await sb
     .from('pm_predictions')
     .insert({
@@ -41,7 +52,7 @@ export async function persistForecast(
       expected_day_return_percent: s.expected_day_return_percent,
       bullish_score: s.bullish_score,
       bearish_score: s.bearish_score,
-      structured: { ...s, llm_excerpt: forecast.rawResponseExcerpt },
+      structured,
       reasoning: forecast.reasoning,
       input_snapshot_id: inputSnapshotId,
     })

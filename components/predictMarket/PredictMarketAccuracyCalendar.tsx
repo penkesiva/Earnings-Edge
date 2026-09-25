@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { directionTextCls } from '@/lib/predictMarket/enrichForecastRange';
+import { formatTargetLabel } from '@/lib/predictMarket/priceTarget/derivePremarketTarget';
 import type {
   PredictMarketCalendarCell,
   PredictMarketCalendarMonth,
@@ -9,51 +10,58 @@ const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
 
 function cellClasses(cell: PredictMarketCalendarCell): string {
   const base =
-    'min-h-[4.5rem] p-1.5 border border-border-subtle flex flex-col gap-0.5 transition-colors';
+    'min-h-[5rem] p-1.5 border border-border-subtle flex flex-col gap-0.5 transition-colors';
   if (!cell.tradingDay) {
     return `${base} bg-bg-elevated/30 opacity-50`;
   }
   if (!cell.hasSession) {
     return `${base} bg-bg hover:border-fg-dim/30`;
   }
-  if (!cell.graded || cell.premarketCorrect == null) {
-    if (cell.graded && cell.actualDirection === 'NEUTRAL') {
-      return `${base} bg-signal-watch/10 border-signal-watch/40 hover:border-signal-watch/60`;
-    }
+  if (cell.priceTargetHit != null) {
+    return cell.priceTargetHit
+      ? `${base} bg-signal-buy/10 border-signal-buy/40 hover:border-signal-buy/60`
+      : `${base} bg-signal-sell/10 border-signal-sell/40 hover:border-signal-sell/60`;
+  }
+  if (cell.morningThesisHit === true) {
+    return `${base} bg-signal-buy/5 border-signal-buy/25 hover:border-signal-buy/40`;
+  }
+  if (!cell.graded) {
     return `${base} bg-bg border-signal-watch/30 hover:border-signal-watch/50`;
   }
-  if (cell.premarketCorrect) {
-    return `${base} bg-signal-buy/10 border-signal-buy/40 hover:border-signal-buy/60`;
-  }
-  return `${base} bg-signal-sell/10 border-signal-sell/40 hover:border-signal-sell/60`;
+  return `${base} bg-bg border-border-subtle`;
 }
 
 function DayCell({ cell }: { cell: PredictMarketCalendarCell }) {
   const inner = (
     <>
       <span className="text-[10px] text-fg-dim tabular-nums">{cell.dayNum}</span>
-      {cell.hasSession && cell.premarketPredicted ? (
-        <span className={`text-[10px] font-bold leading-tight ${directionTextCls(cell.premarketPredicted)}`}>
-          AM {cell.premarketPredicted.slice(0, 1)}
+      {cell.targetSpx != null && cell.targetSide ? (
+        <span className="text-[10px] font-bold leading-tight text-fg-subtle">
+          {formatTargetLabel(cell.targetSpx, cell.targetSide)}
         </span>
+      ) : cell.premarketPredicted ? (
+        <span
+          className={`text-[10px] font-bold leading-tight ${directionTextCls(cell.premarketPredicted)}`}
+        >
+          {cell.premarketPredicted.slice(0, 1)}
+        </span>
+      ) : null}
+      {cell.priceTargetHit != null ? (
+        <span
+          className={`text-[9px] font-bold tracking-wide ${
+            cell.priceTargetHit ? 'text-signal-buy' : 'text-signal-sell'
+          }`}
+        >
+          ${cell.priceTargetHit ? 'HIT' : 'MISS'}
+        </span>
+      ) : null}
+      {cell.morningThesisHit === true ? (
+        <span className="text-[8px] text-fg-dim tracking-wide">Dir ✓</span>
       ) : null}
       {cell.graded && cell.actualDirection ? (
-        <span
-          className={`text-[10px] font-bold leading-tight ${directionTextCls(cell.actualDirection)}`}
-        >
-          → {cell.actualDirection.slice(0, 1)}
+        <span className={`text-[9px] ${directionTextCls(cell.actualDirection)} opacity-70`}>
+          →{cell.actualDirection.slice(0, 1)}
         </span>
-      ) : cell.hasSession ? (
-        <span className="text-[9px] text-fg-dim">…</span>
-      ) : null}
-      {cell.graded && cell.premarketCorrect === true ? (
-        <span className="text-[9px] text-signal-buy tracking-wide">HIT</span>
-      ) : null}
-      {cell.graded && cell.premarketCorrect === false ? (
-        <span className="text-[9px] text-signal-sell tracking-wide">MISS</span>
-      ) : null}
-      {cell.graded && cell.actualDirection === 'NEUTRAL' && cell.premarketCorrect == null ? (
-        <span className="text-[9px] text-signal-watch tracking-wide">FLAT</span>
       ) : null}
     </>
   );
@@ -79,11 +87,17 @@ function DayCell({ cell }: { cell: PredictMarketCalendarCell }) {
 
 function cellTitle(cell: PredictMarketCalendarCell): string {
   const parts = [`${cell.date}`];
-  if (cell.premarketPredicted) parts.push(`Premarket: ${cell.premarketPredicted}`);
-  if (cell.actualDirection) parts.push(`Actual: ${cell.actualDirection}`);
-  if (cell.dailyReturnPercent != null) {
-    parts.push(`Return ${cell.dailyReturnPercent.toFixed(2)}%`);
+  if (cell.targetSpx != null) {
+    parts.push(`Target ${cell.targetSpx.toFixed(0)} ${cell.targetSide ?? ''}`);
   }
+  if (cell.priceTargetHit != null) {
+    parts.push(`$ ${cell.priceTargetHit ? 'HIT' : 'MISS'} (6:30–8:30 AM PT)`);
+  }
+  if (cell.morningThesisHit != null) {
+    parts.push(`Morning thesis ${cell.morningThesisHit ? 'validated' : 'not validated'}`);
+  }
+  if (cell.premarketPredicted) parts.push(`Premarket: ${cell.premarketPredicted}`);
+  if (cell.actualDirection) parts.push(`Close ref: ${cell.actualDirection}`);
   return parts.join(' · ');
 }
 
@@ -96,7 +110,9 @@ export function PredictMarketAccuracyCalendar({ calendar }: { calendar: PredictM
             <span className="page-chevron">›</span> Accuracy calendar
           </h3>
           <p className="text-[11px] text-fg-dim mt-1 max-w-lg">
-            Premarket hit = morning thesis (entry + 7 AM confirm). Green border = validated; red = failed.
+            <strong className="text-fg-subtle">$ HIT / MISS</strong> = premarket SPX target touched
+            6:30–8:30 AM PT. <strong className="text-fg-subtle">Dir ✓</strong> = entry + 7 AM thesis.
+            <strong className="text-fg-subtle"> →R/G</strong> = full-day close (reference).
           </p>
         </div>
         <div className="flex items-center gap-2 text-xs shrink-0">
@@ -131,7 +147,7 @@ export function PredictMarketAccuracyCalendar({ calendar }: { calendar: PredictM
                 cell ? (
                   <DayCell key={cell.date} cell={cell} />
                 ) : (
-                  <div key={`empty-${wi}-${ci}`} className="min-h-[4.5rem]" aria-hidden />
+                  <div key={`empty-${wi}-${ci}`} className="min-h-[5rem]" aria-hidden />
                 ),
               )}
             </div>
@@ -140,15 +156,15 @@ export function PredictMarketAccuracyCalendar({ calendar }: { calendar: PredictM
         <div className="flex flex-wrap gap-3 mt-4 text-[10px] text-fg-dim">
           <span>
             <span className="inline-block w-3 h-3 border border-signal-buy/50 bg-signal-buy/10 mr-1 align-middle" />
-            Premarket hit
+            $ target HIT
           </span>
           <span>
             <span className="inline-block w-3 h-3 border border-signal-sell/50 bg-signal-sell/10 mr-1 align-middle" />
-            Premarket miss
+            $ target MISS
           </span>
           <span>
-            <span className="text-fg-subtle font-bold">AM R/G</span> = premarket forecast ·{' '}
-            <span className="font-bold">→ R/G</span> = actual day
+            <span className="font-bold text-fg-subtle">T7580↓</span> = SPX touch target (PUT low /
+            CALL high)
           </span>
         </div>
       </div>
