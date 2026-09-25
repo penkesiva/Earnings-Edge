@@ -3,6 +3,7 @@ import {
   directionTextCls,
   displayRangeFromPrediction,
 } from '@/lib/predictMarket/enrichForecastRange';
+import { formatFinalGradeDetail } from '@/lib/predictMarket/loadSessionCalendarMonth';
 import { PM_TIMELINE_STEPS, snapshotKindLabel } from '@/lib/predictMarket/sessionUiLabels';
 
 type PredictionRow = Record<string, unknown>;
@@ -79,6 +80,14 @@ export function PredictMarketSessionTimeline({
   const signal = signals[0];
   const cp7 = checkpoints.find(c => c.checkpoint_kind === 'FIRST_7AM');
   const cp10 = checkpoints.find(c => c.checkpoint_kind === 'MIDDAY_10AM');
+
+  const premarketPredicted = pre ? String(pre.direction) : null;
+  let premarketCorrect: boolean | null = null;
+  if (pre && outcome?.actual_direction) {
+    const pd = String(pre.direction);
+    const ad = String(outcome.actual_direction);
+    if (pd === 'GREEN' || pd === 'RED') premarketCorrect = pd === ad;
+  }
 
   const inputSnaps = snapshots.filter(s =>
     ['NIGHT_INPUT', 'PREMARKET_INPUT', 'OPEN'].includes(s.snapshot_kind),
@@ -202,7 +211,12 @@ export function PredictMarketSessionTimeline({
                   {String(outcome.actual_direction ?? '—')}
                 </span>
                 {outcome.daily_return_percent != null ? (
-                  <> · {Number(outcome.daily_return_percent).toFixed(2)}%</>
+                  <span className="text-fg-subtle font-normal">
+                    {' '}
+                    · day return{' '}
+                    {outcome.daily_return_percent >= 0 ? '+' : ''}
+                    {Number(outcome.daily_return_percent).toFixed(2)}%
+                  </span>
                 ) : null}
               </>
             ) : (
@@ -211,7 +225,7 @@ export function PredictMarketSessionTimeline({
           }
           detail={
             outcome
-              ? 'Scored from SPY proxy vs prior close — compares to RED/GREEN forecasts above.'
+              ? formatFinalGradeDetail(outcome, premarketPredicted, premarketCorrect)
               : undefined
           }
         />

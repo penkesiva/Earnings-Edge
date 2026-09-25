@@ -3,8 +3,12 @@ import { loadPredictMarketDashboard } from '@/lib/predictMarketPageActions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function PredictMarketPage() {
-  const data = await loadPredictMarketDashboard();
+export default async function PredictMarketPage({
+  searchParams,
+}: {
+  searchParams: { month?: string };
+}) {
+  const data = await loadPredictMarketDashboard(searchParams.month);
 
   return (
     <div className="space-y-6">

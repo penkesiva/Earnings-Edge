@@ -7,6 +7,12 @@ import {
   displayRangeFromPrediction,
 } from '@/lib/predictMarket/enrichForecastRange';
 import { PM_TIMELINE_STEPS } from '@/lib/predictMarket/sessionUiLabels';
+import { PredictMarketAccuracyCalendar } from '@/components/predictMarket/PredictMarketAccuracyCalendar';
+import type { PredictMarketCalendarMonth } from '@/lib/predictMarket/loadSessionCalendarMonth';
+
+export type PredictMarketPanelData = PredictMarketPageData & {
+  calendar: PredictMarketCalendarMonth;
+};
 
 function displayDirection(row: Record<string, unknown> | null | undefined): string {
   return (row?.direction as string) ?? '—';
@@ -17,7 +23,7 @@ function fmtPct(n: number | null | undefined) {
   return `${n.toFixed(0)}%`;
 }
 
-export function PredictMarketPanel({ data }: { data: PredictMarketPageData }) {
+export function PredictMarketPanel({ data }: { data: PredictMarketPanelData }) {
   const nextLabel = formatDayHeader(data.nextSessionDate);
   const featured = data.featured;
   const featuredLabel = featured ? formatDayHeader(featured.sessionDate) : null;
@@ -101,6 +107,8 @@ export function PredictMarketPanel({ data }: { data: PredictMarketPageData }) {
           ) : null}
         </div>
       </section>
+
+      {!data.migrationRequired ? <PredictMarketAccuracyCalendar calendar={data.calendar} /> : null}
 
       <section className="border border-border divide-y divide-border-subtle">
         <div className="px-4 py-3 space-y-1">
