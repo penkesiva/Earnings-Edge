@@ -1,20 +1,12 @@
 import Link from 'next/link';
 import { formatDayHeader } from '@/lib/earningsDate';
 import type { PredictMarketPageData } from '@/lib/predictMarket/loadPredictMarketPageData';
+import { predictMarketScheduleHint } from '@/lib/predictMarket/loadPredictMarketPageData';
 import {
   directionTextCls,
   displayRangeFromPrediction,
 } from '@/lib/predictMarket/enrichForecastRange';
-
-const TIMELINE = [
-  { label: 'NIGHT FORECAST', time: '9:00 PM PT' },
-  { label: 'PREMARKET FORECAST', time: '6:10 AM PT' },
-  { label: 'OPEN', time: '6:30 AM PT' },
-  { label: 'ENTRY WINDOW', time: '6:31–7:00 AM PT' },
-  { label: 'FIRST CHECK', time: '7:00 AM PT' },
-  { label: 'MIDDAY CHECK', time: '10:00 AM PT' },
-  { label: 'FINAL GRADE', time: '1:15 PM PT' },
-] as const;
+import { PM_TIMELINE_STEPS } from '@/lib/predictMarket/sessionUiLabels';
 
 function displayDirection(row: Record<string, unknown> | null | undefined): string {
   return (row?.direction as string) ?? '—';
@@ -27,10 +19,25 @@ function fmtPct(n: number | null | undefined) {
 
 export function PredictMarketPanel({ data }: { data: PredictMarketPageData }) {
   const nextLabel = formatDayHeader(data.nextSessionDate);
-  const night = data.latestSession?.night;
-  const pre = data.latestSession?.premarket;
+  const featured = data.featured;
+  const featuredLabel = featured ? formatDayHeader(featured.sessionDate) : null;
+  const night = featured?.night;
+  const pre = featured?.premarket;
   const primary = (pre ?? night) as Record<string, unknown> | null | undefined;
   const direction = displayDirection(primary);
+
+  const cardTitle = !featured
+    ? 'No sessions yet'
+    : data.featuredIsUpcoming
+      ? 'Upcoming session forecast'
+      : featured.hasOutcome
+        ? 'Last session (graded)'
+        : 'Session in progress';
+
+  const cardDateLine =
+    featured && featured.sessionDate !== data.nextSessionDate
+      ? `${featuredLabel} · next trading day is ${nextLabel}`
+      : nextLabel;
 
   return (
     <div className="space-y-8 max-w-3xl">
@@ -42,14 +49,19 @@ export function PredictMarketPanel({ data }: { data: PredictMarketPageData }) {
       ) : null}
 
       <section className="border border-border">
-        <div className="px-4 py-5 border-b border-border-subtle">
+        <div className="px-4 py-5 border-b border-border-subtle space-y-2">
           <p className="text-[10px] tracking-widest text-fg-dim uppercase">PredictMarket</p>
-          <h2 className="text-lg font-bold mt-1">Next session</h2>
-          <p className="text-sm text-fg-subtle mt-1">{nextLabel}</p>
+          <h2 className="text-lg font-bold">{cardTitle}</h2>
+          <p className="text-sm text-fg-subtle">{cardDateLine}</p>
+          <p className="text-[11px] text-fg-dim leading-relaxed">{predictMarketScheduleHint()}</p>
         </div>
         <div className="px-4 py-5 space-y-3">
           {night || pre ? (
             <>
+              <p className="text-[10px] text-fg-dim uppercase tracking-widest">
+                Latest forecast
+                {pre && night ? ' (premarket overrides display)' : night ? ' (night)' : ' (premarket)'}
+              </p>
               <p className="text-2xl font-bold tracking-tight">
                 <span className={directionTextCls(direction)}>{direction}</span>{' '}
                 <span className="text-fg-subtle text-base font-normal">
@@ -58,42 +70,52 @@ export function PredictMarketPanel({ data }: { data: PredictMarketPageData }) {
               </p>
               <p className="text-xs text-fg-subtle">
                 Expected SPX range (SPY×10 proxy):{' '}
-                {displayRangeFromPrediction(pre ?? night, data.latestSession?.spxAnchor)}
+                {displayRangeFromPrediction(pre ?? night, featured?.spxAnchor)}
               </p>
               <p className="text-xs text-fg-subtle">
                 Bias: {(pre?.trade_bias as string) ?? (night?.trade_bias as string) ?? '—'}
               </p>
+              {night && pre ? (
+                <p className="text-[11px] text-fg-dim">
+                  Night was {String(night.direction)} {fmtPct(night.confidence as number)} → premarket{' '}
+                  {String(pre.direction)} {fmtPct(pre.confidence as number)}.
+                </p>
+              ) : null}
             </>
           ) : (
             <p className="text-sm text-fg-subtle">
-              No forecasts yet for this session. Vercel cron runs on the timeline below (Pacific).
-              Night runs ~9:00 PM PT; premarket ~6:10 AM PT. Or trigger manually:{' '}
+              No forecasts stored for the highlighted session yet. Cron runs on the schedule below
+              (Pacific). Manual test:{' '}
               <code className="font-mono text-[10px]">
                 /api/cron/predict-market?phase=night&amp;force=1
               </code>
             </p>
           )}
-          {data.latestSession ? (
+          {featured ? (
             <Link
-              href={`/predictmarket/sessions/${data.latestSession.sessionDate}`}
-              className="text-xs text-accent hover:underline"
+              href={`/predictmarket/sessions/${featured.sessionDate}`}
+              className="text-xs text-accent hover:underline inline-block"
             >
-              View session timeline →
+              View full timeline for {featuredLabel} →
             </Link>
           ) : null}
         </div>
       </section>
 
       <section className="border border-border divide-y divide-border-subtle">
-        <div className="px-4 py-3">
+        <div className="px-4 py-3 space-y-1">
           <h3 className="text-sm font-bold tracking-wide">
-            <span className="page-chevron">›</span> Daily timeline
+            <span className="page-chevron">›</span> Daily schedule (7 steps)
           </h3>
+          <p className="text-[11px] text-fg-dim">
+            Each step writes immutable rows. LLM steps = NIGHT + PREMARKET only; the rest are rules +
+            market data.
+          </p>
         </div>
-        {TIMELINE.map(row => (
-          <div key={row.label} className="px-4 py-3 flex justify-between gap-4 text-xs">
+        {PM_TIMELINE_STEPS.map(row => (
+          <div key={row.key} className="px-4 py-3 flex justify-between gap-4 text-xs">
             <span className="font-bold tracking-wide">{row.label}</span>
-            <span className="text-fg-dim tabular-nums">{row.time}</span>
+            <span className="text-fg-dim tabular-nums text-right">{row.timePt}</span>
           </div>
         ))}
       </section>
