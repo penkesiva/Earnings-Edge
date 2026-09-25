@@ -10,7 +10,7 @@ import {
 } from '@/lib/intraday/config/defaults';
 import { runIntradayBacktest } from '@/lib/intraday/backtest/runBacktest';
 import { validateTradingBudget } from '@/lib/intraday/sizing/computeShares';
-import { INTRADAY_STRATEGIES } from '@/lib/intraday/strategies/registry';
+import { INTRADAY_STRATEGIES, strategyLabel } from '@/lib/intraday/strategies/registry';
 import { validateIntradayTicker, normalizeTickerInput } from '@/lib/intraday/validateIntradayTicker';
 import { INTRADAY_STRATEGY_VWAP_OR_V1 } from '@/lib/intraday/types';
 import { revalidatePath } from 'next/cache';
@@ -41,7 +41,9 @@ export async function loadIntradayPageData() {
     ? { data: [] }
     : await sb
         .from('intraday_backtest_runs')
-        .select('id, symbol, calendar_days, status, metrics, trades, error_message, started_at, completed_at')
+        .select(
+          'id, symbol, strategy_id, calendar_days, status, metrics, trades, error_message, started_at, completed_at',
+        )
         .eq('user_id', user.id)
         .order('started_at', { ascending: false })
         .limit(8);
@@ -204,7 +206,7 @@ export async function runIntradayBacktestAction(
     const errNote =
       result.errors.length > 0 ? ` (${result.errors.length} day fetch warning(s).)` : '';
     return {
-      success: `Backtest done: ${result.metrics.trades} trades over ${result.daysWithData} sessions · P&L $${result.metrics.totalPnlUsd.toFixed(2)}.${errNote}`,
+      success: `${strategyLabel(strategyId)} backtest: ${result.metrics.trades} trades over ${result.daysWithData} sessions · P&L $${result.metrics.totalPnlUsd.toFixed(2)}.${errNote}`,
       successTone: result.metrics.totalPnlUsd < 0 ? 'loss' : result.metrics.totalPnlUsd > 0 ? 'profit' : 'neutral',
     };
   } catch (e) {

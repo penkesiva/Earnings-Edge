@@ -45,7 +45,18 @@ export function simulateBuyWeakSellStrongDay(
 
     if (state === 'open' && tMin >= forceFlatAfter) {
       trades.push(
-        closeTrade(sessionDate, entrySetup, entryTime, t, entryPrice, b.c, sharesHeld, reasons, confidence),
+        closeTrade(
+          sessionDate,
+          entrySetup,
+          entryTime,
+          t,
+          entryPrice,
+          b.c,
+          sharesHeld,
+          reasons,
+          confidence,
+          'eod_flat',
+        ),
       );
       state = 'flat';
       break;
@@ -62,7 +73,18 @@ export function simulateBuyWeakSellStrongDay(
 
       if (hitRip || vwapRip) {
         trades.push(
-          closeTrade(sessionDate, entrySetup, entryTime, t, entryPrice, b.c, sharesHeld, reasons, confidence),
+          closeTrade(
+            sessionDate,
+            entrySetup,
+            entryTime,
+            t,
+            entryPrice,
+            b.c,
+            sharesHeld,
+            reasons,
+            confidence,
+            'strength',
+          ),
         );
         state = 'flat';
         cooldownUntilIdx = i + config.cooldownMinutes;
@@ -89,17 +111,20 @@ export function simulateBuyWeakSellStrongDay(
 
   if (state === 'open' && bars.length > 0) {
     const last = bars[bars.length - 1];
+    const exitT = barEtHHMM(last.t);
+    const exitMin = etHHMMToMinutes(exitT);
     trades.push(
       closeTrade(
         sessionDate,
         entrySetup,
         entryTime,
-        barEtHHMM(last.t),
+        exitT,
         entryPrice,
         last.c,
         sharesHeld,
         reasons,
         confidence,
+        exitMin >= forceFlatAfter ? 'eod_flat' : 'session_end',
       ),
     );
   }
@@ -155,6 +180,7 @@ function closeTrade(
   shares: number,
   reasons: string[],
   confidence: number,
+  exitReason: BacktestTrade['exitReason'],
 ): BacktestTrade {
   const pnlUsd = (exitPrice - entryPrice) * shares;
   const pnlPct = entryPrice > 0 ? ((exitPrice - entryPrice) / entryPrice) * 100 : 0;
@@ -170,5 +196,6 @@ function closeTrade(
     pnlPct,
     confidence,
     reasons,
+    exitReason,
   };
 }

@@ -74,6 +74,8 @@ export type BuyWeakStrategyConfig = {
   minConfidence: number;
 };
 
+export type TradeExitReason = 'strength' | 'stop' | 'target' | 'eod_flat' | 'session_end';
+
 export type BacktestTrade = {
   sessionDate: string;
   setupType: SetupType;
@@ -86,6 +88,8 @@ export type BacktestTrade = {
   pnlPct: number;
   confidence: number;
   reasons: string[];
+  /** Why the position closed (Buy Weak uses strength vs eod_flat). */
+  exitReason?: TradeExitReason;
 };
 
 export type BacktestMetrics = {

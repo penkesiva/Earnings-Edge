@@ -5,6 +5,7 @@ import type {
   IntradayStrategyConfig,
   MinuteBar,
   SetupType,
+  TradeExitReason,
 } from '@/lib/intraday/types';
 
 type SimResult = { trades: BacktestTrade[] };
@@ -45,7 +46,20 @@ export function simulateVwapOrDay(
     const t = barEtHHMM(b.t);
     const tMin = etHHMMToMinutes(t);
     if (tMin >= forceFlatAfter && state === 'open') {
-      trades.push(closeTrade(sessionDate, entrySetup, entryTime, t, entryPrice, b.c, sharesHeld, reasons, confidence));
+      trades.push(
+        closeTrade(
+          sessionDate,
+          entrySetup,
+          entryTime,
+          t,
+          entryPrice,
+          b.c,
+          sharesHeld,
+          reasons,
+          confidence,
+          'eod_flat',
+        ),
+      );
       state = 'flat';
       break;
     }
@@ -63,7 +77,18 @@ export function simulateVwapOrDay(
       const pnlPct = ((b.c - entryPrice) / entryPrice) * 100;
       if (b.l <= stop) {
         trades.push(
-          closeTrade(sessionDate, entrySetup, entryTime, t, entryPrice, stop, sharesHeld, reasons, confidence),
+          closeTrade(
+            sessionDate,
+            entrySetup,
+            entryTime,
+            t,
+            entryPrice,
+            stop,
+            sharesHeld,
+            reasons,
+            confidence,
+            'stop',
+          ),
         );
         state = 'flat';
         cooldownUntilIdx = i + config.cooldownMinutes;
@@ -71,7 +96,18 @@ export function simulateVwapOrDay(
       }
       if (pnlPct >= config.target1Pct) {
         trades.push(
-          closeTrade(sessionDate, entrySetup, entryTime, t, entryPrice, b.c, sharesHeld, reasons, confidence),
+          closeTrade(
+            sessionDate,
+            entrySetup,
+            entryTime,
+            t,
+            entryPrice,
+            b.c,
+            sharesHeld,
+            reasons,
+            confidence,
+            'target',
+          ),
         );
         state = 'flat';
         cooldownUntilIdx = i + config.cooldownMinutes;
@@ -108,6 +144,7 @@ export function simulateVwapOrDay(
         sharesHeld,
         reasons,
         confidence,
+        'session_end',
       ),
     );
   }
@@ -190,6 +227,7 @@ function closeTrade(
   shares: number,
   reasons: string[],
   confidence: number,
+  exitReason?: TradeExitReason,
 ): BacktestTrade {
   const pnlUsd = (exitPrice - entryPrice) * shares;
   const pnlPct = entryPrice > 0 ? ((exitPrice - entryPrice) / entryPrice) * 100 : 0;
@@ -205,5 +243,6 @@ function closeTrade(
     pnlPct,
     confidence,
     reasons,
+    exitReason,
   };
 }

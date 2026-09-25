@@ -8,6 +8,8 @@ import {
   type IntradayPageState,
 } from '@/lib/intradayPageActions';
 import { BACKTEST_DAY_PRESETS } from '@/lib/intraday/config/defaults';
+import { strategyLabel } from '@/lib/intraday/strategies/registry';
+import { INTRADAY_STRATEGY_BUY_WEAK_SELL_STRONG_V1 } from '@/lib/intraday/types';
 
 const FIELD =
   'w-full h-10 box-border bg-bg border border-border px-3 text-sm font-mono focus:outline-none focus:border-accent';
@@ -50,9 +52,32 @@ function pnlToneClass(n: number | null | undefined): string {
   return n < 0 ? 'text-signal-sell' : 'text-signal-buy';
 }
 
+function tradeLogLineClass(pnl: number, exitReason: string | undefined): string {
+  if (!Number.isFinite(pnl)) return '';
+  if (pnl > 0) return 'text-signal-buy';
+  if (
+    (exitReason === 'eod_flat' || exitReason === 'session_end') &&
+    pnl < 0
+  ) {
+    return 'text-signal-watch';
+  }
+  return pnl < 0 ? 'text-signal-sell' : '';
+}
+
+function exitReasonTag(exitReason: string | undefined, pnl: number): string {
+  if (exitReason === 'strength') return ' · rip';
+  if (exitReason === 'eod_flat') return pnl < 0 ? ' · EOD flat (held, not stop)' : ' · EOD flat';
+  if (exitReason === 'stop') return ' · stop';
+  if (exitReason === 'target') return ' · target';
+  if (exitReason === 'session_end') return ' · session end';
+  if (pnl < 0 && exitReason == null) return ' · exit';
+  return '';
+}
+
 type RunRow = {
   id: string;
   symbol: string;
+  strategy_id?: string;
   calendar_days: number;
   status: string;
   metrics: Record<string, unknown> | null;
@@ -292,11 +317,13 @@ function BacktestRunDetails({ run }: { run: RunRow }) {
   const totalPnl = m.totalPnlUsd != null ? Number(m.totalPnlUsd) : null;
   const pnlLabel =
     totalPnl != null && Number.isFinite(totalPnl) ? fmtUsd(totalPnl) : null;
+  const stratLabel = run.strategy_id ? strategyLabel(run.strategy_id) : 'Unknown strategy';
+  const isBuyWeak = run.strategy_id === INTRADAY_STRATEGY_BUY_WEAK_SELL_STRONG_V1;
   return (
     <details className="px-4 py-3 group">
       <summary className="cursor-pointer text-xs font-bold tracking-wide list-none flex flex-wrap justify-between gap-x-2 gap-y-1">
         <span>
-          {run.symbol} · {run.calendar_days}d · {run.status}
+          {run.symbol} · {stratLabel} · {run.calendar_days}d · {run.status}
           {pnlLabel ? (
             <>
               {' '}
@@ -325,16 +352,29 @@ function BacktestRunDetails({ run }: { run: RunRow }) {
             <summary className="px-3 py-2 cursor-pointer text-fg-dim">
               Trade log ({trades.length})
             </summary>
+            {isBuyWeak ? (
+              <p className="px-3 py-2 text-[10px] text-fg-dim border-t border-border-subtle">
+                Green = sold on strength. Amber = 3:50 PM ET mandatory flat (intraday rule), not a
+                discretionary stop while red.
+              </p>
+            ) : null}
             <ul className="max-h-48 overflow-auto divide-y divide-border-subtle border-t border-border-subtle">
               {trades.slice(0, 50).map((t, i) => {
                 const pnl = Number(t.pnlUsd);
+                const exitReason =
+                  t.exitReason != null
+                    ? String(t.exitReason)
+                    : String(t.exitTimeEt ?? '').startsWith('15:5')
+                      ? 'eod_flat'
+                      : undefined;
                 return (
                   <li
                     key={i}
-                    className={`px-3 py-2 font-mono text-[10px] ${pnlToneClass(pnl)}`}
+                    className={`px-3 py-2 font-mono text-[10px] ${tradeLogLineClass(pnl, exitReason)}`}
                   >
                     {String(t.sessionDate)} {String(t.setupType)} {String(t.entryTimeEt)}→
                     {String(t.exitTimeEt)} ${Number.isFinite(pnl) ? pnl.toFixed(2) : '—'}
+                    {exitReasonTag(exitReason, pnl)}
                   </li>
                 );
               })}
