@@ -107,6 +107,9 @@ export default async function PredictMarketSessionPage({
                 previous_close:
                   outcome.previous_close != null ? Number(outcome.previous_close) : null,
                 close: outcome.close != null ? Number(outcome.close) : null,
+                payload: outcome.payload as {
+                  morning_thesis?: import('@/lib/predictMarket/morningThesisGrade').MorningThesisGrade;
+                } | null,
               }
             : null
         }

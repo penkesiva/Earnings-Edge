@@ -96,8 +96,7 @@ export function PredictMarketAccuracyCalendar({ calendar }: { calendar: PredictM
             <span className="page-chevron">›</span> Accuracy calendar
           </h3>
           <p className="text-[11px] text-fg-dim mt-1 max-w-lg">
-            Premarket RED/GREEN vs actual day (SPY proxy). Green border = morning call correct; red =
-            wrong. Click a day for the full timeline.
+            Premarket hit = morning thesis (entry + 7 AM confirm). Green border = validated; red = failed.
           </p>
         </div>
         <div className="flex items-center gap-2 text-xs shrink-0">

@@ -6,6 +6,7 @@ import {
   classifyActualDirection,
   scoreDirectionForecast,
 } from '@/lib/predictMarket/outcomeGrading';
+import { computeMorningThesisGrade } from '@/lib/predictMarket/morningThesisGrade';
 
 const PROXY = 'SPY';
 
@@ -56,6 +57,33 @@ export async function gradePredictMarketSession(
       : null;
   const actualDirection = classifyActualDirection(dailyReturn);
 
+  const [{ data: entryRow }, { data: cp7Row }, { data: prePred }] = await Promise.all([
+    sb
+      .from('pm_trade_signals')
+      .select('recommended_side')
+      .eq('session_id', sessionId)
+      .maybeSingle(),
+    sb
+      .from('pm_validation_checkpoints')
+      .select('thesis_status')
+      .eq('session_id', sessionId)
+      .eq('checkpoint_kind', 'FIRST_7AM')
+      .maybeSingle(),
+    sb
+      .from('pm_predictions')
+      .select('direction, trade_bias, prediction_type')
+      .eq('session_id', sessionId)
+      .eq('prediction_type', 'PREMARKET')
+      .maybeSingle(),
+  ]);
+
+  const morning = computeMorningThesisGrade({
+    premarketDirection: (prePred?.direction as string) ?? null,
+    tradeBias: (prePred?.trade_bias as string) ?? null,
+    entrySide: (entryRow?.recommended_side as string) ?? null,
+    checkpoint7Status: (cp7Row?.thesis_status as string) ?? null,
+  });
+
   await sb.from('pm_market_outcomes').upsert(
     {
       session_id: sessionId,
@@ -68,7 +96,15 @@ export async function gradePredictMarketSession(
       daily_return_percent: dailyReturn,
       intraday_range_percent: rangePercent,
       actual_direction: actualDirection,
-      payload: { proxy: PROXY, note: 'SPY used as SPX proxy for Phase 2 grading' },
+      payload: {
+        proxy: PROXY,
+        note: 'SPY used as SPX proxy; actual_direction is full-session close (reference).',
+        morning_thesis: morning,
+        eod_reference: {
+          actual_direction: actualDirection,
+          daily_return_percent: dailyReturn,
+        },
+      },
       graded_at_pt: gradedAtIso,
     },
     { onConflict: 'session_id' },
@@ -81,7 +117,12 @@ export async function gradePredictMarketSession(
 
   for (const p of preds ?? []) {
     const predicted = p.direction as string;
-    const directionCorrect = scoreDirectionForecast(predicted, actualDirection);
+    const predictionType = p.prediction_type as string;
+    const eodCorrect = scoreDirectionForecast(predicted, actualDirection);
+    const directionCorrect =
+      predictionType === 'PREMARKET' && morning.premarketHit != null
+        ? morning.premarketHit
+        : eodCorrect;
 
     const expLow = p.expected_low != null ? Number(p.expected_low) : null;
     const expHigh = p.expected_high != null ? Number(p.expected_high) : null;
@@ -109,11 +150,13 @@ export async function gradePredictMarketSession(
         metrics: {
           actual_direction: actualDirection,
           daily_return_percent: dailyReturn,
+          morning_thesis_status: morning.status,
+          eod_direction_correct: eodCorrect,
         },
       },
       { onConflict: 'prediction_id' },
     );
   }
 
-  return `Graded ${preds?.length ?? 0} prediction(s); actual ${actualDirection} ${dailyReturn.toFixed(2)}% (${PROXY} proxy).`;
+  return `Graded ${preds?.length ?? 0} prediction(s); morning ${morning.status}; EOD ${actualDirection} ${dailyReturn.toFixed(2)}% (${PROXY}).`;
 }

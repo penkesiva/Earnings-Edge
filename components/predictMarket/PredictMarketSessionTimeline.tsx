@@ -3,7 +3,12 @@ import {
   directionTextCls,
   displayRangeFromPrediction,
 } from '@/lib/predictMarket/enrichForecastRange';
-import { formatFinalGradeDetail, summarizeOutcomeMove } from '@/lib/predictMarket/outcomeGrading';
+import { summarizeOutcomeMove, formatOutcomeMoveLine } from '@/lib/predictMarket/outcomeGrading';
+import {
+  computeMorningThesisGrade,
+  morningGradeLabel,
+  type MorningThesisGrade,
+} from '@/lib/predictMarket/morningThesisGrade';
 import { PM_TIMELINE_STEPS, snapshotKindLabel } from '@/lib/predictMarket/sessionUiLabels';
 
 type PredictionRow = Record<string, unknown>;
@@ -15,7 +20,14 @@ type OutcomeRow = {
   daily_return_percent: number | null;
   previous_close?: number | null;
   close?: number | null;
+  payload?: { morning_thesis?: MorningThesisGrade } | null;
 };
+
+function HitMark({ ok }: { ok: boolean | null | undefined }) {
+  if (ok === true) return <span className="text-signal-buy ml-1" aria-label="hit">✓</span>;
+  if (ok === false) return <span className="text-signal-sell ml-1" aria-label="miss">✗</span>;
+  return null;
+}
 
 function fmtTimePt(iso: string | undefined | null): string | null {
   if (!iso) return null;
@@ -83,17 +95,21 @@ export function PredictMarketSessionTimeline({
   const cp7 = checkpoints.find(c => c.checkpoint_kind === 'FIRST_7AM');
   const cp10 = checkpoints.find(c => c.checkpoint_kind === 'MIDDAY_10AM');
 
+  const morningFromPayload = outcome?.payload?.morning_thesis;
+  const morning =
+    morningFromPayload ??
+    computeMorningThesisGrade({
+      premarketDirection: pre ? String(pre.direction) : null,
+      tradeBias: pre ? String(pre.trade_bias) : null,
+      entrySide: signal ? String(signal.recommended_side) : null,
+      checkpoint7Status: cp7 ? String(cp7.thesis_status) : null,
+    });
+
+  const entryAligned = morning.entryAligned;
+  const cp7Confirmed = morning.checkpoint7Confirmed;
+
   const premarketPredicted = pre ? String(pre.direction) : null;
-  let premarketCorrect: boolean | null = null;
-  if (pre && outcome?.actual_direction) {
-    const pd = String(pre.direction);
-    const ad = String(outcome.actual_direction);
-    if (ad === 'NEUTRAL') {
-      premarketCorrect = pd === 'NEUTRAL' ? true : null;
-    } else if (pd === 'GREEN' || pd === 'RED') {
-      premarketCorrect = pd === ad;
-    }
-  }
+  const premarketCorrect = morning.premarketHit;
 
   const moveSummary =
     outcome?.previous_close != null && outcome?.close != null
@@ -107,7 +123,7 @@ export function PredictMarketSessionTimeline({
   return (
     <div className="space-y-4">
       <p className="text-xs text-fg-subtle border border-border-subtle bg-bg px-3 py-2 leading-relaxed">
-        Seven scheduled steps per NYSE session.{' '}
+        Seven scheduled steps per NYSE session (morning thesis grade is primary).{' '}
         <span className="text-fg-dim">
           “Market data saved…” rows are raw inputs fed to the model or rules — not separate predictions.
         </span>
@@ -181,19 +197,33 @@ export function PredictMarketSessionTimeline({
           timePt={PM_TIMELINE_STEPS[3].timePt}
           status={
             signal ? (
-              <span>{String(signal.recommended_side)}</span>
+              <span>
+                {String(signal.recommended_side)}
+                <HitMark ok={entryAligned} />
+              </span>
             ) : (
               <span className="text-fg-dim font-normal">Pending</span>
             )
           }
-          detail={signal?.reasoning ? String(signal.reasoning).slice(0, 200) : undefined}
+          detail={
+            signal?.reasoning
+              ? `${String(signal.reasoning).slice(0, 200)}${
+                  entryAligned
+                    ? ' Entry aligns with premarket bias (counts toward morning grade).'
+                    : ''
+                }`
+              : undefined
+          }
         />
         <Step
           title={PM_TIMELINE_STEPS[4].label}
           timePt={PM_TIMELINE_STEPS[4].timePt}
           status={
             cp7 ? (
-              <span>{String(cp7.thesis_status)}</span>
+              <span>
+                {String(cp7.thesis_status)}
+                <HitMark ok={cp7Confirmed ? true : null} />
+              </span>
             ) : (
               <span className="text-fg-dim font-normal">Pending</span>
             )
@@ -216,23 +246,35 @@ export function PredictMarketSessionTimeline({
           title={PM_TIMELINE_STEPS[6].label}
           timePt={PM_TIMELINE_STEPS[6].timePt}
           status={
+            morning.status === 'VALIDATED' ? (
+              <span className="text-signal-buy">
+                {morningGradeLabel(morning.status)}
+                <HitMark ok />
+              </span>
+            ) : morning.status === 'FAILED' ? (
+              <span className="text-signal-sell">{morningGradeLabel(morning.status)}</span>
+            ) : (
+              <span className="text-fg-subtle">{morningGradeLabel(morning.status)}</span>
+            )
+          }
+          detail={morning.summary}
+        />
+        <Step
+          title={PM_TIMELINE_STEPS[7].label}
+          timePt={PM_TIMELINE_STEPS[7].timePt}
+          muted
+          status={
             outcome ? (
               <>
                 <span className={directionTextCls(String(outcome.actual_direction ?? 'NEUTRAL'))}>
                   {String(outcome.actual_direction ?? '—')}
                 </span>
                 {moveSummary ? (
-                  <span className="text-fg-subtle font-normal block sm:inline text-xs sm:text-sm mt-1 sm:mt-0">
+                  <span className="text-fg-dim font-normal block text-xs mt-1">
                     {moveSummary.spyChangeDollars >= 0 ? '+' : ''}
                     {moveSummary.spyChangeDollars.toFixed(2)} SPY · ~
                     {moveSummary.spxProxyPoints >= 0 ? '+' : ''}
                     {moveSummary.spxProxyPoints.toFixed(1)} SPX pts
-                  </span>
-                ) : outcome.daily_return_percent != null ? (
-                  <span className="text-fg-subtle font-normal">
-                    {' '}
-                    · {outcome.daily_return_percent >= 0 ? '+' : ''}
-                    {Number(outcome.daily_return_percent).toFixed(3)}%
                   </span>
                 ) : null}
               </>
@@ -241,17 +283,11 @@ export function PredictMarketSessionTimeline({
             )
           }
           detail={
-            outcome
-              ? formatFinalGradeDetail(
-                  {
-                    ...outcome,
-                    previous_close: outcome.previous_close,
-                    close: outcome.close,
-                  },
-                  premarketPredicted,
-                  premarketCorrect,
-                )
-              : undefined
+            outcome && moveSummary
+              ? `Reference only — full session close vs prior. ${formatOutcomeMoveLine(moveSummary)}`
+              : outcome
+                ? 'Reference only — full session close vs prior close (SPY proxy).'
+                : undefined
           }
         />
       </ul>

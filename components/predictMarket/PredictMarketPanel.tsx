@@ -113,7 +113,7 @@ export function PredictMarketPanel({ data }: { data: PredictMarketPanelData }) {
       <section className="border border-border divide-y divide-border-subtle">
         <div className="px-4 py-3 space-y-1">
           <h3 className="text-sm font-bold tracking-wide">
-            <span className="page-chevron">›</span> Daily schedule (7 steps)
+            <span className="page-chevron">›</span> Daily schedule
           </h3>
           <p className="text-[11px] text-fg-dim">
             Each step writes immutable rows. LLM steps = NIGHT + PREMARKET only; the rest are rules +

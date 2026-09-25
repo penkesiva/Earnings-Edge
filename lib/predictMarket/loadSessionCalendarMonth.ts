@@ -1,6 +1,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { isTradingDay } from '@/lib/usMarketCalendar';
 import { scoreDirectionForecast } from '@/lib/predictMarket/outcomeGrading';
+import type { MorningThesisGrade } from '@/lib/predictMarket/morningThesisGrade';
+import { computeMorningThesisGrade } from '@/lib/predictMarket/morningThesisGrade';
 
 export type PredictMarketCalendarCell = {
   date: string;
@@ -116,20 +118,27 @@ export async function loadSessionCalendarMonth(
   const sessionIds = [...sessionByDate.values()];
   const outcomeBySession = new Map<
     string,
-    { actual_direction: string; daily_return_percent: number | null }
+    { actual_direction: string; daily_return_percent: number | null; payload?: unknown }
   >();
   const predsBySession = new Map<string, PredBundle>();
 
   if (sessionIds.length > 0) {
-    const [{ data: outcomes }, { data: preds }] = await Promise.all([
+    const [{ data: outcomes }, { data: preds }, { data: signals }, { data: cps7 }] =
+      await Promise.all([
       sb
         .from('pm_market_outcomes')
-        .select('session_id, actual_direction, daily_return_percent')
+        .select('session_id, actual_direction, daily_return_percent, payload')
         .in('session_id', sessionIds),
       sb
         .from('pm_predictions')
-        .select('id, session_id, prediction_type, direction')
+        .select('id, session_id, prediction_type, direction, trade_bias')
         .in('session_id', sessionIds),
+      sb.from('pm_trade_signals').select('session_id, recommended_side').in('session_id', sessionIds),
+      sb
+        .from('pm_validation_checkpoints')
+        .select('session_id, thesis_status')
+        .in('session_id', sessionIds)
+        .eq('checkpoint_kind', 'FIRST_7AM'),
     ]);
 
     for (const o of outcomes ?? []) {
@@ -137,8 +146,16 @@ export async function loadSessionCalendarMonth(
         actual_direction: o.actual_direction as string,
         daily_return_percent:
           o.daily_return_percent != null ? Number(o.daily_return_percent) : null,
+        payload: o.payload,
       });
     }
+
+    const entryBySession = new Map(
+      (signals ?? []).map(s => [s.session_id as string, s.recommended_side as string]),
+    );
+    const cp7BySession = new Map(
+      (cps7 ?? []).map(c => [c.session_id as string, c.thesis_status as string]),
+    );
 
     for (const id of sessionIds) {
       predsBySession.set(id, {
@@ -156,6 +173,7 @@ export async function loadSessionCalendarMonth(
       }
       if (p.prediction_type === 'PREMARKET') {
         entry.pre = { id: p.id as string, direction: p.direction as string };
+        (entry as PredBundle & { tradeBias?: string }).tradeBias = p.trade_bias as string;
       }
     }
 
@@ -173,10 +191,23 @@ export async function loadSessionCalendarMonth(
 
     for (const [sid, bundle] of predsBySession) {
       const outcome = outcomeBySession.get(sid);
-      bundle.preCorrect = bundle.pre
-        ? (scoreByPredId.get(bundle.pre.id) ??
-          directionMatch(bundle.pre.direction, outcome?.actual_direction ?? null))
-        : null;
+      const payload = outcome?.payload as { morning_thesis?: MorningThesisGrade } | undefined;
+      const ext = bundle as PredBundle & { tradeBias?: string };
+      const computed = computeMorningThesisGrade({
+        premarketDirection: bundle.pre?.direction ?? null,
+        tradeBias: ext.tradeBias ?? null,
+        entrySide: entryBySession.get(sid) ?? null,
+        checkpoint7Status: cp7BySession.get(sid) ?? null,
+      });
+      const morningHit = payload?.morning_thesis?.premarketHit ?? computed.premarketHit;
+
+      bundle.preCorrect =
+        morningHit != null
+          ? morningHit
+          : bundle.pre
+            ? (scoreByPredId.get(bundle.pre.id) ??
+              directionMatch(bundle.pre.direction, outcome?.actual_direction ?? null))
+            : null;
       bundle.nightCorrect = bundle.night
         ? (scoreByPredId.get(bundle.night.id) ??
           directionMatch(bundle.night.direction, outcome?.actual_direction ?? null))
