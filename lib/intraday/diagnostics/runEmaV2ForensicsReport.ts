@@ -139,7 +139,8 @@ export async function runEmaV2ForensicsReport(input: {
       (!winnerRow || e.sessionDate !== winnerRow.sessionDate || e.entryTimeEt !== winnerRow.entryTimeEt),
   );
 
-  const compareTable = COMPARE_NUMERIC_KEYS.map(key => {
+  const compareTable: { feature: string; winner: string; avgLoser: string; diff: string }[] =
+    COMPARE_NUMERIC_KEYS.map(key => {
     const w = winnerRow?.[key];
     const avg = avgForensics(loserRows, key);
     const wNum = typeof w === 'number' ? w : null;
