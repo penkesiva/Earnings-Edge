@@ -1,3 +1,4 @@
+import { passesForensicsDelayedEntry } from '@/lib/intraday/diagnostics/delayedEntryGate';
 import { applyLongExitPrice, applyLongFillPrice, commissionCost } from '@/lib/intraday/backtest/executionCost';
 import { barEtHHMM, etHHMMToMinutes } from '@/lib/intraday/indicators/engine';
 import { DEFAULT_EMA_TREND_DAY_V2_CONFIG } from '@/lib/intraday/strategies/emaTrendDayV2/config';
@@ -286,6 +287,15 @@ export function simulateEmaTrendDayV2(
         reject('SCORE_BELOW_MIN');
         continue;
       }
+    }
+
+    if (
+      config.forensicsDelayedEntryVariant &&
+      config.forensicsDelayedEntryVariant !== 'A' &&
+      !passesForensicsDelayedEntry(bars, i, b, ctx, config)
+    ) {
+      reject('DELAYED_CONFIRMATION');
+      continue;
     }
 
     signalLog[logIdx].accepted = true;

@@ -102,6 +102,8 @@ export type MarketContextFilter = 'OFF' | 'SCORE_ONLY' | 'REQUIRE';
 export type EmaInitialization = 'SESSION_ONLY' | 'PRIOR_BARS_SEEDED';
 export type EmaV2EntryMode = 'EMA_ONLY' | 'EMA_REGIME' | 'EMA_REGIME_MOMENTUM';
 export type VolumeMomentumMode = 'OFF' | 'SCORE_ONLY' | 'REQUIRE';
+/** Diagnostic replay only — does not change production default config. */
+export type ForensicsDelayedEntryVariant = 'A' | 'B' | 'C' | 'D' | 'E';
 
 export type EmaTrendDayV2Config = {
   warmupBars: number;
@@ -155,6 +157,8 @@ export type EmaTrendDayV2Config = {
   momentumWeightVolume: number;
   momentumWeightEma: number;
   momentumWeightVwap: number;
+  /** When set, applies extra entry confirmation gate (forensics / variant sim). */
+  forensicsDelayedEntryVariant?: ForensicsDelayedEntryVariant;
 };
 
 export type SignalLogEntry = {

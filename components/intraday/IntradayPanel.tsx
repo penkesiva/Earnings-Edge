@@ -6,6 +6,7 @@ import { useMemo, useState } from 'react';
 import {
   runIntradayBacktestAction,
   compareEmaTrendBacktestAction,
+  runEmaV2ForensicsAction,
   saveIntradaySettingsAction,
   type IntradayPageState,
 } from '@/lib/intradayPageActions';
@@ -115,6 +116,7 @@ export function IntradayPanel({
   const [saveState, saveAction] = useFormState(saveIntradaySettingsAction, {});
   const [btState, btAction] = useFormState(runIntradayBacktestAction, {});
   const [compareState, compareAction] = useFormState(compareEmaTrendBacktestAction, {});
+  const [forensicsState, forensicsAction] = useFormState(runEmaV2ForensicsAction, {});
 
   const symbol = (settings?.symbol as string) ?? '';
   const companyName = (settings?.company_name as string) ?? '';
@@ -243,6 +245,7 @@ export function IntradayPanel({
         <form action={btAction} className="px-4 py-4 space-y-4">
           <Flash state={btState} />
           <Flash state={compareState} />
+          <Flash state={forensicsState} />
           <div className="grid sm:grid-cols-2 gap-4">
             <div className="space-y-1">
               <label className="text-xs font-bold tracking-wide">Ticker</label>
@@ -311,6 +314,13 @@ export function IntradayPanel({
             className="ml-2 inline-flex h-9 items-center justify-center border border-border px-4 text-xs font-bold tracking-wide text-fg-subtle hover:border-accent hover:text-accent"
           >
             Compare EMA v1 vs v2 modes
+          </button>
+          <button
+            type="submit"
+            formAction={forensicsAction}
+            className="ml-2 inline-flex h-9 items-center justify-center border border-border px-4 text-xs font-bold tracking-wide text-fg-subtle hover:border-accent hover:text-accent"
+          >
+            V2 forensics report
           </button>
         </form>
       </section>

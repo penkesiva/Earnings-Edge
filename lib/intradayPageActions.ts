@@ -15,6 +15,7 @@ import {
 } from '@/lib/intraday/backtest/compareEmaTrend';
 import { validateTradingBudget } from '@/lib/intraday/sizing/computeShares';
 import { INTRADAY_STRATEGIES, strategyLabel } from '@/lib/intraday/strategies/registry';
+import { runEmaV2ForensicsReport } from '@/lib/intraday/diagnostics/runEmaV2ForensicsReport';
 import { validateIntradayTicker, normalizeTickerInput } from '@/lib/intraday/validateIntradayTicker';
 import { INTRADAY_STRATEGY_VWAP_OR_V1 } from '@/lib/intraday/types';
 import type { BacktestTrade } from '@/lib/intraday/types';
@@ -348,6 +349,59 @@ export async function compareEmaTrendBacktestAction(
       successTone:
         bestV2.totalPnlUsd > v1.totalPnlUsd ? 'profit' : bestV2.totalPnlUsd < v1.totalPnlUsd ? 'loss' : 'neutral',
     };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+const FORENSICS_REPORT_MAX = 14_000;
+
+/** Deep v2 diagnostic report (entry/post-entry/rejects/variants). Does not tune config. */
+export async function runEmaV2ForensicsAction(
+  _prev: IntradayPageState,
+  formData: FormData,
+): Promise<IntradayPageState> {
+  const { user } = await requireAuthSession();
+
+  const symbol = normalizeTickerInput(String(formData.get('symbol') ?? ''));
+  const daysRaw = Number(formData.get('calendar_days'));
+  const calendarDays = Number.isFinite(daysRaw) ? Math.round(daysRaw) : 30;
+
+  if (calendarDays < MIN_BACKTEST_DAYS || calendarDays > MAX_BACKTEST_DAYS) {
+    return { error: `Backtest days must be ${MIN_BACKTEST_DAYS}–${MAX_BACKTEST_DAYS}.` };
+  }
+
+  const budgetCheck = validateTradingBudget(
+    formData.get('trading_budget_usd'),
+    formData.get('deploy_pct'),
+  );
+  if (!budgetCheck.ok) return { error: budgetCheck.error };
+
+  let auth;
+  try {
+    auth = await resolveAlpacaAuthForUser(user.id);
+  } catch {
+    return { error: 'Alpaca keys required.' };
+  }
+  if (!auth) return { error: 'Alpaca keys required.' };
+
+  const validated = await validateIntradayTicker(symbol, auth);
+  if (!validated.ok) return { error: validated.error };
+
+  try {
+    const report = await runEmaV2ForensicsReport({
+      symbol: validated.ticker.symbol,
+      calendarDays,
+      effectiveBudgetUsd: budgetCheck.effectiveUsd,
+      auth,
+    });
+    let md = report.markdown;
+    if (md.length > FORENSICS_REPORT_MAX) {
+      md =
+        md.slice(0, FORENSICS_REPORT_MAX) +
+        `\n\n… [truncated — run: pnpm tsx scripts/ema-v2-forensics.ts ${validated.ticker.symbol} ${calendarDays}]`;
+    }
+    return { success: md, successTone: 'neutral' };
   } catch (e) {
     return { error: e instanceof Error ? e.message : String(e) };
   }
