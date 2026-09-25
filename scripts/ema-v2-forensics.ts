@@ -43,8 +43,8 @@ async function main() {
   const outPath = resolve(process.cwd(), `ema-v2-forensics-${symbol}-${days}d.md`);
   writeFileSync(outPath, report.markdown, 'utf8');
   console.log(`\nWrote ${outPath}\n`);
-  console.log(report.markdown.slice(0, 4000));
-  if (report.markdown.length > 4000) console.log('\n… (see file for full report)');
+  console.log(report.executiveSummary);
+  console.log('\n--- full report in file ---\n');
 }
 
 main().catch(e => {

@@ -29,6 +29,7 @@ import type {
 } from '@/lib/intraday/types';
 import type { MinuteBar } from '@/lib/intraday/types';
 import { formatForensicsMarkdown } from '@/lib/intraday/diagnostics/formatForensicsReport';
+import { buildForensicsExecutiveSummary } from '@/lib/intraday/diagnostics/forensicsExecutiveSummary';
 
 export type VariantSimRow = {
   variant: ForensicsDelayedEntryVariant;
@@ -53,6 +54,7 @@ export type EmaV2ForensicsReport = {
   rejectionBuckets: RejectionBucketStats[];
   acceptedForward: ReturnType<typeof analyzeAcceptedForward>;
   errors: string[];
+  executiveSummary: string;
   markdown: string;
 };
 
@@ -228,8 +230,10 @@ export async function runEmaV2ForensicsReport(input: {
     acceptedForward,
     errors: errors.slice(0, 8),
     markdown: '',
+    executiveSummary: '',
   };
   report.markdown = formatForensicsMarkdown(report);
+  report.executiveSummary = buildForensicsExecutiveSummary(report);
   return report;
 }
 

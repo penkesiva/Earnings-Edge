@@ -26,6 +26,8 @@ export type IntradayPageState = {
   success?: string;
   /** Backtest / save success styling when P&L or outcome is negative. */
   successTone?: 'profit' | 'loss' | 'neutral';
+  /** Full markdown from V2 forensics (client opens modal). */
+  forensicsMarkdown?: string;
 };
 
 export async function loadIntradayPageData() {
@@ -354,8 +356,6 @@ export async function compareEmaTrendBacktestAction(
   }
 }
 
-const FORENSICS_REPORT_MAX = 14_000;
-
 /** Deep v2 diagnostic report (entry/post-entry/rejects/variants). Does not tune config. */
 export async function runEmaV2ForensicsAction(
   _prev: IntradayPageState,
@@ -395,13 +395,11 @@ export async function runEmaV2ForensicsAction(
       effectiveBudgetUsd: budgetCheck.effectiveUsd,
       auth,
     });
-    let md = report.markdown;
-    if (md.length > FORENSICS_REPORT_MAX) {
-      md =
-        md.slice(0, FORENSICS_REPORT_MAX) +
-        `\n\n… [truncated — run: pnpm tsx scripts/ema-v2-forensics.ts ${validated.ticker.symbol} ${calendarDays}]`;
-    }
-    return { success: md, successTone: 'neutral' };
+    return {
+      success: report.executiveSummary,
+      forensicsMarkdown: report.markdown,
+      successTone: 'neutral',
+    };
   } catch (e) {
     return { error: e instanceof Error ? e.message : String(e) };
   }

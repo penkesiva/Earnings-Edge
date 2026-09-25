@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useFormState, useFormStatus } from 'react-dom';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   runIntradayBacktestAction,
   compareEmaTrendBacktestAction,
@@ -21,6 +21,41 @@ import {
 
 const FIELD =
   'w-full h-10 box-border bg-bg border border-border px-3 text-sm font-mono focus:outline-none focus:border-accent';
+
+function ForensicsReportModal({
+  markdown,
+  onClose,
+}: {
+  markdown: string;
+  onClose: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+      role="dialog"
+      aria-modal
+      aria-labelledby="forensics-report-title"
+    >
+      <div className="flex max-h-[85vh] w-full max-w-3xl flex-col border border-border bg-bg shadow-xl">
+        <div className="flex items-center justify-between border-b border-border-subtle px-4 py-3">
+          <h2 id="forensics-report-title" className="text-sm font-bold tracking-wide">
+            V2 forensics report
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-xs font-bold tracking-wide text-fg-subtle hover:text-accent"
+          >
+            Close
+          </button>
+        </div>
+        <pre className="overflow-auto p-4 text-[11px] leading-relaxed text-fg-subtle whitespace-pre-wrap font-mono">
+          {markdown}
+        </pre>
+      </div>
+    </div>
+  );
+}
 
 function SubmitBtn({ label, pendingLabel }: { label: string; pendingLabel: string }) {
   const { pending } = useFormStatus();
@@ -117,6 +152,13 @@ export function IntradayPanel({
   const [btState, btAction] = useFormState(runIntradayBacktestAction, {});
   const [compareState, compareAction] = useFormState(compareEmaTrendBacktestAction, {});
   const [forensicsState, forensicsAction] = useFormState(runEmaV2ForensicsAction, {});
+  const [forensicsMarkdown, setForensicsMarkdown] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (forensicsState.forensicsMarkdown) {
+      setForensicsMarkdown(forensicsState.forensicsMarkdown);
+    }
+  }, [forensicsState.forensicsMarkdown]);
 
   const symbol = (settings?.symbol as string) ?? '';
   const companyName = (settings?.company_name as string) ?? '';
@@ -141,6 +183,9 @@ export function IntradayPanel({
 
   return (
     <div className="space-y-8 max-w-3xl">
+      {forensicsMarkdown ? (
+        <ForensicsReportModal markdown={forensicsMarkdown} onClose={() => setForensicsMarkdown(null)} />
+      ) : null}
       {!paperConfigured ? (
         <p className="text-sm text-signal-watch border border-signal-watch/30 px-3 py-2">
           Add Alpaca keys in <Link href="/settings" className="text-accent underline">Settings</Link>{' '}
@@ -246,6 +291,19 @@ export function IntradayPanel({
           <Flash state={btState} />
           <Flash state={compareState} />
           <Flash state={forensicsState} />
+          {forensicsState.forensicsMarkdown ? (
+            <button
+              type="button"
+              onClick={() => setForensicsMarkdown(forensicsState.forensicsMarkdown!)}
+              className="text-xs text-accent underline"
+            >
+              View full forensics report
+            </button>
+          ) : null}
+          <p className="text-[10px] text-fg-dim">
+            Run backtest = production v2 entries (unchanged). V2 forensics = diagnose only + replay variants A–E
+            (does not change the trade list above).
+          </p>
           <div className="grid sm:grid-cols-2 gap-4">
             <div className="space-y-1">
               <label className="text-xs font-bold tracking-wide">Ticker</label>
