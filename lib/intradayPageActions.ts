@@ -13,6 +13,10 @@ import {
   compareEmaTrendDayBacktest,
   formatCompareMetricsLine,
 } from '@/lib/intraday/backtest/compareEmaTrend';
+import {
+  compareTrendResumptionBacktest,
+  formatTrendResumptionCompare,
+} from '@/lib/intraday/backtest/compareTrendResumption';
 import { validateTradingBudget } from '@/lib/intraday/sizing/computeShares';
 import { INTRADAY_STRATEGIES, strategyLabel } from '@/lib/intraday/strategies/registry';
 import { runEmaV2ForensicsReport } from '@/lib/intraday/diagnostics/runEmaV2ForensicsReport';
@@ -350,6 +354,46 @@ export async function compareEmaTrendBacktestAction(
       success: lines.join('\n'),
       successTone:
         bestV2.totalPnlUsd > v1.totalPnlUsd ? 'profit' : bestV2.totalPnlUsd < v1.totalPnlUsd ? 'loss' : 'neutral',
+    };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/** 30 / 90 / 180 calendar days — ema v1, v2, trend_resumption early & confirmed (in memory). */
+export async function compareTrendResumptionBacktestAction(
+  _prev: IntradayPageState,
+  formData: FormData,
+): Promise<IntradayPageState> {
+  const { user } = await requireAuthSession();
+
+  const symbol = normalizeTickerInput(String(formData.get('symbol') ?? ''));
+  const budgetCheck = validateTradingBudget(
+    formData.get('trading_budget_usd'),
+    formData.get('deploy_pct'),
+  );
+  if (!budgetCheck.ok) return { error: budgetCheck.error };
+
+  let auth;
+  try {
+    auth = await resolveAlpacaAuthForUser(user.id);
+  } catch {
+    return { error: 'Alpaca keys required.' };
+  }
+  if (!auth) return { error: 'Alpaca keys required.' };
+
+  const validated = await validateIntradayTicker(symbol, auth);
+  if (!validated.ok) return { error: validated.error };
+
+  try {
+    const cmp = await compareTrendResumptionBacktest({
+      symbol: validated.ticker.symbol,
+      effectiveBudgetUsd: budgetCheck.effectiveUsd,
+      auth,
+    });
+    return {
+      success: formatTrendResumptionCompare(cmp),
+      successTone: 'neutral',
     };
   } catch (e) {
     return { error: e instanceof Error ? e.message : String(e) };

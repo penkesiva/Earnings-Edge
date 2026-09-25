@@ -2,12 +2,16 @@ export const INTRADAY_STRATEGY_VWAP_OR_V1 = 'vwap_opening_range_v1' as const;
 export const INTRADAY_STRATEGY_BUY_WEAK_SELL_STRONG_V1 = 'buy_weak_sell_strong_v1' as const;
 export const INTRADAY_STRATEGY_EMA_TREND_DAY_V1 = 'ema_trend_day_v1' as const;
 export const INTRADAY_STRATEGY_EMA_TREND_DAY_V2 = 'ema_trend_day_v2' as const;
+export const INTRADAY_STRATEGY_TREND_RESUMPTION_V1_EARLY = 'trend_resumption_v1_early' as const;
+export const INTRADAY_STRATEGY_TREND_RESUMPTION_V1_CONFIRMED = 'trend_resumption_v1_confirmed' as const;
 
 export type IntradayStrategyId =
   | typeof INTRADAY_STRATEGY_VWAP_OR_V1
   | typeof INTRADAY_STRATEGY_BUY_WEAK_SELL_STRONG_V1
   | typeof INTRADAY_STRATEGY_EMA_TREND_DAY_V1
-  | typeof INTRADAY_STRATEGY_EMA_TREND_DAY_V2;
+  | typeof INTRADAY_STRATEGY_EMA_TREND_DAY_V2
+  | typeof INTRADAY_STRATEGY_TREND_RESUMPTION_V1_EARLY
+  | typeof INTRADAY_STRATEGY_TREND_RESUMPTION_V1_CONFIRMED;
 
 export type IntradayRunMode = 'backtest' | 'paper' | 'live';
 
@@ -33,7 +37,9 @@ export type SetupType =
   | 'ema_cross_up'
   | 'ema_pullback'
   | 'ema_cross_up_confirmed'
-  | 'ema_pullback_confirmed';
+  | 'ema_pullback_confirmed'
+  | 'trend_resumption_building'
+  | 'trend_resumption_expanding';
 
 export type MinuteBar = {
   t: string;
@@ -162,6 +168,32 @@ export type EmaTrendDayV2Config = {
   momentumWeightVwap: number;
   /** When set, applies extra entry confirmation gate (forensics / variant sim). */
   forensicsDelayedEntryVariant?: ForensicsDelayedEntryVariant;
+};
+
+export type ResumptionTriggerMode = 'EARLY_RESUMPTION' | 'CONFIRMED_RESUMPTION';
+
+export type TrendResumptionV1Config = {
+  warmupBars: number;
+  cooldownMinutes: number;
+  maxTradesPerDay: number;
+  noNewEntriesAfterEt: string;
+  forceFlatEt: string;
+  triggerMode: ResumptionTriggerMode;
+  minCloseLocation: number;
+  maxDistVwapExtendedPct: number;
+  maxDistEma9ExtendedPct: number;
+  maxPercentBExtended: number;
+  maxRet1ExtendedPct: number;
+  maxRet3ExtendedPct: number;
+  volumeSpikeAccel: number;
+  resetZoneVwapPct: number;
+  resetZoneEma9Pct: number;
+  pullbackMinBars: number;
+  structuralStopLookbackBars: number;
+  maxLossPctGuard: number;
+  slippageBps: number;
+  commissionPerShare: number;
+  exitOnBearCross: boolean;
 };
 
 export type SignalLogEntry = {

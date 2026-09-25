@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   runIntradayBacktestAction,
   compareEmaTrendBacktestAction,
+  compareTrendResumptionBacktestAction,
   runEmaV2ForensicsAction,
   saveIntradaySettingsAction,
   type IntradayPageState,
@@ -151,6 +152,10 @@ export function IntradayPanel({
   const [saveState, saveAction] = useFormState(saveIntradaySettingsAction, {});
   const [btState, btAction] = useFormState(runIntradayBacktestAction, {});
   const [compareState, compareAction] = useFormState(compareEmaTrendBacktestAction, {});
+  const [resumptionCompareState, resumptionCompareAction] = useFormState(
+    compareTrendResumptionBacktestAction,
+    {},
+  );
   const [forensicsState, forensicsAction] = useFormState(runEmaV2ForensicsAction, {});
   const [forensicsMarkdown, setForensicsMarkdown] = useState<string | null>(null);
 
@@ -290,6 +295,7 @@ export function IntradayPanel({
         <form action={btAction} className="px-4 py-4 space-y-4">
           <Flash state={btState} />
           <Flash state={compareState} />
+          <Flash state={resumptionCompareState} />
           <Flash state={forensicsState} />
           {forensicsState.forensicsMarkdown ? (
             <button
@@ -302,7 +308,7 @@ export function IntradayPanel({
           ) : null}
           <p className="text-[10px] text-fg-dim">
             Run backtest = production v2 entries (unchanged). V2 forensics = diagnose only + replay variants A–E
-            (does not change the trade list above).
+            (does not change the trade list above). Use 90 calendar days for larger sample before changing rules.
           </p>
           <div className="grid sm:grid-cols-2 gap-4">
             <div className="space-y-1">
@@ -372,6 +378,13 @@ export function IntradayPanel({
             className="ml-2 inline-flex h-9 items-center justify-center border border-border px-4 text-xs font-bold tracking-wide text-fg-subtle hover:border-accent hover:text-accent"
           >
             Compare EMA v1 vs v2 modes
+          </button>
+          <button
+            type="submit"
+            formAction={resumptionCompareAction}
+            className="ml-2 inline-flex h-9 items-center justify-center border border-border px-4 text-xs font-bold tracking-wide text-fg-subtle hover:border-accent hover:text-accent"
+          >
+            Compare trend resumption (30/90/180d)
           </button>
           <button
             type="submit"

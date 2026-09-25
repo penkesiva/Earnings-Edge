@@ -2,6 +2,8 @@ import {
   INTRADAY_STRATEGY_BUY_WEAK_SELL_STRONG_V1,
   INTRADAY_STRATEGY_EMA_TREND_DAY_V1,
   INTRADAY_STRATEGY_EMA_TREND_DAY_V2,
+  INTRADAY_STRATEGY_TREND_RESUMPTION_V1_CONFIRMED,
+  INTRADAY_STRATEGY_TREND_RESUMPTION_V1_EARLY,
   INTRADAY_STRATEGY_VWAP_OR_V1,
 } from '@/lib/intraday/types';
 
@@ -29,6 +31,18 @@ export const INTRADAY_STRATEGIES = [
     label: '9/20 EMA Trend Day v2 (experimental)',
     description:
       'Regime filter (BULL/CHOP), VWAP + volume + score, pullback zone, structural stop, profit giveback. Baseline config — compare vs v1.',
+  },
+  {
+    id: INTRADAY_STRATEGY_TREND_RESUMPTION_V1_EARLY,
+    label: 'Trend Resumption v1 · Early',
+    description:
+      'Experimental: enter on BUILDING momentum after VWAP/EMA reset. Avoids EXTENDED chase. Compare vs EMA v1/v2.',
+  },
+  {
+    id: INTRADAY_STRATEGY_TREND_RESUMPTION_V1_CONFIRMED,
+    label: 'Trend Resumption v1 · Confirmed',
+    description:
+      'Experimental: wait for BUILDING → EXPANDING before entry after reset. Same exits as Early variant.',
   },
 ] as const;
 

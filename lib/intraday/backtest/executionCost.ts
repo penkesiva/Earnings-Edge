@@ -1,13 +1,13 @@
-import type { EmaTrendDayV2Config } from '@/lib/intraday/types';
+type ExecutionCostConfig = { slippageBps: number; commissionPerShare: number };
 
-export function applyLongFillPrice(price: number, config: EmaTrendDayV2Config): number {
+export function applyLongFillPrice(price: number, config: ExecutionCostConfig): number {
   return price * (1 + config.slippageBps / 10_000);
 }
 
-export function applyLongExitPrice(price: number, config: EmaTrendDayV2Config): number {
+export function applyLongExitPrice(price: number, config: ExecutionCostConfig): number {
   return price * (1 - config.slippageBps / 10_000);
 }
 
-export function commissionCost(shares: number, config: EmaTrendDayV2Config): number {
+export function commissionCost(shares: number, config: ExecutionCostConfig): number {
   return shares * config.commissionPerShare;
 }
