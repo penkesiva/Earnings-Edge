@@ -5,6 +5,7 @@ import type { MinuteBar } from '@/lib/intraday/types';
 /** v1-style entries for EMA_ONLY mode inside v2 backtests. */
 export function detectEmaOnlyEntry(
   b: MinuteBar,
+  prev: MinuteBar,
   ctx: BarContext,
   ctxPrev: BarContext,
   config: EmaTrendDayV2Config,
@@ -13,9 +14,15 @@ export function detectEmaOnlyEntry(
   if (bullCross) return { type: 'ema_cross_up' };
 
   if (!config.allowPullbackEntry) return null;
-  const zone = config.pullbackZonePct / 100;
-  const inZone = Math.abs(b.l - ctx.ema9) / ctx.ema9 <= zone;
-  if (ctx.ema9 > ctx.ema20 && b.c > ctx.ema9 && inZone) return { type: 'ema_pullback' };
+  /** Match v1 `pullbackTouchPct` default (0.05) — not v2 `pullbackZonePct`. */
+  const touchPct = config.emaOnlyPullbackTouchPct;
+  const uptrend = ctx.ema9 > ctx.ema20;
+  const touchedFast =
+    uptrend &&
+    b.l <= ctx.ema9 * (1 + touchPct / 100) &&
+    b.c > ctx.ema9 &&
+    prev.c >= ctxPrev.ema9;
+  if (touchedFast) return { type: 'ema_pullback' };
 
   return null;
 }

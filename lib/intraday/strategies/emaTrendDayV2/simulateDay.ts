@@ -291,7 +291,7 @@ export function simulateEmaTrendDayV2(
     signalLog[logIdx].accepted = true;
     entrySetup = candidate.type;
     reasons = allLines;
-    confidence = entryMode === 'EMA_ONLY' ? scored.score : scored.score;
+    confidence = scored.score;
     regimeAtEntry = regime;
     relVolEntry = ctx.relVolume;
     entryPrice = applyLongFillPrice(b.c, config);
@@ -345,7 +345,7 @@ function resolveEntryCandidate(
   pullbackFsm: PullbackStateMachine,
 ): { type: 'ema_cross_up_confirmed' | 'ema_pullback_confirmed'; isPullback: boolean } | null {
   if (entryMode === 'EMA_ONLY') {
-    const raw = detectEmaOnlyEntry(b, ctx, ctxPrev, config);
+    const raw = detectEmaOnlyEntry(b, prev, ctx, ctxPrev, config);
     if (!raw) return null;
     return {
       type: raw.type === 'ema_cross_up' ? 'ema_cross_up_confirmed' : 'ema_pullback_confirmed',

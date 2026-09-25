@@ -69,9 +69,12 @@ export function evaluateMomentum(
   score += Math.min(wCandle, candlePts);
 
   const n = config.microBreakoutBars;
-  let priorHigh = -Infinity;
-  for (let j = Math.max(0, i - n); j < i; j++) priorHigh = Math.max(priorHigh, bars[j].h);
-  const microBreakout = b.c > priorHigh;
+  let microBreakout = false;
+  if (i >= n) {
+    let priorHigh = -Infinity;
+    for (let j = i - n; j < i; j++) priorHigh = Math.max(priorHigh, bars[j].h);
+    microBreakout = b.c > priorHigh;
+  }
   if (microBreakout) {
     score += wMicro;
     lines.push(`+ broke prior ${n}-bar high`);
@@ -127,8 +130,11 @@ export function evaluateMomentum(
     vwapPts += wVwap * 0.5;
     lines.push('+ above rising VWAP');
   } else if (vwapSlope < 0 && b.c < ctx.vwap) {
-    vwapPts = 0;
+    vwapPts = Math.max(0, vwapPts - wVwap * 0.4);
     lines.push('- VWAP falling, price weak');
+  } else if (vwapSlope < 0 && b.c > ctx.vwap && ctxPrev.ema9 <= ctxPrev.ema20 && ctx.ema9 > ctx.ema20) {
+    vwapPts = Math.max(0, vwapPts - wVwap * 0.5);
+    lines.push('- bullish cross below falling VWAP');
   }
   score += Math.max(0, Math.min(wVwap, vwapPts));
 

@@ -146,6 +146,8 @@ export type EmaTrendDayV2Config = {
   minCloseLocation: number;
   microBreakoutBars: number;
   microBreakRequiredForPullback: boolean;
+  /** Pullback touch % for EMA_ONLY (aligns with v1 default 0.05). */
+  emaOnlyPullbackTouchPct: number;
   volumeMomentumMode: VolumeMomentumMode;
   momentumWeightPrice: number;
   momentumWeightCandle: number;

@@ -53,6 +53,7 @@ export const DEFAULT_EMA_TREND_DAY_V2_CONFIG: EmaTrendDayV2Config = {
   minCloseLocation: 0.65,
   microBreakoutBars: 2,
   microBreakRequiredForPullback: false,
+  emaOnlyPullbackTouchPct: 0.05,
   volumeMomentumMode: 'SCORE_ONLY',
   momentumWeightPrice: 20,
   momentumWeightCandle: 15,
