@@ -139,7 +139,11 @@ export function IntradayPanel({
           {companyName ? (
             <p className="text-xs text-fg-subtle">Saved: {companyName}</p>
           ) : null}
-          <p className="text-[11px] text-fg-dim">{strategies.find(s => s.id === strategyId)?.description}</p>
+          <p className="text-[11px] text-fg-dim">
+            {strategies.find(s => s.id === strategyId)?.description}
+            {' '}
+            Paper/live uses Trade Alpaca mode (automation cron next phase).
+          </p>
 
           <div className="grid sm:grid-cols-2 gap-4">
             <div className="space-y-1">

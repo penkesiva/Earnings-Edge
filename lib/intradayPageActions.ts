@@ -174,6 +174,7 @@ export async function runIntradayBacktestAction(
       calendarDays,
       effectiveBudgetUsd: budgetCheck.effectiveUsd,
       auth,
+      strategyId,
     });
 
     if (result.daysWithData === 0) {

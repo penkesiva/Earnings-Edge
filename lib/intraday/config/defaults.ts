@@ -1,4 +1,4 @@
-import type { IntradayStrategyConfig } from '@/lib/intraday/types';
+import type { BuyWeakStrategyConfig, IntradayStrategyConfig } from '@/lib/intraday/types';
 
 export const DEFAULT_INTRADAY_CONFIG: IntradayStrategyConfig = {
   openingRangeMinutes: 15,
@@ -12,6 +12,18 @@ export const DEFAULT_INTRADAY_CONFIG: IntradayStrategyConfig = {
   forceFlatEt: '15:50',
   scaleFirstPct: 50,
   minConfidence: 60,
+};
+
+export const DEFAULT_BUY_WEAK_CONFIG: BuyWeakStrategyConfig = {
+  openingRangeMinutes: 15,
+  cooldownMinutes: 15,
+  maxTradesPerDay: 2,
+  minProfitExitPct: 0.35,
+  dipBelowVwapPct: 0.25,
+  ripExitAboveVwap: true,
+  noNewEntriesAfterEt: '15:00',
+  forceFlatEt: '15:50',
+  minConfidence: 55,
 };
 
 export const BACKTEST_DAY_PRESETS = [30, 90, 180, 365] as const;

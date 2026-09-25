@@ -1,11 +1,10 @@
 import type { AlpacaAuth } from '@/lib/alpaca';
 import { lastUsEquityBacktestEndDate } from '@/lib/earningsDate';
-import { DEFAULT_INTRADAY_CONFIG } from '@/lib/intraday/config/defaults';
+import { aggregateBacktestMetrics } from '@/lib/intraday/backtest/metrics';
 import { fetchMinuteBarsForDay, listRecentTradingDates } from '@/lib/intraday/data/bars';
 import { filterRegularSessionBars } from '@/lib/intraday/indicators/engine';
-import { aggregateBacktestMetrics } from '@/lib/intraday/backtest/metrics';
-import { simulateVwapOrDay } from '@/lib/intraday/strategies/vwapOpeningRange/simulateDay';
-import type { BacktestMetrics, BacktestTrade } from '@/lib/intraday/types';
+import { simulateStrategyDay } from '@/lib/intraday/strategies/runStrategyDay';
+import { INTRADAY_STRATEGY_VWAP_OR_V1, type BacktestMetrics, type BacktestTrade } from '@/lib/intraday/types';
 
 export type BacktestRunResult = {
   trades: BacktestTrade[];
@@ -19,7 +18,9 @@ export async function runIntradayBacktest(input: {
   calendarDays: number;
   effectiveBudgetUsd: number;
   auth: AlpacaAuth;
+  strategyId?: string;
 }): Promise<BacktestRunResult> {
+  const strategyId = input.strategyId ?? INTRADAY_STRATEGY_VWAP_OR_V1;
   const end = lastUsEquityBacktestEndDate();
   const dates = listRecentTradingDates(end, input.calendarDays);
   const allTrades: BacktestTrade[] = [];
@@ -32,11 +33,11 @@ export async function runIntradayBacktest(input: {
       const bars = filterRegularSessionBars(raw, sessionDate);
       if (bars.length < 20) continue;
       daysWithData += 1;
-      const { trades } = simulateVwapOrDay(
+      const trades = simulateStrategyDay(
+        strategyId,
         sessionDate,
         bars,
         input.effectiveBudgetUsd,
-        DEFAULT_INTRADAY_CONFIG,
       );
       allTrades.push(...trades);
     } catch (e) {

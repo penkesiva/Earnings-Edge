@@ -1,11 +1,20 @@
-import { INTRADAY_STRATEGY_VWAP_OR_V1 } from '@/lib/intraday/types';
+import {
+  INTRADAY_STRATEGY_BUY_WEAK_SELL_STRONG_V1,
+  INTRADAY_STRATEGY_VWAP_OR_V1,
+} from '@/lib/intraday/types';
 
 export const INTRADAY_STRATEGIES = [
   {
     id: INTRADAY_STRATEGY_VWAP_OR_V1,
     label: 'VWAP + Opening Range Momentum',
     description:
-      '15m opening range, VWAP pullback & OR breakout longs. Stocks only. Paper/live uses Trade Alpaca mode.',
+      '15m opening range, VWAP pullback & OR breakout longs. Stops + targets. Long-only.',
+  },
+  {
+    id: INTRADAY_STRATEGY_BUY_WEAK_SELL_STRONG_V1,
+    label: 'Buy Weak · Sell Strong',
+    description:
+      'Buy dips below VWAP; exit on strength (profit only). No stop — hold red until rip or 3:50 PM ET flat.',
   },
 ] as const;
 

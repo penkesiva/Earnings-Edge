@@ -1,6 +1,9 @@
 export const INTRADAY_STRATEGY_VWAP_OR_V1 = 'vwap_opening_range_v1' as const;
+export const INTRADAY_STRATEGY_BUY_WEAK_SELL_STRONG_V1 = 'buy_weak_sell_strong_v1' as const;
 
-export type IntradayStrategyId = typeof INTRADAY_STRATEGY_VWAP_OR_V1;
+export type IntradayStrategyId =
+  | typeof INTRADAY_STRATEGY_VWAP_OR_V1
+  | typeof INTRADAY_STRATEGY_BUY_WEAK_SELL_STRONG_V1;
 
 export type IntradayRunMode = 'backtest' | 'paper' | 'live';
 
@@ -17,7 +20,12 @@ export type StrategyState =
   | 'COOLDOWN'
   | 'FORCE_EXIT';
 
-export type SetupType = 'vwap_pullback' | 'or_breakout' | 'or_retest';
+export type SetupType =
+  | 'vwap_pullback'
+  | 'or_breakout'
+  | 'or_retest'
+  | 'vwap_dip'
+  | 'deep_dip';
 
 export type MinuteBar = {
   t: string;
@@ -47,6 +55,22 @@ export type IntradayStrategyConfig = {
   forceFlatEt: string;
   scaleFirstPct: number;
   /** Minimum signal score (0–100) before entering. */
+  minConfidence: number;
+};
+
+/** Buy weak / sell strong — no stop, exit on profit or EOD flat. */
+export type BuyWeakStrategyConfig = {
+  openingRangeMinutes: number;
+  cooldownMinutes: number;
+  maxTradesPerDay: number;
+  /** Min % gain before allowing a strength exit. */
+  minProfitExitPct: number;
+  /** Enter when price is at least this % below session VWAP. */
+  dipBelowVwapPct: number;
+  /** Also exit when back above VWAP with partial min profit. */
+  ripExitAboveVwap: boolean;
+  noNewEntriesAfterEt: string;
+  forceFlatEt: string;
   minConfidence: number;
 };
 
