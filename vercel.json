@@ -47,6 +47,10 @@
     {
       "path": "/api/cron/predict-market?phase=grade",
       "schedule": "15 20 * * 1-5"
+    },
+    {
+      "path": "/api/cron/intraday",
+      "schedule": "*/1 14-20 * * 1-5"
     }
   ]
 }

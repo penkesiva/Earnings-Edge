@@ -26,7 +26,7 @@ export type ServerEnvRequirement = {
 
 export const SYSTEM_STATUS_MANIFEST = {
   /** Bump when you change phases, migrations, or env requirements below. */
-  manifestVersion: '2026-10-01',
+  manifestVersion: '2026-09-25',
 
   phases: [
     {
@@ -95,6 +95,13 @@ export const SYSTEM_STATUS_MANIFEST = {
       migration: '0022',
       status: 'shipped',
     },
+    {
+      id: 'intraday',
+      name: 'Intraday — ticker strategies, backtest, paper/live automation',
+      route: '/intraday',
+      migration: '0026',
+      status: 'shipped',
+    },
   ] satisfies SystemPhase[],
 
   migrations: [
@@ -147,6 +154,11 @@ export const SYSTEM_STATUS_MANIFEST = {
       id: '0025',
       file: '0025_pm_price_target.sql',
       summary: 'Premarket SPX price target evaluations (2h RTH window)',
+    },
+    {
+      id: '0026',
+      file: '0026_intraday_strategy.sql',
+      summary: 'Intraday settings, backtest runs, sessions, trades',
     },
   ] satisfies SystemMigration[],
 

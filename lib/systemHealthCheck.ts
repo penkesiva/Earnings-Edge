@@ -93,6 +93,7 @@ export async function runSystemHealthChecks(
       label: 'pm_price_target_evaluations (PredictMarket $ HIT)',
       migration: '0025',
     },
+    { table: 'intraday_settings', label: 'intraday_settings (Intraday)', migration: '0026' },
   ];
 
   for (const t of tableChecks) {
