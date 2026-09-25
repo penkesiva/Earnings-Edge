@@ -26,7 +26,7 @@ export type ServerEnvRequirement = {
 
 export const SYSTEM_STATUS_MANIFEST = {
   /** Bump when you change phases, migrations, or env requirements below. */
-  manifestVersion: '2026-09-29',
+  manifestVersion: '2026-09-30',
 
   phases: [
     {
@@ -137,6 +137,11 @@ export const SYSTEM_STATUS_MANIFEST = {
       id: '0023',
       file: '0023_pm_trade_signal_unique.sql',
       summary: 'One pm_trade_signals row per session (entry upsert)',
+    },
+    {
+      id: '0024',
+      file: '0024_pm_outcome_neutral.sql',
+      summary: 'NEUTRAL actual_direction for flat SPY deadband days',
     },
   ] satisfies SystemMigration[],
 

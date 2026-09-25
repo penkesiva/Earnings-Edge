@@ -3,7 +3,7 @@ import {
   directionTextCls,
   displayRangeFromPrediction,
 } from '@/lib/predictMarket/enrichForecastRange';
-import { formatFinalGradeDetail } from '@/lib/predictMarket/loadSessionCalendarMonth';
+import { formatFinalGradeDetail, summarizeOutcomeMove } from '@/lib/predictMarket/outcomeGrading';
 import { PM_TIMELINE_STEPS, snapshotKindLabel } from '@/lib/predictMarket/sessionUiLabels';
 
 type PredictionRow = Record<string, unknown>;
@@ -13,6 +13,8 @@ type CheckpointRow = { checkpoint_kind: string; thesis_status: string; reasoning
 type OutcomeRow = {
   actual_direction: string | null;
   daily_return_percent: number | null;
+  previous_close?: number | null;
+  close?: number | null;
 };
 
 function fmtTimePt(iso: string | undefined | null): string | null {
@@ -86,8 +88,17 @@ export function PredictMarketSessionTimeline({
   if (pre && outcome?.actual_direction) {
     const pd = String(pre.direction);
     const ad = String(outcome.actual_direction);
-    if (pd === 'GREEN' || pd === 'RED') premarketCorrect = pd === ad;
+    if (ad === 'NEUTRAL') {
+      premarketCorrect = pd === 'NEUTRAL' ? true : null;
+    } else if (pd === 'GREEN' || pd === 'RED') {
+      premarketCorrect = pd === ad;
+    }
   }
+
+  const moveSummary =
+    outcome?.previous_close != null && outcome?.close != null
+      ? summarizeOutcomeMove(Number(outcome.previous_close), Number(outcome.close))
+      : null;
 
   const inputSnaps = snapshots.filter(s =>
     ['NIGHT_INPUT', 'PREMARKET_INPUT', 'OPEN'].includes(s.snapshot_kind),
@@ -210,12 +221,18 @@ export function PredictMarketSessionTimeline({
                 <span className={directionTextCls(String(outcome.actual_direction ?? 'NEUTRAL'))}>
                   {String(outcome.actual_direction ?? '—')}
                 </span>
-                {outcome.daily_return_percent != null ? (
+                {moveSummary ? (
+                  <span className="text-fg-subtle font-normal block sm:inline text-xs sm:text-sm mt-1 sm:mt-0">
+                    {moveSummary.spyChangeDollars >= 0 ? '+' : ''}
+                    {moveSummary.spyChangeDollars.toFixed(2)} SPY · ~
+                    {moveSummary.spxProxyPoints >= 0 ? '+' : ''}
+                    {moveSummary.spxProxyPoints.toFixed(1)} SPX pts
+                  </span>
+                ) : outcome.daily_return_percent != null ? (
                   <span className="text-fg-subtle font-normal">
                     {' '}
-                    · day return{' '}
-                    {outcome.daily_return_percent >= 0 ? '+' : ''}
-                    {Number(outcome.daily_return_percent).toFixed(2)}%
+                    · {outcome.daily_return_percent >= 0 ? '+' : ''}
+                    {Number(outcome.daily_return_percent).toFixed(3)}%
                   </span>
                 ) : null}
               </>
@@ -225,7 +242,15 @@ export function PredictMarketSessionTimeline({
           }
           detail={
             outcome
-              ? formatFinalGradeDetail(outcome, premarketPredicted, premarketCorrect)
+              ? formatFinalGradeDetail(
+                  {
+                    ...outcome,
+                    previous_close: outcome.previous_close,
+                    close: outcome.close,
+                  },
+                  premarketPredicted,
+                  premarketCorrect,
+                )
               : undefined
           }
         />

@@ -17,6 +17,9 @@ function cellClasses(cell: PredictMarketCalendarCell): string {
     return `${base} bg-bg hover:border-fg-dim/30`;
   }
   if (!cell.graded || cell.premarketCorrect == null) {
+    if (cell.graded && cell.actualDirection === 'NEUTRAL') {
+      return `${base} bg-signal-watch/10 border-signal-watch/40 hover:border-signal-watch/60`;
+    }
     return `${base} bg-bg border-signal-watch/30 hover:border-signal-watch/50`;
   }
   if (cell.premarketCorrect) {
@@ -48,6 +51,9 @@ function DayCell({ cell }: { cell: PredictMarketCalendarCell }) {
       ) : null}
       {cell.graded && cell.premarketCorrect === false ? (
         <span className="text-[9px] text-signal-sell tracking-wide">MISS</span>
+      ) : null}
+      {cell.graded && cell.actualDirection === 'NEUTRAL' && cell.premarketCorrect == null ? (
+        <span className="text-[9px] text-signal-watch tracking-wide">FLAT</span>
       ) : null}
     </>
   );

@@ -2,6 +2,10 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { getHistoricalBars } from '@/lib/alpaca';
 import { addCalendarDays } from '@/lib/earningsDate';
 import { confidenceBucket } from '@/lib/predictMarket/analytics/historicalContext';
+import {
+  classifyActualDirection,
+  scoreDirectionForecast,
+} from '@/lib/predictMarket/outcomeGrading';
 
 const PROXY = 'SPY';
 
@@ -50,7 +54,7 @@ export async function gradePredictMarketSession(
     high != null && low != null && previousClose
       ? ((high - low) / previousClose) * 100
       : null;
-  const actualDirection = close >= previousClose ? 'GREEN' : 'RED';
+  const actualDirection = classifyActualDirection(dailyReturn);
 
   await sb.from('pm_market_outcomes').upsert(
     {
@@ -77,8 +81,7 @@ export async function gradePredictMarketSession(
 
   for (const p of preds ?? []) {
     const predicted = p.direction as string;
-    const directionCorrect =
-      predicted === 'GREEN' || predicted === 'RED' ? predicted === actualDirection : null;
+    const directionCorrect = scoreDirectionForecast(predicted, actualDirection);
 
     const expLow = p.expected_low != null ? Number(p.expected_low) : null;
     const expHigh = p.expected_high != null ? Number(p.expected_high) : null;

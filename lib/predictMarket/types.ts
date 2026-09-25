@@ -49,7 +49,7 @@ export type OutcomeRecord = {
   gap_percent: number | null;
   daily_return_percent: number | null;
   intraday_range_percent: number | null;
-  actual_direction: 'GREEN' | 'RED' | null;
+  actual_direction: 'GREEN' | 'RED' | 'NEUTRAL' | null;
 };
 
 export type ProvenanceTag = 'ACTUAL' | 'CALCULATED' | 'LLM_INTERPRETATION';

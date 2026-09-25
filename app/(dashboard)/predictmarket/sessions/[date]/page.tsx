@@ -104,6 +104,9 @@ export default async function PredictMarketSessionPage({
             ? {
                 actual_direction: outcome.actual_direction as string | null,
                 daily_return_percent: outcome.daily_return_percent as number | null,
+                previous_close:
+                  outcome.previous_close != null ? Number(outcome.previous_close) : null,
+                close: outcome.close != null ? Number(outcome.close) : null,
               }
             : null
         }

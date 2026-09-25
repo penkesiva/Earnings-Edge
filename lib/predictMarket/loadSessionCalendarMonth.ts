@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { isTradingDay } from '@/lib/usMarketCalendar';
+import { scoreDirectionForecast } from '@/lib/predictMarket/outcomeGrading';
 
 export type PredictMarketCalendarCell = {
   date: string;
@@ -61,8 +62,8 @@ function mondayFirstIndex(isoDate: string): number {
 
 function directionMatch(predicted: string | null, actual: string | null): boolean | null {
   if (!predicted || !actual) return null;
-  if (predicted !== 'GREEN' && predicted !== 'RED') return null;
-  return predicted === actual;
+  if (actual !== 'GREEN' && actual !== 'RED' && actual !== 'NEUTRAL') return null;
+  return scoreDirectionForecast(predicted, actual as 'GREEN' | 'RED' | 'NEUTRAL');
 }
 
 type PredBundle = {
@@ -255,30 +256,4 @@ function packWeeks(
     weeks.push(week);
   }
   return weeks;
-}
-
-export function formatFinalGradeDetail(
-  outcome: { actual_direction: string | null; daily_return_percent: number | null },
-  premarketPredicted: string | null,
-  premarketCorrect: boolean | null,
-): string {
-  const dir = outcome.actual_direction ?? '—';
-  const ret =
-    outcome.daily_return_percent != null
-      ? `${outcome.daily_return_percent >= 0 ? '+' : ''}${outcome.daily_return_percent.toFixed(2)}%`
-      : '—';
-  const parts = [
-    `Actual day (${dir}): SPY proxy close vs prior close, return ${ret}.`,
-    'That color is what happened — not your forecast confidence.',
-  ];
-  if (premarketPredicted) {
-    if (premarketCorrect === true) {
-      parts.push(`Premarket forecast ${premarketPredicted} matched the actual day.`);
-    } else if (premarketCorrect === false) {
-      parts.push(`Premarket forecast ${premarketPredicted} did not match (actual ${dir}).`);
-    } else {
-      parts.push(`Premarket forecast was ${premarketPredicted}; grade pending or neutral.`);
-    }
-  }
-  return parts.join(' ');
 }
