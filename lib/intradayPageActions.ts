@@ -9,6 +9,7 @@ import {
   DEFAULT_INTRADAY_CONFIG,
 } from '@/lib/intraday/config/defaults';
 import { runIntradayBacktest } from '@/lib/intraday/backtest/runBacktest';
+import { compareEmaTrendDayBacktest } from '@/lib/intraday/backtest/compareEmaTrend';
 import { validateTradingBudget } from '@/lib/intraday/sizing/computeShares';
 import { INTRADAY_STRATEGIES, strategyLabel } from '@/lib/intraday/strategies/registry';
 import { validateIntradayTicker, normalizeTickerInput } from '@/lib/intraday/validateIntradayTicker';
@@ -197,7 +198,10 @@ export async function runIntradayBacktestAction(
       .from('intraday_backtest_runs')
       .update({
         status: 'completed',
-        metrics: result.metrics,
+        metrics: {
+          ...result.metrics,
+          ...(result.signalLogSample ? { signalLogSample: result.signalLogSample } : {}),
+        },
         trades: result.trades,
         completed_at: new Date().toISOString(),
       })
@@ -277,6 +281,62 @@ export async function loadIntradayBacktestChartDayAction(
         ema20: toLinePoints(bars, ind.ema20),
         markers: markersForSessionTrades(sessionDate, bars, dayTrades),
       },
+    };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/** Same symbol/days/budget — runs ema_trend_day_v1 and v2 in memory (no DB row). */
+export async function compareEmaTrendBacktestAction(
+  _prev: IntradayPageState,
+  formData: FormData,
+): Promise<IntradayPageState> {
+  const { user } = await requireAuthSession();
+
+  const symbol = normalizeTickerInput(String(formData.get('symbol') ?? ''));
+  const daysRaw = Number(formData.get('calendar_days'));
+  const calendarDays = Number.isFinite(daysRaw) ? Math.round(daysRaw) : 30;
+
+  if (calendarDays < MIN_BACKTEST_DAYS || calendarDays > MAX_BACKTEST_DAYS) {
+    return { error: `Backtest days must be ${MIN_BACKTEST_DAYS}–${MAX_BACKTEST_DAYS}.` };
+  }
+
+  const budgetCheck = validateTradingBudget(
+    formData.get('trading_budget_usd'),
+    formData.get('deploy_pct'),
+  );
+  if (!budgetCheck.ok) return { error: budgetCheck.error };
+
+  let auth;
+  try {
+    auth = await resolveAlpacaAuthForUser(user.id);
+  } catch {
+    return { error: 'Alpaca keys required.' };
+  }
+  if (!auth) return { error: 'Alpaca keys required.' };
+
+  const validated = await validateIntradayTicker(symbol, auth);
+  if (!validated.ok) return { error: validated.error };
+
+  try {
+    const cmp = await compareEmaTrendDayBacktest({
+      symbol: validated.ticker.symbol,
+      calendarDays,
+      effectiveBudgetUsd: budgetCheck.effectiveUsd,
+      auth,
+    });
+    const v1 = cmp.v1;
+    const v2 = cmp.v2;
+    const msg =
+      `EMA v1 vs v2 (${cmp.daysWithData} sessions, ${validated.ticker.symbol}): ` +
+      `v1 P&L $${v1.totalPnlUsd.toFixed(2)}, ${v1.trades} trades, WR ${v1.winRate?.toFixed(1) ?? '—'}%, PF ${v1.profitFactor?.toFixed(2) ?? '—'}. ` +
+      `v2 P&L $${v2.totalPnlUsd.toFixed(2)}, ${v2.trades} trades, WR ${v2.winRate?.toFixed(1) ?? '—'}%, PF ${v2.profitFactor?.toFixed(2) ?? '—'}, ` +
+      `rejected signals ${v2.rejectedSignals ?? 0}, expectancy $${v2.expectancyPerTrade?.toFixed(2) ?? '—'}/trade.`;
+    return {
+      success: msg,
+      successTone:
+        v2.totalPnlUsd > v1.totalPnlUsd ? 'profit' : v2.totalPnlUsd < v1.totalPnlUsd ? 'loss' : 'neutral',
     };
   } catch (e) {
     return { error: e instanceof Error ? e.message : String(e) };

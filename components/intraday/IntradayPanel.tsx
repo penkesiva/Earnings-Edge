@@ -5,12 +5,13 @@ import { useFormState, useFormStatus } from 'react-dom';
 import { useMemo, useState } from 'react';
 import {
   runIntradayBacktestAction,
+  compareEmaTrendBacktestAction,
   saveIntradaySettingsAction,
   type IntradayPageState,
 } from '@/lib/intradayPageActions';
 import { BACKTEST_DAY_PRESETS } from '@/lib/intraday/config/defaults';
 import { strategyLabel } from '@/lib/intraday/strategies/registry';
-import { INTRADAY_STRATEGY_BUY_WEAK_SELL_STRONG_V1 } from '@/lib/intraday/types';
+import { INTRADAY_STRATEGY_BUY_WEAK_SELL_STRONG_V1, INTRADAY_STRATEGY_EMA_TREND_DAY_V2 } from '@/lib/intraday/types';
 import type { BacktestTrade } from '@/lib/intraday/types';
 import {
   ExpandChartIcon,
@@ -77,6 +78,9 @@ function exitReasonTag(exitReason: string | undefined, pnl: number): string {
   if (exitReason === 'target') return ' · target';
   if (exitReason === 'session_end') return ' · session end';
   if (exitReason === 'ema_cross_down') return ' · 9↓20 exit';
+  if (exitReason === 'structural_stop') return ' · struct stop';
+  if (exitReason === 'max_loss_guard') return ' · max loss';
+  if (exitReason === 'profit_giveback') return ' · giveback';
   if (pnl < 0 && exitReason == null) return ' · exit';
   return '';
 }
@@ -110,6 +114,7 @@ export function IntradayPanel({
 }) {
   const [saveState, saveAction] = useFormState(saveIntradaySettingsAction, {});
   const [btState, btAction] = useFormState(runIntradayBacktestAction, {});
+  const [compareState, compareAction] = useFormState(compareEmaTrendBacktestAction, {});
 
   const symbol = (settings?.symbol as string) ?? '';
   const companyName = (settings?.company_name as string) ?? '';
@@ -237,6 +242,7 @@ export function IntradayPanel({
         </div>
         <form action={btAction} className="px-4 py-4 space-y-4">
           <Flash state={btState} />
+          <Flash state={compareState} />
           <div className="grid sm:grid-cols-2 gap-4">
             <div className="space-y-1">
               <label className="text-xs font-bold tracking-wide">Ticker</label>
@@ -299,6 +305,13 @@ export function IntradayPanel({
             </div>
           </div>
           <SubmitBtn label="Run backtest" pendingLabel="Running…" />
+          <button
+            type="submit"
+            formAction={compareAction}
+            className="ml-2 inline-flex h-9 items-center justify-center border border-border px-4 text-xs font-bold tracking-wide text-fg-subtle hover:border-accent hover:text-accent"
+          >
+            Compare EMA v1 vs v2
+          </button>
         </form>
       </section>
 
@@ -327,6 +340,8 @@ function BacktestRunDetails({ run }: { run: RunRow }) {
     totalPnl != null && Number.isFinite(totalPnl) ? fmtUsd(totalPnl) : null;
   const stratLabel = run.strategy_id ? strategyLabel(run.strategy_id) : 'Unknown strategy';
   const isBuyWeak = run.strategy_id === INTRADAY_STRATEGY_BUY_WEAK_SELL_STRONG_V1;
+  const isEmaV2 = run.strategy_id === INTRADAY_STRATEGY_EMA_TREND_DAY_V2;
+  const ext = m as Record<string, unknown>;
   return (
     <>
       <IntradayBacktestChartModal
@@ -380,6 +395,24 @@ function BacktestRunDetails({ run }: { run: RunRow }) {
           <Metric label="Max DD" value={fmtUsd(m.maxDrawdownUsd)} tone={Number(m.maxDrawdownUsd) > 0 ? -1 : undefined} />
           <Metric label="Trades/day" value={fmtNum(m.tradesPerDay)} />
         </div>
+        {isEmaV2 && ext.expectancyPerTrade != null ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 border border-border-subtle p-2">
+            <Metric label="Expectancy" value={fmtUsd(ext.expectancyPerTrade)} tone={Number(ext.expectancyPerTrade)} />
+            <Metric label="Largest win" value={fmtUsd(ext.largestWinnerUsd)} tone={Number(ext.largestWinnerUsd)} />
+            <Metric label="Largest loss" value={fmtUsd(ext.largestLoserUsd)} tone={Number(ext.largestLoserUsd)} />
+            <Metric label="Avg MFE" value={fmtUsd(ext.avgMfeUsd)} />
+            <Metric label="Avg MAE" value={fmtUsd(ext.avgMaeUsd)} tone={Number(ext.avgMaeUsd) > 0 ? -1 : undefined} />
+            <Metric label="Rejected signals" value={String(ext.rejectedSignals ?? '—')} />
+          </div>
+        ) : null}
+        {isEmaV2 && ext.byRegime && typeof ext.byRegime === 'object' ? (
+          <p className="text-[10px] text-fg-dim font-mono">
+            By regime:{' '}
+            {Object.entries(ext.byRegime as Record<string, { trades: number; pnlUsd: number }>)
+              .map(([k, v]) => `${k} ${v.trades}t $${v.pnlUsd.toFixed(0)}`)
+              .join(' · ')}
+          </p>
+        ) : null}
         {trades.length > 0 ? (
           <details className="border border-border-subtle">
             <summary className="px-3 py-2 cursor-pointer text-fg-dim">

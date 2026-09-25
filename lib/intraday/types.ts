@@ -1,11 +1,13 @@
 export const INTRADAY_STRATEGY_VWAP_OR_V1 = 'vwap_opening_range_v1' as const;
 export const INTRADAY_STRATEGY_BUY_WEAK_SELL_STRONG_V1 = 'buy_weak_sell_strong_v1' as const;
 export const INTRADAY_STRATEGY_EMA_TREND_DAY_V1 = 'ema_trend_day_v1' as const;
+export const INTRADAY_STRATEGY_EMA_TREND_DAY_V2 = 'ema_trend_day_v2' as const;
 
 export type IntradayStrategyId =
   | typeof INTRADAY_STRATEGY_VWAP_OR_V1
   | typeof INTRADAY_STRATEGY_BUY_WEAK_SELL_STRONG_V1
-  | typeof INTRADAY_STRATEGY_EMA_TREND_DAY_V1;
+  | typeof INTRADAY_STRATEGY_EMA_TREND_DAY_V1
+  | typeof INTRADAY_STRATEGY_EMA_TREND_DAY_V2;
 
 export type IntradayRunMode = 'backtest' | 'paper' | 'live';
 
@@ -29,7 +31,9 @@ export type SetupType =
   | 'vwap_dip'
   | 'deep_dip'
   | 'ema_cross_up'
-  | 'ema_pullback';
+  | 'ema_pullback'
+  | 'ema_cross_up_confirmed'
+  | 'ema_pullback_confirmed';
 
 export type MinuteBar = {
   t: string;
@@ -90,13 +94,87 @@ export type EmaTrendDayConfig = {
   forceFlatEt: string;
 };
 
+export type MarketRegime = 'BULL_TREND' | 'CHOP' | 'BEARISH' | 'UNKNOWN';
+
+export type VolumeFilterMode = 'OFF' | 'PREFER' | 'REQUIRE';
+export type ProfitProtectMode = 'NONE' | 'EMA9' | 'SWING_LOW' | 'TRAILING_PERCENT' | 'PROFIT_GIVEBACK';
+export type MarketContextFilter = 'OFF' | 'SCORE_ONLY' | 'REQUIRE';
+export type EmaInitialization = 'SESSION_ONLY' | 'PRIOR_BARS_SEEDED';
+
+export type EmaTrendDayV2Config = {
+  warmupBars: number;
+  cooldownMinutes: number;
+  maxTradesPerDay: number;
+  noNewEntriesAfterEt: string;
+  forceFlatEt: string;
+  emaInitialization: EmaInitialization;
+  minScoreToEnter: number;
+  minEmaSpreadPctBull: number;
+  minEmaSpreadPctChop: number;
+  maxEmaCrossCount30: number;
+  maxVwapCrossCount30: number;
+  flatSlopeAbsMax: number;
+  pullbackZonePct: number;
+  allowPullbackEntry: boolean;
+  maxExtensionFromEma9Pct: number;
+  maxExtensionFromVwapPct: number;
+  volumeFilterMode: VolumeFilterMode;
+  minRelativeVolumePrefer: number;
+  minRelativeVolumeRequire: number;
+  structuralStopLookbackBars: number;
+  maxLossPctGuard: number;
+  slippageBps: number;
+  commissionPerShare: number;
+  profitProtectMode: ProfitProtectMode;
+  profitGivebackActivatePct: number;
+  profitGivebackRetracePct: number;
+  exitOnBearCross: boolean;
+  exitOnEma9Close: boolean;
+  exitOnEma20Close: boolean;
+  exitOnVwapClose: boolean;
+  exitOnSwingLowBreak: boolean;
+  consecutiveLossHalt: number;
+  requireStrongerAfterLoss: boolean;
+  minScoreAfterLoss: number;
+  marketContextFilter: MarketContextFilter;
+};
+
+export type SignalLogEntry = {
+  sessionDate: string;
+  timeEt: string;
+  price: number;
+  ema9: number;
+  ema20: number;
+  emaSpreadPct: number;
+  ema9Slope: number;
+  ema20Slope: number;
+  vwap: number;
+  relativeVolume: number;
+  distEma9Pct: number;
+  distVwapPct: number;
+  regime: MarketRegime;
+  signalType: string;
+  score: number;
+  scoreLines: string[];
+  accepted: boolean;
+  rejectionReason?: string;
+};
+
 export type TradeExitReason =
   | 'strength'
   | 'stop'
   | 'target'
   | 'eod_flat'
   | 'session_end'
-  | 'ema_cross_down';
+  | 'ema_cross_down'
+  | 'structural_stop'
+  | 'max_loss_guard'
+  | 'profit_giveback'
+  | 'ema9_close'
+  | 'ema20_close'
+  | 'vwap_close'
+  | 'swing_low_break'
+  | 'session_halt_losses';
 
 export type BacktestTrade = {
   sessionDate: string;
@@ -112,6 +190,10 @@ export type BacktestTrade = {
   reasons: string[];
   /** Why the position closed (Buy Weak uses strength vs eod_flat). */
   exitReason?: TradeExitReason;
+  regimeAtEntry?: MarketRegime;
+  mfeUsd?: number;
+  maeUsd?: number;
+  relativeVolumeAtEntry?: number;
 };
 
 export type BacktestMetrics = {
@@ -128,4 +210,16 @@ export type BacktestMetrics = {
   avgHoldMinutes: number | null;
   tradesPerDay: number | null;
   bySetup: Record<string, { trades: number; pnlUsd: number }>;
+};
+
+export type BacktestMetricsExtended = BacktestMetrics & {
+  expectancyPerTrade?: number | null;
+  largestWinnerUsd?: number | null;
+  largestLoserUsd?: number | null;
+  avgMfeUsd?: number | null;
+  avgMaeUsd?: number | null;
+  byRegime?: Record<string, { trades: number; pnlUsd: number }>;
+  rejectedSignals?: number;
+  slippageBps?: number;
+  commissionPerShare?: number;
 };
