@@ -112,7 +112,7 @@ export function IntradayPanel({
       <section className="border border-border">
         <div className="px-4 py-3 border-b border-border-subtle">
           <h2 className="text-sm font-bold tracking-wide">Strategy & symbol</h2>
-          <p className="text-xs text-fg-dim mt-1">One active symbol. US common stocks only.</p>
+          <p className="text-xs text-fg-dim mt-1">One active symbol. US stocks and ETFs.</p>
         </div>
         <form action={saveAction} className="px-4 py-4 space-y-4">
           <Flash state={saveState} />

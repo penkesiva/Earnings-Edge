@@ -13,7 +13,7 @@ export default async function IntradayPage() {
           <span className="page-chevron">›</span> INTRADAY
         </h1>
         <p className="text-sm text-fg-subtle max-w-2xl">
-          Rules-based stock strategies — backtest first, then paper or live via Trade Alpaca mode.
+          Rules-based intraday strategies for stocks and ETFs — backtest first, then paper or live via Trade Alpaca mode.
           One symbol at a time.
         </p>
       </div>

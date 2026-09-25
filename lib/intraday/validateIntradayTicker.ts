@@ -41,14 +41,14 @@ export async function validateIntradayTicker(
 
   try {
     const profile = await getCompanyProfile(symbol);
-    if (profile.isEtf || profile.isFund) {
-      return { ok: false, error: 'ETFs and funds are not supported (stocks only).' };
+    if (profile.isFund && !profile.isEtf) {
+      return { ok: false, error: 'Mutual funds are not supported — use stocks or ETFs.' };
     }
-    if (isPreferredShareName(profile.companyName)) {
+    if (!profile.isEtf && isPreferredShareName(profile.companyName)) {
       return { ok: false, error: 'Preferred shares are not supported.' };
     }
     if (profile.exchange && !isUsListedExchange(profile.exchange)) {
-      return { ok: false, error: 'Ticker must be US-listed common equity (NYSE/Nasdaq/AMEX).' };
+      return { ok: false, error: 'Ticker must be US-listed (NYSE, Nasdaq, or AMEX).' };
     }
     companyName = profile.companyName;
     exchange = profile.exchange;
@@ -73,7 +73,7 @@ export async function validateIntradayTicker(
   }
 
   if (exchange && !isUsListedExchange(exchange)) {
-    return { ok: false, error: 'Non-US exchange — US common stocks only.' };
+    return { ok: false, error: 'Non-US exchange — US stocks and ETFs only.' };
   }
 
   return {
