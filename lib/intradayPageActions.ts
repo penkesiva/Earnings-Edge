@@ -15,7 +15,12 @@ import { validateIntradayTicker, normalizeTickerInput } from '@/lib/intraday/val
 import { INTRADAY_STRATEGY_VWAP_OR_V1 } from '@/lib/intraday/types';
 import { revalidatePath } from 'next/cache';
 
-export type IntradayPageState = { error?: string; success?: string };
+export type IntradayPageState = {
+  error?: string;
+  success?: string;
+  /** Backtest / save success styling when P&L or outcome is negative. */
+  successTone?: 'profit' | 'loss' | 'neutral';
+};
 
 export async function loadIntradayPageData() {
   const { sb, user } = await requireAuthSession();
@@ -199,6 +204,7 @@ export async function runIntradayBacktestAction(
       result.errors.length > 0 ? ` (${result.errors.length} day fetch warning(s).)` : '';
     return {
       success: `Backtest done: ${result.metrics.trades} trades over ${result.daysWithData} sessions · P&L $${result.metrics.totalPnlUsd.toFixed(2)}.${errNote}`,
+      successTone: result.metrics.totalPnlUsd < 0 ? 'loss' : result.metrics.totalPnlUsd > 0 ? 'profit' : 'neutral',
     };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

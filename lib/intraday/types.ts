@@ -46,6 +46,8 @@ export type IntradayStrategyConfig = {
   noNewEntriesAfterEt: string;
   forceFlatEt: string;
   scaleFirstPct: number;
+  /** Minimum signal score (0–100) before entering. */
+  minConfidence: number;
 };
 
 export type BacktestTrade = {

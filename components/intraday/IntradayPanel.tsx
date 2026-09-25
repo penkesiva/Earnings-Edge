@@ -28,15 +28,26 @@ function SubmitBtn({ label, pendingLabel }: { label: string; pendingLabel: strin
 function Flash({ state }: { state: IntradayPageState }) {
   const text = state.error ?? state.success;
   if (!text) return null;
+  const successLoss = !state.error && state.successTone === 'loss';
+  const successProfit = !state.error && state.successTone === 'profit';
   return (
     <p
       className={`text-xs px-3 py-2 border ${
-        state.error ? 'border-signal-sell/40 text-signal-sell' : 'border-signal-buy/40 text-signal-buy'
+        state.error || successLoss
+          ? 'border-signal-sell/40 text-signal-sell'
+          : successProfit
+            ? 'border-signal-buy/40 text-signal-buy'
+            : 'border-border-subtle text-fg-subtle'
       }`}
     >
       {text}
     </p>
   );
+}
+
+function pnlToneClass(n: number | null | undefined): string {
+  if (n == null || !Number.isFinite(n) || n === 0) return '';
+  return n < 0 ? 'text-signal-sell' : 'text-signal-buy';
 }
 
 type RunRow = {
@@ -274,11 +285,20 @@ export function IntradayPanel({
 function BacktestRunDetails({ run }: { run: RunRow }) {
   const m = run.metrics ?? {};
   const trades = (run.trades as Array<Record<string, unknown>>) ?? [];
+  const totalPnl = m.totalPnlUsd != null ? Number(m.totalPnlUsd) : null;
+  const pnlLabel =
+    totalPnl != null && Number.isFinite(totalPnl) ? fmtUsd(totalPnl) : null;
   return (
     <details className="px-4 py-3 group">
-      <summary className="cursor-pointer text-xs font-bold tracking-wide list-none flex justify-between gap-2">
+      <summary className="cursor-pointer text-xs font-bold tracking-wide list-none flex flex-wrap justify-between gap-x-2 gap-y-1">
         <span>
           {run.symbol} · {run.calendar_days}d · {run.status}
+          {pnlLabel ? (
+            <>
+              {' '}
+              · <span className={pnlToneClass(totalPnl)}>{pnlLabel}</span>
+            </>
+          ) : null}
         </span>
         <span className="text-fg-dim font-normal tabular-nums">
           {new Date(run.started_at).toLocaleDateString()}
@@ -291,9 +311,9 @@ function BacktestRunDetails({ run }: { run: RunRow }) {
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
           <Metric label="Trades" value={String(m.trades ?? '—')} />
           <Metric label="Win rate" value={fmtPct(m.winRate)} />
-          <Metric label="Total P&L" value={fmtUsd(m.totalPnlUsd)} />
+          <Metric label="Total P&L" value={fmtUsd(m.totalPnlUsd)} tone={totalPnl} />
           <Metric label="Profit factor" value={fmtNum(m.profitFactor)} />
-          <Metric label="Max DD" value={fmtUsd(m.maxDrawdownUsd)} />
+          <Metric label="Max DD" value={fmtUsd(m.maxDrawdownUsd)} tone={Number(m.maxDrawdownUsd) > 0 ? -1 : undefined} />
           <Metric label="Trades/day" value={fmtNum(m.tradesPerDay)} />
         </div>
         {trades.length > 0 ? (
@@ -302,12 +322,18 @@ function BacktestRunDetails({ run }: { run: RunRow }) {
               Trade log ({trades.length})
             </summary>
             <ul className="max-h-48 overflow-auto divide-y divide-border-subtle border-t border-border-subtle">
-              {trades.slice(0, 50).map((t, i) => (
-                <li key={i} className="px-3 py-2 font-mono text-[10px]">
-                  {String(t.sessionDate)} {String(t.setupType)} {String(t.entryTimeEt)}→
-                  {String(t.exitTimeEt)} ${Number(t.pnlUsd).toFixed(2)}
-                </li>
-              ))}
+              {trades.slice(0, 50).map((t, i) => {
+                const pnl = Number(t.pnlUsd);
+                return (
+                  <li
+                    key={i}
+                    className={`px-3 py-2 font-mono text-[10px] ${pnlToneClass(pnl)}`}
+                  >
+                    {String(t.sessionDate)} {String(t.setupType)} {String(t.entryTimeEt)}→
+                    {String(t.exitTimeEt)} ${Number.isFinite(pnl) ? pnl.toFixed(2) : '—'}
+                  </li>
+                );
+              })}
             </ul>
           </details>
         ) : null}
@@ -316,11 +342,19 @@ function BacktestRunDetails({ run }: { run: RunRow }) {
   );
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
+function Metric({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone?: number | null;
+}) {
   return (
     <div>
       <p className="text-[10px] text-fg-dim uppercase tracking-widest">{label}</p>
-      <p className="font-bold tabular-nums">{value}</p>
+      <p className={`font-bold tabular-nums ${pnlToneClass(tone ?? undefined)}`}>{value}</p>
     </div>
   );
 }

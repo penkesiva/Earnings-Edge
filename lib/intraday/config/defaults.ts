@@ -11,6 +11,7 @@ export const DEFAULT_INTRADAY_CONFIG: IntradayStrategyConfig = {
   noNewEntriesAfterEt: '15:30',
   forceFlatEt: '15:50',
   scaleFirstPct: 50,
+  minConfidence: 60,
 };
 
 export const BACKTEST_DAY_PRESETS = [30, 90, 180, 365] as const;

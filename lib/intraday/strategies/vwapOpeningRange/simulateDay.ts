@@ -81,7 +81,7 @@ export function simulateVwapOrDay(
     }
 
     const setup = detectLongSetup(bars, i, or, ind, vwap, e9, e20, rv);
-    if (!setup) continue;
+    if (!setup || setup.confidence < config.minConfidence) continue;
 
     entrySetup = setup.type;
     reasons = setup.reasons;
@@ -165,7 +165,7 @@ function detectLongSetup(
     };
   }
 
-  if (b.c > or.orh && b.l <= or.orh && b.c > vwap) {
+  if (b.c > or.orh && b.l <= or.orh && b.c > vwap && e9 > e20) {
     reasons.push('ORH retest hold');
     score += 15;
     return {
