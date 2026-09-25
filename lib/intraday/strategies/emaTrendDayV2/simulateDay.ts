@@ -2,6 +2,7 @@ import { passesForensicsDelayedEntry } from '@/lib/intraday/diagnostics/delayedE
 import { applyLongExitPrice, applyLongFillPrice, commissionCost } from '@/lib/intraday/backtest/executionCost';
 import { barEtHHMM, etHHMMToMinutes } from '@/lib/intraday/indicators/engine';
 import { DEFAULT_EMA_TREND_DAY_V2_CONFIG } from '@/lib/intraday/strategies/emaTrendDayV2/config';
+import { detectExperimentalVwapResumptionEntry } from '@/lib/intraday/diagnostics/experimentalEntry';
 import {
   detectEmaOnlyEntry,
   detectMomentumCrossEntry,
@@ -216,7 +217,12 @@ export function simulateEmaTrendDayV2(
     if (entryMode === 'EMA_REGIME_MOMENTUM' && config.allowPullbackEntry) {
       pullbackFsm.tick(b, prev, ctx, config);
     }
+    if (entryMode === 'EXPERIMENTAL_VWAP_RESUMPTION' && config.allowPullbackEntry) {
+      pullbackFsm.tick(b, prev, ctx, config);
+    }
     const candidate = resolveEntryCandidate(
+      bars,
+      i,
       b,
       prev,
       ctx,
@@ -230,7 +236,9 @@ export function simulateEmaTrendDayV2(
     const scored =
       entryMode === 'EMA_ONLY'
         ? { score: 100, lines: [`EMA_ONLY ${candidate.type}`] }
-        : scoreEntryCandidate(candidate.type, b, ctx, regime, config);
+        : entryMode === 'EXPERIMENTAL_VWAP_RESUMPTION'
+          ? { score: 70, lines: ['EXPERIMENTAL_VWAP_RESUMPTION'] }
+          : scoreEntryCandidate(candidate.type, b, ctx, regime, config);
 
     let momentumScore: number | undefined;
     let momentumLines: string[] = [];
@@ -346,6 +354,8 @@ export function simulateEmaTrendDayV2(
 }
 
 function resolveEntryCandidate(
+  bars: MinuteBar[],
+  i: number,
   b: MinuteBar,
   prev: MinuteBar,
   ctx: BarContext,
@@ -367,6 +377,19 @@ function resolveEntryCandidate(
     const raw = detectRegimeEntry(b, prev, ctx, ctxPrev, config);
     if (!raw) return null;
     return { type: raw.type, isPullback: raw.type === 'ema_pullback_confirmed' };
+  }
+
+  if (entryMode === 'EXPERIMENTAL_VWAP_RESUMPTION') {
+    const ex = detectExperimentalVwapResumptionEntry(
+      bars,
+      i,
+      b,
+      ctx,
+      ctxPrev,
+      pullbackFsm.readyForMomentumEntry(),
+    );
+    if (ex) return { type: ex.type, isPullback: true };
+    return null;
   }
 
   const cross = detectMomentumCrossEntry(b, ctx, ctxPrev);

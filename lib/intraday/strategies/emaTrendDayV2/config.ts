@@ -1,4 +1,4 @@
-import type { EmaTrendDayV2Config, EmaV2EntryMode } from '@/lib/intraday/types';
+import type { EmaTrendDayV2Config, EmaV2SimEntryMode } from '@/lib/intraday/types';
 
 /** Baseline v2 — not optimized; for comparison vs ema_trend_day_v1. */
 export const DEFAULT_EMA_TREND_DAY_V2_CONFIG: EmaTrendDayV2Config = {
@@ -64,7 +64,7 @@ export const DEFAULT_EMA_TREND_DAY_V2_CONFIG: EmaTrendDayV2Config = {
 };
 
 export function emaV2ConfigWithEntryMode(
-  entryMode: EmaV2EntryMode,
+  entryMode: EmaV2SimEntryMode,
   overrides: Partial<EmaTrendDayV2Config> = {},
 ): EmaTrendDayV2Config {
   return { ...DEFAULT_EMA_TREND_DAY_V2_CONFIG, entryMode, ...overrides };

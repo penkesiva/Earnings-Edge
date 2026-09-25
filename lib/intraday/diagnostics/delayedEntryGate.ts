@@ -1,5 +1,11 @@
 import type { BarContext } from '@/lib/intraday/strategies/emaTrendDayV2/indicators';
 import type { EmaTrendDayV2Config, ForensicsDelayedEntryVariant, MinuteBar } from '@/lib/intraday/types';
+import {
+  evaluateGateB,
+  evaluateGateC,
+  evaluateGateD,
+  evaluateGateE,
+} from '@/lib/intraday/diagnostics/candidateGateAudit';
 import { priorBarHigh } from '@/lib/intraday/diagnostics/barIndex';
 
 export function passesForensicsDelayedEntry(
@@ -11,34 +17,11 @@ export function passesForensicsDelayedEntry(
 ): boolean {
   const variant = config.forensicsDelayedEntryVariant ?? 'A';
   if (variant === 'A') return true;
-
-  const high1 = priorBarHigh(bars, i, 1);
-  const high2 = priorBarHigh(bars, i, 2);
-  const ret3 = i >= 3 ? b.c / bars[i - 3].c - 1 : 0;
-  const volPrev5 =
-    i >= 5
-      ? bars.slice(i - 5, i).reduce((a, x) => a + x.v, 0) / 5
-      : bars.slice(0, i).reduce((a, x) => a + x.v, 0) / Math.max(i, 1);
-  const volumeAcceleration = volPrev5 > 0 ? b.v / volPrev5 : 1;
-
-  switch (variant) {
-    case 'B':
-      return high1 != null && b.c > high1;
-    case 'C':
-      return high2 != null && b.c > high2;
-    case 'D':
-      return high2 != null && b.c > high2 && ret3 > 0;
-    case 'E':
-      return (
-        high2 != null &&
-        b.c > high2 &&
-        ret3 > 0 &&
-        volumeAcceleration >= 1.1 &&
-        ctx.relVolume >= config.minRelativeVolumePrefer
-      );
-    default:
-      return true;
-  }
+  if (variant === 'B') return evaluateGateB(bars, i, b).pass;
+  if (variant === 'C') return evaluateGateC(bars, i, b).pass;
+  if (variant === 'D') return evaluateGateD(bars, i, b).pass;
+  if (variant === 'E') return evaluateGateE(bars, i, b, ctx, config).pass;
+  return true;
 }
 
 export function entryConfirmationClass(

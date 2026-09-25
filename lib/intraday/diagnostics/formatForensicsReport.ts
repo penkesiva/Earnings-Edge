@@ -46,10 +46,30 @@ export function formatForensicsMarkdown(r: EmaV2ForensicsReport): string {
     '## 1. Entry forensics (all trades)',
     '',
     ...r.entryForensics.flatMap(e => [entryBlock(e), '']),
-    '---',
-    '## 2. Post-entry analysis',
-    '',
   ];
+
+  lines.push(
+    '---',
+    '## 1b. VERIFY delayed confirmation (production accepted candidates)',
+    '',
+    ...r.variantValidation,
+    '',
+    '| Session | Time | B | C | D | E |',
+    '| --- | --- | --- | --- | --- | --- |',
+  );
+
+  for (const g of r.gateAudit) {
+    lines.push(
+      `| ${g.sessionDate} | ${g.timeEt} | ${g.B.pass ? 'PASS' : 'FAIL'} | ${g.C.pass ? 'PASS' : 'FAIL'} | ${g.D.pass ? 'PASS' : 'FAIL'} | ${g.E.pass ? 'PASS' : 'FAIL'} |`,
+    );
+  }
+
+  lines.push('', 'Gate detail:');
+  for (const g of r.gateAudit) {
+    lines.push(`${g.sessionDate} ${g.timeEt}:`, `  B: ${g.B.reason}`, `  C: ${g.C.reason}`, `  D: ${g.D.reason}`, `  E: ${g.E.reason}`, '');
+  }
+
+  lines.push('---', '## 2. Post-entry analysis', '');
 
   for (const p of r.postEntry) {
     lines.push(
@@ -74,10 +94,11 @@ export function formatForensicsMarkdown(r: EmaV2ForensicsReport): string {
     lines.push(`| ${row.feature} | ${row.winner} | ${row.avgLoser} | ${row.diff} |`);
   }
 
-  lines.push('', '---', '## 4. Momentum / pullback timing', '');
+  lines.push('', '---', '## 4. Momentum / pullback timing (fixed per-entry replay)', '');
   for (const t of r.momentumTimelines) {
+    const flag = t.timingValid ? 'OK' : `DATA/STATE ERROR: ${t.timingError ?? '?'}`;
     lines.push(
-      `${t.sessionDate} ${t.entryTimeEt}: pullback detected ${t.pullbackDetectedTime ?? '—'} → momentum OK ${t.momentumConfirmedTime ?? '—'} → entry ${t.entryTime} | class ${t.confirmationClass}`,
+      `${t.sessionDate} ${t.entryTimeEt}: pullback ${t.pullbackDetectedTime ?? '—'} → momentum ${t.momentumConfirmedTime ?? '—'} → entry ${t.entryTime} | ${flag}`,
     );
   }
   lines.push(
@@ -94,14 +115,57 @@ export function formatForensicsMarkdown(r: EmaV2ForensicsReport): string {
   for (const v of r.variantSims) {
     const vm = v.metrics;
     lines.push(
-      `| ${v.variant} | ${v.candidateTrades} | ${v.executedTrades} | ${vm.winRate?.toFixed(1) ?? '—'}% | $${vm.totalPnlUsd.toFixed(2)} | ${vm.profitFactor?.toFixed(2) ?? '—'} | $${vm.expectancyPerTrade?.toFixed(2) ?? '—'} | $${vm.maxDrawdownUsd.toFixed(2)} | $${vm.avgMfeUsd?.toFixed(2) ?? '—'} | $${vm.avgMaeUsd?.toFixed(2) ?? '—'} |`,
+      `| ${v.variant} | ${v.candidateTrades} | ${v.executedTrades} | ${vm.winRate?.toFixed(1) ?? '—'}% | $${vm.totalPnlUsd.toFixed(2)} | ${vm.profitFactor?.toFixed(2) ?? '—'} | $${vm.expectancyPerTrade?.toFixed(2) ?? '—'} | $${vm.maxDrawdownUsd.toFixed(2)} | $${vm.avgMfeUsd?.toFixed(2) ?? '—'} | $${vm.avgMaeUsd?.toFixed(2) ?? '—'} | fp ${v.entryFingerprint} |`,
     );
   }
 
   lines.push(
     '',
     '---',
-    '## 6. Rejected signals by bucket',
+    '## 6. VWAP proximity buckets (exploratory, no optimal threshold)',
+    '',
+    '| Bucket | Candidates | Trades | avg 5m | avg 10m | avg 20m | MFE | MAE | WR | Exp |',
+    '| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |',
+  );
+  for (const row of r.vwapProximity) {
+    lines.push(
+      `| ${row.bucket} | ${row.candidateCount} | ${row.tradeCount} | ${fmt(row.avgReturn5m, 3)}% | ${fmt(row.avgReturn10m, 3)}% | ${fmt(row.avgReturn20m, 3)}% | ${fmt(row.avgMfePct, 3)}% | ${fmt(row.avgMaePct, 3)}% | ${row.winRate?.toFixed(0) ?? '—'}% | $${row.expectancyUsd?.toFixed(2) ?? '—'} |`,
+    );
+  }
+
+  lines.push('', '---', '## 7. Bollinger %B and bandwidth', '', '### %B buckets');
+  for (const row of r.bollingerBuckets.percentB) {
+    lines.push(
+      `${row.bucket}: candidates ${row.candidateCount} | trades ${row.tradeCount} | W ${row.winnerCount} L ${row.loserCount}`,
+    );
+  }
+  lines.push('', '### Bandwidth regime');
+  for (const row of r.bollingerBuckets.bandwidth) {
+    lines.push(
+      `${row.bucket}: candidates ${row.candidateCount} | trades ${row.tradeCount} | W ${row.winnerCount} L ${row.loserCount}`,
+    );
+  }
+
+  lines.push('', '---', '## 8. Momentum phase at entry', '');
+  for (const p of r.momentumPhasesAtEntry) {
+    lines.push(`${p.sessionDate} ${p.entryTimeEt}: ${p.phase} — ${p.lines.join('; ')}`);
+  }
+
+  if (r.experimentalMetrics) {
+    const em = r.experimentalMetrics;
+    lines.push(
+      '',
+      '---',
+      '## 9. EXPERIMENTAL_VWAP_RESUMPTION (forensics only, not production)',
+      '',
+      `Trades ${em.trades} | P&L $${em.totalPnlUsd.toFixed(2)} | WR ${em.winRate?.toFixed(1) ?? '—'}% | PF ${em.profitFactor?.toFixed(2) ?? '—'} | DD $${em.maxDrawdownUsd.toFixed(2)}`,
+    );
+  }
+
+  lines.push(
+    '',
+    '---',
+    '## 10. Rejected signals by bucket',
     '',
     'COOLDOWN/TIME: not logged in signal log (skipped before candidate log). Counts are 0 here.',
     '',
@@ -120,13 +184,15 @@ export function formatForensicsMarkdown(r: EmaV2ForensicsReport): string {
     `Accepted entries forward (n=${r.acceptedForward.n}): avg 5m ${fmt(r.acceptedForward.avgReturn5m, 3)}% | avg 10m ${fmt(r.acceptedForward.avgReturn10m, 3)}% | avg 20m MFE ${fmt(r.acceptedForward.avgMfe20, 3)}%`,
     '',
     '---',
-    '## 7. Diagnostic questions (manual read)',
+    '## 11. Diagnostic questions (manual read)',
     '',
-    '1. Aug-14 winner: see winner row vs avg loser table (spread, momentum, micro-break, VWAP).',
-    '2. Other failures: check post-entry behavior=immediately_failed / worked_then_reversed.',
-    '3. Early pullback? Compare momentumConfirmedTime vs entryTime; class A/B vs D/E.',
-    '4. 736 rejects: dominant bucket counts above.',
-    '5. Rejects vs accepted: compare bucket forward returns to accepted forward line.',
+    'Do not tune from small samples. Re-run with calendar_days=90 for larger n.',
+    '',
+    '1. Aug-14 winner: winner vs avg loser table + VWAP bucket.',
+    '2. Gate audit: which of 10 production entries pass B/C/D/E (identical variant metrics means same pass set).',
+    '3. Timing rows flagged DATA/STATE ERROR must be excluded from setup conclusions.',
+    '4. Momentum phase: losers skew EXTENDED/FADING vs BUILDING/EXPANDING?',
+    '5. Rejects vs accepted forward returns in section 10.',
   );
 
   if (r.errors.length) {

@@ -1,4 +1,4 @@
-import { barEtHHMM } from '@/lib/intraday/indicators/engine';
+import { barEtHHMM, etHHMMToMinutes } from '@/lib/intraday/indicators/engine';
 import { findBarIndexByTimeEt } from '@/lib/intraday/diagnostics/barIndex';
 import { entryConfirmationClass } from '@/lib/intraday/diagnostics/delayedEntryGate';
 import { DEFAULT_EMA_TREND_DAY_V2_CONFIG } from '@/lib/intraday/strategies/emaTrendDayV2/config';
@@ -14,8 +14,28 @@ export type PullbackMomentumTimeline = {
   momentumConfirmedTime: string | null;
   entryTime: string;
   confirmationClass: string;
+  timingValid: boolean;
+  timingError: string | null;
 };
 
+function orderedTimes(a: string | null, b: string | null, c: string | null): { ok: boolean; err: string | null } {
+  const seq = [
+    { label: 'pullback', t: a },
+    { label: 'momentum', t: b },
+    { label: 'entry', t: c },
+  ].filter(x => x.t) as { label: string; t: string }[];
+  for (let i = 1; i < seq.length; i++) {
+    if (etHHMMToMinutes(seq[i].t) < etHHMMToMinutes(seq[i - 1].t)) {
+      return {
+        ok: false,
+        err: `${seq[i].label} ${seq[i].t} before ${seq[i - 1].label} ${seq[i - 1].t} (impossible)`,
+      };
+    }
+  }
+  return { ok: true, err: null };
+}
+
+/** Replay FSM only through entry bar — times for the setup that led to this entry. */
 export function replayPullbackMomentumTimeline(
   sessionDate: string,
   bars: MinuteBar[],
@@ -23,13 +43,27 @@ export function replayPullbackMomentumTimeline(
   config: EmaTrendDayV2Config = DEFAULT_EMA_TREND_DAY_V2_CONFIG,
 ): PullbackMomentumTimeline {
   const contexts = buildBarContexts(bars);
-  const fsm = new PullbackStateMachine();
-  const warmup = config.warmupBars;
-  let pullbackDetectedTime: string | null = null;
-  let momentumConfirmedTime: string | null = null;
   const entryIdx = findBarIndexByTimeEt(bars, entryTimeEt);
+  const warmup = config.warmupBars;
 
-  for (let i = warmup; i < bars.length; i++) {
+  if (entryIdx < warmup) {
+    return {
+      sessionDate,
+      entryTimeEt,
+      pullbackDetectedTime: null,
+      momentumConfirmedTime: null,
+      entryTime: entryTimeEt,
+      confirmationClass: '—',
+      timingValid: false,
+      timingError: 'entry bar not found or before warmup',
+    };
+  }
+
+  const fsm = new PullbackStateMachine();
+  let pullbackForSetup: string | null = null;
+  let momentumForSetup: string | null = null;
+
+  for (let i = warmup; i <= entryIdx; i++) {
     const b = bars[i];
     const prev = bars[i - 1];
     const ctx = contexts[i];
@@ -38,37 +72,48 @@ export function replayPullbackMomentumTimeline(
 
     const phaseBefore = fsm.phase;
     if (config.allowPullbackEntry) fsm.tick(b, prev, ctx, config);
+
+    if (phaseBefore === 'wait_momentum' && (fsm.phase === 'idle' || fsm.phase === 'uptrend')) {
+      pullbackForSetup = null;
+      momentumForSetup = null;
+    }
+
     if (phaseBefore !== 'pullback_detected' && fsm.phase === 'pullback_detected') {
-      pullbackDetectedTime = barEtHHMM(b.t);
+      pullbackForSetup = barEtHHMM(b.t);
+      momentumForSetup = null;
     }
 
-    const mom = evaluateMomentum(bars, i, b, ctx, ctxPrev, config);
-    if (
-      momentumConfirmedTime == null &&
-      fsm.phase === 'wait_momentum' &&
-      mom.score >= config.minMomentumScore
-    ) {
-      momentumConfirmedTime = barEtHHMM(b.t);
+    if (fsm.phase === 'wait_momentum') {
+      const mom = evaluateMomentum(bars, i, b, ctx, ctxPrev, config);
+      if (mom.score >= config.minMomentumScore) {
+        momentumForSetup = barEtHHMM(b.t);
+      }
     }
   }
 
-  let confirmationClass = '—';
-  if (entryIdx >= 0) {
-    confirmationClass = entryConfirmationClass(
-      bars,
-      entryIdx,
-      bars[entryIdx],
-      contexts[entryIdx],
-      config,
-    );
-  }
+  const confirmationClass = entryConfirmationClass(
+    bars,
+    entryIdx,
+    bars[entryIdx],
+    contexts[entryIdx],
+    config,
+  );
+
+  const order = orderedTimes(pullbackForSetup, momentumForSetup, entryTimeEt);
+  let timingError: string | null = order.err;
+  if (!pullbackForSetup) timingError = timingError ?? 'no pullback_detected before entry';
+  if (!momentumForSetup) timingError = timingError ?? 'no momentumConfirmed before entry';
+
+  const timingValid = order.ok && Boolean(pullbackForSetup) && Boolean(momentumForSetup);
 
   return {
     sessionDate,
     entryTimeEt,
-    pullbackDetectedTime,
-    momentumConfirmedTime,
+    pullbackDetectedTime: pullbackForSetup,
+    momentumConfirmedTime: momentumForSetup,
     entryTime: entryTimeEt,
     confirmationClass,
+    timingValid,
+    timingError: timingValid ? null : timingError,
   };
 }

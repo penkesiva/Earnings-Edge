@@ -101,6 +101,9 @@ export type ProfitProtectMode = 'NONE' | 'EMA9' | 'SWING_LOW' | 'TRAILING_PERCEN
 export type MarketContextFilter = 'OFF' | 'SCORE_ONLY' | 'REQUIRE';
 export type EmaInitialization = 'SESSION_ONLY' | 'PRIOR_BARS_SEEDED';
 export type EmaV2EntryMode = 'EMA_ONLY' | 'EMA_REGIME' | 'EMA_REGIME_MOMENTUM';
+/** Forensics / replay only — not in compare EMA modes UI. */
+export type EmaV2ForensicsOnlyEntryMode = 'EXPERIMENTAL_VWAP_RESUMPTION';
+export type EmaV2SimEntryMode = EmaV2EntryMode | EmaV2ForensicsOnlyEntryMode;
 export type VolumeMomentumMode = 'OFF' | 'SCORE_ONLY' | 'REQUIRE';
 /** Diagnostic replay only — does not change production default config. */
 export type ForensicsDelayedEntryVariant = 'A' | 'B' | 'C' | 'D' | 'E';
@@ -143,7 +146,7 @@ export type EmaTrendDayV2Config = {
   marketContextFilter: MarketContextFilter;
 
   /** Backtest entry variant (v2 only). */
-  entryMode: EmaV2EntryMode;
+  entryMode: EmaV2SimEntryMode;
   minMomentumScore: number;
   minCloseLocation: number;
   microBreakoutBars: number;

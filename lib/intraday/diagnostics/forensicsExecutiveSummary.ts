@@ -70,7 +70,23 @@ export function buildForensicsExecutiveSummary(r: EmaV2ForensicsReport): string 
     `Accepted entries avg 5m fwd: ${r.acceptedForward.avgReturn5m?.toFixed(3) ?? '—'}% (n=${r.acceptedForward.n})`,
   );
 
-  lines.push('', 'Delayed confirmation replay (production filters + extra gate):');
+  lines.push('', ...r.variantValidation);
+
+  const invalidTiming = r.momentumTimelines.filter(t => !t.timingValid).length;
+  if (invalidTiming) {
+    lines.push(`Timing audit: ${invalidTiming}/${r.momentumTimelines.length} pullback rows invalid (do not use for setup timing).`);
+  }
+
+  lines.push('', 'Gate pass counts on production entries — see full report section 1b.');
+
+  if (r.experimentalMetrics) {
+    const em = r.experimentalMetrics;
+    lines.push(
+      `EXPERIMENTAL_VWAP_RESUMPTION: ${em.trades} tr | P&L $${em.totalPnlUsd.toFixed(2)} | WR ${em.winRate?.toFixed(0) ?? '—'}%`,
+    );
+  }
+
+  lines.push('', 'Delayed confirmation replay:');
   for (const v of r.variantSims) {
     const vm = v.metrics;
     lines.push(
@@ -78,7 +94,7 @@ export function buildForensicsExecutiveSummary(r: EmaV2ForensicsReport): string 
     );
   }
 
-  lines.push('', 'Open "View full forensics report" for entry tables, reject buckets, and per-trade detail.');
+  lines.push('', 'Open "View full forensics report" for gate audit, VWAP/%B buckets, momentum phase, 90d rerun.');
 
   return lines.join('\n');
 }

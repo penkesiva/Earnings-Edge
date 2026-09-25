@@ -2,6 +2,14 @@ import type { AlpacaAuth } from '@/lib/alpaca';
 import { lastUsEquityBacktestEndDate } from '@/lib/earningsDate';
 import { aggregateV2BacktestMetrics } from '@/lib/intraday/backtest/metricsV2';
 import { findBarIndexByTimeEt } from '@/lib/intraday/diagnostics/barIndex';
+import {
+  auditDelayedGatesAtBar,
+  type DelayedGateAuditRow,
+  variantEntryFingerprint,
+} from '@/lib/intraday/diagnostics/candidateGateAudit';
+import { analyzeBollingerBuckets } from '@/lib/intraday/diagnostics/bollingerExperiment';
+import { classifyMomentumPhase } from '@/lib/intraday/diagnostics/momentumPhase';
+import { analyzeVwapProximityBuckets, type ProximityBucketRow } from '@/lib/intraday/diagnostics/vwapProximityExperiment';
 import { FORENSICS_VARIANTS } from '@/lib/intraday/diagnostics/delayedEntryGate';
 import {
   avgForensics,
@@ -18,7 +26,7 @@ import {
 } from '@/lib/intraday/diagnostics/rejectionAnalysis';
 import { fetchMinuteBarsForDay, listRecentTradingDates } from '@/lib/intraday/data/bars';
 import { filterRegularSessionBars } from '@/lib/intraday/indicators/engine';
-import { DEFAULT_EMA_TREND_DAY_V2_CONFIG } from '@/lib/intraday/strategies/emaTrendDayV2/config';
+import { DEFAULT_EMA_TREND_DAY_V2_CONFIG, emaV2ConfigWithEntryMode } from '@/lib/intraday/strategies/emaTrendDayV2/config';
 import { buildBarContexts } from '@/lib/intraday/strategies/emaTrendDayV2/indicators';
 import { simulateEmaTrendDayV2 } from '@/lib/intraday/strategies/emaTrendDayV2/simulateDay';
 import type {
@@ -35,7 +43,15 @@ export type VariantSimRow = {
   variant: ForensicsDelayedEntryVariant;
   candidateTrades: number;
   executedTrades: number;
+  entryFingerprint: string;
   metrics: BacktestMetricsExtended;
+};
+
+export type MomentumPhaseAtEntry = {
+  sessionDate: string;
+  entryTimeEt: string;
+  phase: string;
+  lines: string[];
 };
 
 export type EmaV2ForensicsReport = {
@@ -50,6 +66,12 @@ export type EmaV2ForensicsReport = {
   loserRows: EntryForensicsRow[];
   compareTable: { feature: string; winner: string; avgLoser: string; diff: string }[];
   momentumTimelines: ReturnType<typeof replayPullbackMomentumTimeline>[];
+  gateAudit: DelayedGateAuditRow[];
+  variantValidation: string[];
+  vwapProximity: ProximityBucketRow[];
+  bollingerBuckets: ReturnType<typeof analyzeBollingerBuckets>;
+  momentumPhasesAtEntry: MomentumPhaseAtEntry[];
+  experimentalMetrics: BacktestMetricsExtended | null;
   variantSims: VariantSimRow[];
   rejectionBuckets: RejectionBucketStats[];
   acceptedForward: ReturnType<typeof analyzeAcceptedForward>;
@@ -181,9 +203,24 @@ export async function runEmaV2ForensicsReport(input: {
     replayPullbackMomentumTimeline(t.sessionDate, barsBySession.get(t.sessionDate)!, t.entryTimeEt, cfg),
   );
 
-  const productionCandidates = allLog.filter(s => s.accepted).length;
+  const productionAccepted = allLog.filter(s => s.accepted);
+  const gateAudit: DelayedGateAuditRow[] = [];
+  for (const s of productionAccepted) {
+    const bars = barsBySession.get(s.sessionDate);
+    if (!bars) continue;
+    const i = findBarIndexByTimeEt(bars, s.timeEt);
+    if (i < 0) continue;
+    const contexts = buildBarContexts(bars);
+    gateAudit.push(
+      auditDelayedGatesAtBar(s.sessionDate, s.timeEt, s.signalType, true, bars, i, contexts[i], cfg),
+    );
+  }
+
+  const productionCandidates = productionAccepted.length;
 
   const variantSims: VariantSimRow[] = [];
+  const variantValidation: string[] = [];
+  const fingerprints: string[] = [];
   for (const variant of FORENSICS_VARIANTS) {
     const vTrades: BacktestTrade[] = [];
     for (const sessionDate of dates) {
@@ -195,6 +232,8 @@ export async function runEmaV2ForensicsReport(input: {
       });
       vTrades.push(...day.trades);
     }
+    const fp = variantEntryFingerprint(vTrades);
+    fingerprints.push(fp);
     const metrics = aggregateV2BacktestMetrics(
       vTrades,
       daysWithData,
@@ -206,9 +245,69 @@ export async function runEmaV2ForensicsReport(input: {
       variant,
       candidateTrades: productionCandidates,
       executedTrades: vTrades.length,
+      entryFingerprint: fp.slice(0, 80) + (fp.length > 80 ? '…' : ''),
       metrics,
     });
   }
+  const uniqueFp = new Set(fingerprints);
+  variantValidation.push(
+    `Variant entry fingerprints: ${uniqueFp.size} unique of ${FORENSICS_VARIANTS.length} (B/C/D/E identical iff same fingerprint).`,
+  );
+  if (uniqueFp.size === 1 && FORENSICS_VARIANTS.length > 1) {
+    variantValidation.push(
+      'WARNING: All variants produced identical entry sets — likely all production candidates pass B–E or all fail together.',
+    );
+  }
+  const passCounts = { B: 0, C: 0, D: 0, E: 0 };
+  for (const row of gateAudit) {
+    if (row.B.pass) passCounts.B += 1;
+    if (row.C.pass) passCounts.C += 1;
+    if (row.D.pass) passCounts.D += 1;
+    if (row.E.pass) passCounts.E += 1;
+  }
+  variantValidation.push(
+    `Production candidates passing gates: B=${passCounts.B} C=${passCounts.C} D=${passCounts.D} E=${passCounts.E} of ${gateAudit.length}`,
+  );
+
+  const vwapProximity = analyzeVwapProximityBuckets(allLog, allTrades, barsBySession);
+  const bollingerBuckets = analyzeBollingerBuckets(allLog, allTrades, barsBySession);
+
+  const momentumPhasesAtEntry: MomentumPhaseAtEntry[] = [];
+  for (const t of allTrades) {
+    const bars = barsBySession.get(t.sessionDate);
+    if (!bars) continue;
+    const i = findBarIndexByTimeEt(bars, t.entryTimeEt);
+    if (i < 0) continue;
+    const contexts = buildBarContexts(bars);
+    const snap = classifyMomentumPhase(bars, i, bars[i], contexts[i], contexts[i - 1]);
+    momentumPhasesAtEntry.push({
+      sessionDate: t.sessionDate,
+      entryTimeEt: t.entryTimeEt,
+      phase: snap.phase,
+      lines: snap.lines,
+    });
+  }
+
+  let experimentalTrades: BacktestTrade[] = [];
+  for (const sessionDate of dates) {
+    const bars = barsBySession.get(sessionDate);
+    if (!bars) continue;
+    experimentalTrades.push(
+      ...simulateEmaTrendDayV2(
+        sessionDate,
+        bars,
+        input.effectiveBudgetUsd,
+        emaV2ConfigWithEntryMode('EXPERIMENTAL_VWAP_RESUMPTION'),
+      ).trades,
+    );
+  }
+  const experimentalMetrics = aggregateV2BacktestMetrics(
+    experimentalTrades,
+    daysWithData,
+    [],
+    cfg.slippageBps,
+    cfg.commissionPerShare,
+  );
 
   const rejectionBuckets = analyzeRejections(allLog, barsBySession);
   const acceptedForward = analyzeAcceptedForward(allLog, barsBySession);
@@ -225,6 +324,12 @@ export async function runEmaV2ForensicsReport(input: {
     loserRows,
     compareTable,
     momentumTimelines,
+    gateAudit,
+    variantValidation,
+    vwapProximity,
+    bollingerBuckets,
+    momentumPhasesAtEntry,
+    experimentalMetrics,
     variantSims,
     rejectionBuckets,
     acceptedForward,
