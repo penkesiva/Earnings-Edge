@@ -278,7 +278,7 @@ export function simulateSamV3(
       ...trigger.lines,
       `confirm: open ${b.o.toFixed(2)} >= previous close ${prev.c.toFixed(2)}, no upper-wick rejection`,
       `stop ${stop.toFixed(2)} (R ${riskR.toFixed(2)}, ${config.minStopAtrMult}-${config.atrStopMult}x ATR ${a[p].toFixed(3)}), trail after +${config.trailActivateR}R`,
-      `candle sells start after ${config.exitGraceBars} candles`,
+      `candle sells start after ${config.exitGraceBars} candle${config.exitGraceBars === 1 ? '' : 's'}`,
     ];
     open = true;
 
