@@ -21,7 +21,7 @@ import { validateTradingBudget } from '@/lib/intraday/sizing/computeShares';
 import { INTRADAY_STRATEGIES, strategyLabel } from '@/lib/intraday/strategies/registry';
 import { runEmaV2ForensicsReport } from '@/lib/intraday/diagnostics/runEmaV2ForensicsReport';
 import { validateIntradayTicker, normalizeTickerInput } from '@/lib/intraday/validateIntradayTicker';
-import { INTRADAY_STRATEGY_VWAP_OR_V1 } from '@/lib/intraday/types';
+import { INTRADAY_STRATEGY_SAM_EMA50_200_V1, INTRADAY_STRATEGY_VWAP_OR_V1 } from '@/lib/intraday/types';
 import type { BacktestTrade } from '@/lib/intraday/types';
 import { revalidatePath } from 'next/cache';
 
@@ -237,9 +237,10 @@ export async function runIntradayBacktestAction(
 export type IntradayChartDayPayload = {
   sessionDate: string;
   symbol: string;
+  /** e.g. "RTH 1-min" or "RTH 5-min". */
+  barLabel: string;
   candles: import('@/lib/intraday/chart/chartDayPayload').ChartBarPoint[];
-  ema9: import('@/lib/intraday/chart/chartDayPayload').ChartLinePoint[];
-  ema20: import('@/lib/intraday/chart/chartDayPayload').ChartLinePoint[];
+  lines: import('@/lib/intraday/chart/chartDayPayload').ChartLineSeries[];
   markers: import('@/lib/intraday/chart/chartDayPayload').ChartMarkerPoint[];
 };
 
@@ -247,6 +248,7 @@ export async function loadIntradayBacktestChartDayAction(
   symbol: string,
   sessionDate: string,
   tradesJson: BacktestTrade[],
+  strategyId?: string,
 ): Promise<{ error?: string; data?: IntradayChartDayPayload }> {
   const { user } = await requireAuthSession();
   const sym = normalizeTickerInput(symbol);
@@ -263,7 +265,7 @@ export async function loadIntradayBacktestChartDayAction(
   if (!auth) return { error: 'Alpaca keys required for chart data.' };
 
   try {
-    const { fetchMinuteBarsForDay } = await import('@/lib/intraday/data/bars');
+    const { fetchMinuteBarsForDay, fetchPriorSessionBars } = await import('@/lib/intraday/data/bars');
     const { filterRegularSessionBars, computeSessionIndicators } = await import(
       '@/lib/intraday/indicators/engine'
     );
@@ -279,16 +281,38 @@ export async function loadIntradayBacktestChartDayAction(
       return { error: 'Not enough bar data for this session.' };
     }
 
-    const ind = computeSessionIndicators(bars);
     const dayTrades = tradesJson.filter(t => t.sessionDate === sessionDate);
+
+    if (strategyId === INTRADAY_STRATEGY_SAM_EMA50_200_V1) {
+      const { buildSamChartDay } = await import('@/lib/intraday/strategies/samEma50200/chart');
+      const { DEFAULT_SAM_EMA50_200_CONFIG } = await import(
+        '@/lib/intraday/strategies/samEma50200/config'
+      );
+      const cfg = DEFAULT_SAM_EMA50_200_CONFIG;
+      const priorBars = await fetchPriorSessionBars(sym, sessionDate, cfg.warmupSessions, auth);
+      const sam = buildSamChartDay(sessionDate, bars, priorBars, dayTrades, cfg);
+      return {
+        data: {
+          sessionDate,
+          symbol: sym,
+          barLabel: `RTH ${cfg.barMinutes}-min`,
+          ...sam,
+        },
+      };
+    }
+
+    const ind = computeSessionIndicators(bars);
 
     return {
       data: {
         sessionDate,
         symbol: sym,
+        barLabel: 'RTH 1-min',
         candles: toCandlePoints(bars),
-        ema9: toLinePoints(bars, ind.ema9),
-        ema20: toLinePoints(bars, ind.ema20),
+        lines: [
+          { label: 'EMA9', color: '#34d399', points: toLinePoints(bars, ind.ema9) },
+          { label: 'EMA20', color: '#60a5fa', points: toLinePoints(bars, ind.ema20) },
+        ],
         markers: markersForSessionTrades(sessionDate, bars, dayTrades),
       },
     };

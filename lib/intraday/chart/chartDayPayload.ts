@@ -11,6 +11,8 @@ export type ChartBarPoint = {
 
 export type ChartLinePoint = { time: number; value: number };
 
+export type ChartLineSeries = { label: string; color: string; points: ChartLinePoint[] };
+
 export type ChartMarkerPoint = {
   time: number;
   kind: 'entry' | 'exit';
@@ -53,12 +55,13 @@ export function markersForSessionTrades(
   sessionDate: string,
   bars: MinuteBar[],
   trades: BacktestTrade[],
+  findBar: (bars: MinuteBar[], hhmm: string) => MinuteBar | null = findBarByEt,
 ): ChartMarkerPoint[] {
   const markers: ChartMarkerPoint[] = [];
   for (const t of trades) {
     if (t.sessionDate !== sessionDate) continue;
-    const entryBar = findBarByEt(bars, t.entryTimeEt);
-    const exitBar = findBarByEt(bars, t.exitTimeEt);
+    const entryBar = findBar(bars, t.entryTimeEt);
+    const exitBar = findBar(bars, t.exitTimeEt);
     const pnl = t.pnlUsd;
     if (entryBar) {
       markers.push({

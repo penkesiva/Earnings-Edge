@@ -21,6 +21,7 @@ type Props = {
   open: boolean;
   onClose: () => void;
   symbol: string;
+  strategyId?: string | null;
   strategyLabel: string;
   trades: BacktestTrade[];
   initialSessionDate?: string;
@@ -30,6 +31,7 @@ export function IntradayBacktestChartModal({
   open,
   onClose,
   symbol,
+  strategyId,
   strategyLabel,
   trades,
   initialSessionDate,
@@ -69,14 +71,19 @@ export function IntradayBacktestChartModal({
     setLoading(true);
     setError(null);
     setPayload(null);
-    const res = await loadIntradayBacktestChartDayAction(symbol, sessionDate, trades);
+    const res = await loadIntradayBacktestChartDayAction(
+      symbol,
+      sessionDate,
+      trades,
+      strategyId ?? undefined,
+    );
     setLoading(false);
     if (res.error) {
       setError(res.error);
       return;
     }
     setPayload(res.data ?? null);
-  }, [open, sessionDate, symbol, trades]);
+  }, [open, sessionDate, symbol, trades, strategyId]);
 
   useEffect(() => {
     fetchDay();
@@ -122,10 +129,10 @@ export function IntradayBacktestChartModal({
     candleRef.current = candles;
     candles.setData(payload.candles as CandlestickData<Time>[]);
 
-    const ema9 = chart.addLineSeries({ color: '#34d399', lineWidth: 1, title: 'EMA9' });
-    ema9.setData(payload.ema9 as LineData<Time>[]);
-    const ema20 = chart.addLineSeries({ color: '#60a5fa', lineWidth: 1, title: 'EMA20' });
-    ema20.setData(payload.ema20 as LineData<Time>[]);
+    for (const line of payload.lines) {
+      const s = chart.addLineSeries({ color: line.color, lineWidth: 1, title: line.label });
+      s.setData(line.points as LineData<Time>[]);
+    }
 
     const seriesMarkers: SeriesMarker<Time>[] = payload.markers.map(m => ({
       time: m.time as Time,
@@ -173,7 +180,9 @@ export function IntradayBacktestChartModal({
             {symbol} · {sessionDate || '—'} · {strategyLabel}
           </p>
           <p className="text-[10px] text-fg-dim">
-            RTH 1-min · {dayTrades.length} simulated trade(s) this session · E / X markers
+            {payload?.barLabel ?? 'RTH'} · {payload?.lines.map(l => l.label).join(' / ')}
+            {payload ? ' · ' : ''}
+            {dayTrades.length} simulated trade(s) this session · E / X markers
           </p>
         </div>
         <div className="flex items-center gap-2">

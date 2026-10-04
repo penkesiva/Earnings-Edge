@@ -429,6 +429,7 @@ function BacktestRunDetails({ run }: { run: RunRow }) {
         open={chartOpen}
         onClose={() => setChartOpen(false)}
         symbol={run.symbol}
+        strategyId={run.strategy_id}
         strategyLabel={stratLabel}
         trades={trades}
       />

@@ -1,6 +1,7 @@
 import { addCalendarDays, isUsEquityWeekday, usEquityTimestamp } from '@/lib/earningsDate';
 import { getHistoricalBars } from '@/lib/alpaca';
 import type { AlpacaAuth } from '@/lib/alpaca';
+import { filterRegularSessionBars } from '@/lib/intraday/indicators/engine';
 import type { MinuteBar } from '@/lib/intraday/types';
 
 export async function fetchMinuteBarsForDay(
@@ -28,6 +29,23 @@ export async function fetchMinuteBarsForDay(
       c: b.c!,
       v: b.v ?? 0,
     }));
+}
+
+/** RTH 1m bars for the `sessions` trading days before `sessionDate` that have data, oldest first. */
+export async function fetchPriorSessionBars(
+  symbol: string,
+  sessionDate: string,
+  sessions: number,
+  auth: AlpacaAuth,
+): Promise<MinuteBar[]> {
+  const candidates = listRecentTradingDates(addCalendarDays(sessionDate, -1), sessions + 4).reverse();
+  const found: MinuteBar[][] = [];
+  for (const d of candidates) {
+    if (found.length >= sessions) break;
+    const bars = filterRegularSessionBars(await fetchMinuteBarsForDay(symbol, d, auth), d);
+    if (bars.length >= 20) found.unshift(bars);
+  }
+  return found.flat();
 }
 
 export function listRecentTradingDates(endDate: string, calendarDays: number): string[] {
