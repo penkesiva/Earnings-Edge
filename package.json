@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "seed": "tsx scripts/seed.ts",
-    "scan:local": "tsx scripts/scan-local.ts"
+    "scan:local": "tsx scripts/scan-local.ts",
+    "backtest": "tsx scripts/backtest.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",
