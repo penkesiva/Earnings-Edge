@@ -1,7 +1,9 @@
+import { DEFAULT_SAM_EMA50_200_CONFIG } from '@/lib/intraday/strategies/samEma50200/config';
 import {
   INTRADAY_STRATEGY_BUY_WEAK_SELL_STRONG_V1,
   INTRADAY_STRATEGY_EMA_TREND_DAY_V1,
   INTRADAY_STRATEGY_EMA_TREND_DAY_V2,
+  INTRADAY_STRATEGY_SAM_EMA50_200_V1,
   INTRADAY_STRATEGY_TREND_RESUMPTION_V1_CONFIRMED,
   INTRADAY_STRATEGY_TREND_RESUMPTION_V1_EARLY,
   INTRADAY_STRATEGY_VWAP_OR_V1,
@@ -44,8 +46,19 @@ export const INTRADAY_STRATEGIES = [
     description:
       'Experimental: wait for BUILDING → EXPANDING before entry after reset. Same exits as Early variant.',
   },
+  {
+    id: INTRADAY_STRATEGY_SAM_EMA50_200_V1,
+    label: 'SAM EMA 50/200 (experimental)',
+    description:
+      '5m bars, EMAs warmed from prior sessions. Long when price > EMA50 > EMA200 and EMA50 slope is sharp and accelerating, confirmed by MACD + RSI. Exit on 1.5 ATR stop, close below EMA50, MACD cross down in profit, or EOD.',
+  },
 ] as const;
 
 export function strategyLabel(id: string): string {
   return INTRADAY_STRATEGIES.find(s => s.id === id)?.label ?? id;
+}
+
+/** Prior RTH sessions of 1m bars the strategy needs before the session being simulated. */
+export function strategyWarmupSessions(id: string): number {
+  return id === INTRADAY_STRATEGY_SAM_EMA50_200_V1 ? DEFAULT_SAM_EMA50_200_CONFIG.warmupSessions : 0;
 }

@@ -5,6 +5,7 @@ import { fetchMinuteBarsForDay, listRecentTradingDates } from '@/lib/intraday/da
 import { filterRegularSessionBars } from '@/lib/intraday/indicators/engine';
 import { aggregateV2BacktestMetrics } from '@/lib/intraday/backtest/metricsV2';
 import { DEFAULT_EMA_TREND_DAY_V2_CONFIG } from '@/lib/intraday/strategies/emaTrendDayV2/config';
+import { strategyWarmupSessions } from '@/lib/intraday/strategies/registry';
 import { simulateStrategyDay } from '@/lib/intraday/strategies/runStrategyDay';
 import {
   INTRADAY_STRATEGY_EMA_TREND_DAY_V2,
@@ -12,6 +13,7 @@ import {
   type BacktestMetrics,
   type BacktestMetricsExtended,
   type BacktestTrade,
+  type MinuteBar,
   type SignalLogEntry,
 } from '@/lib/intraday/types';
 
@@ -32,26 +34,37 @@ export async function runIntradayBacktest(input: {
 }): Promise<BacktestRunResult> {
   const strategyId = input.strategyId ?? INTRADAY_STRATEGY_VWAP_OR_V1;
   const end = lastUsEquityBacktestEndDate();
-  const dates = listRecentTradingDates(end, input.calendarDays);
+  const warmupSessions = strategyWarmupSessions(strategyId);
+  const allDates = listRecentTradingDates(end, input.calendarDays + warmupSessions);
   const allTrades: BacktestTrade[] = [];
   const allSignalLog: SignalLogEntry[] = [];
   const errors: string[] = [];
   let daysWithData = 0;
+  const priorSessions: MinuteBar[][] = [];
 
-  for (const sessionDate of dates) {
+  for (let d = 0; d < allDates.length; d++) {
+    const sessionDate = allDates[d];
+    const isWarmupOnly = d < warmupSessions;
     try {
       const raw = await fetchMinuteBarsForDay(input.symbol, sessionDate, input.auth);
       const bars = filterRegularSessionBars(raw, sessionDate);
       if (bars.length < 20) continue;
-      daysWithData += 1;
-      const day = simulateStrategyDay(
-        strategyId,
-        sessionDate,
-        bars,
-        input.effectiveBudgetUsd,
-      );
-      allTrades.push(...day.trades);
-      if (day.signalLog) allSignalLog.push(...day.signalLog);
+      if (!isWarmupOnly) {
+        daysWithData += 1;
+        const day = simulateStrategyDay(
+          strategyId,
+          sessionDate,
+          bars,
+          input.effectiveBudgetUsd,
+          warmupSessions > 0 ? { priorBars: priorSessions.flat() } : undefined,
+        );
+        allTrades.push(...day.trades);
+        if (day.signalLog) allSignalLog.push(...day.signalLog);
+      }
+      if (warmupSessions > 0) {
+        priorSessions.push(bars);
+        if (priorSessions.length > warmupSessions) priorSessions.shift();
+      }
     } catch (e) {
       errors.push(`${sessionDate}: ${e instanceof Error ? e.message : String(e)}`);
     }

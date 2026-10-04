@@ -4,6 +4,7 @@ export const INTRADAY_STRATEGY_EMA_TREND_DAY_V1 = 'ema_trend_day_v1' as const;
 export const INTRADAY_STRATEGY_EMA_TREND_DAY_V2 = 'ema_trend_day_v2' as const;
 export const INTRADAY_STRATEGY_TREND_RESUMPTION_V1_EARLY = 'trend_resumption_v1_early' as const;
 export const INTRADAY_STRATEGY_TREND_RESUMPTION_V1_CONFIRMED = 'trend_resumption_v1_confirmed' as const;
+export const INTRADAY_STRATEGY_SAM_EMA50_200_V1 = 'sam_ema50_200_v1' as const;
 
 export type IntradayStrategyId =
   | typeof INTRADAY_STRATEGY_VWAP_OR_V1
@@ -11,7 +12,8 @@ export type IntradayStrategyId =
   | typeof INTRADAY_STRATEGY_EMA_TREND_DAY_V1
   | typeof INTRADAY_STRATEGY_EMA_TREND_DAY_V2
   | typeof INTRADAY_STRATEGY_TREND_RESUMPTION_V1_EARLY
-  | typeof INTRADAY_STRATEGY_TREND_RESUMPTION_V1_CONFIRMED;
+  | typeof INTRADAY_STRATEGY_TREND_RESUMPTION_V1_CONFIRMED
+  | typeof INTRADAY_STRATEGY_SAM_EMA50_200_V1;
 
 export type IntradayRunMode = 'backtest' | 'paper' | 'live';
 
@@ -39,7 +41,8 @@ export type SetupType =
   | 'ema_cross_up_confirmed'
   | 'ema_pullback_confirmed'
   | 'trend_resumption_building'
-  | 'trend_resumption_expanding';
+  | 'trend_resumption_expanding'
+  | 'sam_ema50_200';
 
 export type MinuteBar = {
   t: string;
@@ -196,6 +199,31 @@ export type TrendResumptionV1Config = {
   exitOnBearCross: boolean;
 };
 
+/** SAM EMA 50/200 — 5m bars, EMAs warmed up from prior sessions. */
+export type SamEma50200Config = {
+  barMinutes: number;
+  warmupSessions: number;
+  emaFast: number;
+  emaSlow: number;
+  slopeLookbackBars: number;
+  minEma50SlopePct: number;
+  macdFast: number;
+  macdSlow: number;
+  macdSignal: number;
+  rsiPeriod: number;
+  rsiMin: number;
+  rsiMax: number;
+  atrPeriod: number;
+  atrStopMult: number;
+  firstEntryEt: string;
+  noNewEntriesAfterEt: string;
+  forceFlatEt: string;
+  maxTradesPerDay: number;
+  cooldownBars: number;
+  slippageBps: number;
+  commissionPerShare: number;
+};
+
 export type SignalLogEntry = {
   sessionDate: string;
   timeEt: string;
@@ -232,7 +260,9 @@ export type TradeExitReason =
   | 'ema20_close'
   | 'vwap_close'
   | 'swing_low_break'
-  | 'session_halt_losses';
+  | 'session_halt_losses'
+  | 'ema50_close'
+  | 'macd_cross_down';
 
 export type BacktestTrade = {
   sessionDate: string;
