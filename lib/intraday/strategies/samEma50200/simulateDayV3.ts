@@ -49,6 +49,7 @@ export function simulateSamV3(
   let open = false;
   let entryPrice = 0;
   let entryTime = '';
+  let entryIdx = 0;
   let entrySetup: SetupType = config.crossSetupType;
   let initialStop = 0;
   let trailStop = 0;
@@ -142,18 +143,28 @@ export function simulateSamV3(
 
     if (open) {
       const prevParts = candleParts(prev);
+      const candleSellsActive = i - entryIdx >= config.exitGraceBars;
+      const atrP = Number.isFinite(a[p]) ? a[p] : 0;
+      const gapLevel = prev.l - config.gapExitMinAtr * atrP;
+      const ema50BreakLevel = e50[p] - config.ema50BreakBufferAtr * atrP;
       let exit: { reason: TradeExitReason; line: string } | null = null;
-      if (b.o < prev.l) {
+      if (candleSellsActive && b.o < gapLevel) {
         exit = {
           reason: 'gap_below_prev_low',
-          line: `open ${b.o.toFixed(2)} < previous low ${prev.l.toFixed(2)}`,
-        };
-      } else if (Number.isFinite(e50[p]) && prev.c < e50[p] && b.o < e50[p]) {
-        exit = {
-          reason: 'ema50_break_confirmed',
-          line: `previous close ${prev.c.toFixed(2)} and open ${b.o.toFixed(2)} both below EMA50 ${e50[p].toFixed(2)}`,
+          line: `open ${b.o.toFixed(2)} < previous low ${prev.l.toFixed(2)} - ${config.gapExitMinAtr}x ATR ${atrP.toFixed(3)} = ${gapLevel.toFixed(2)}`,
         };
       } else if (
+        candleSellsActive &&
+        Number.isFinite(e50[p]) &&
+        prev.c < ema50BreakLevel &&
+        b.o < e50[p]
+      ) {
+        exit = {
+          reason: 'ema50_break_confirmed',
+          line: `previous close ${prev.c.toFixed(2)} < EMA50 ${e50[p].toFixed(2)} - ${config.ema50BreakBufferAtr}x ATR = ${ema50BreakLevel.toFixed(2)}; open ${b.o.toFixed(2)} below EMA50`,
+        };
+      } else if (
+        candleSellsActive &&
         isUpperWickRejection(prev, config.wickBodyRatio, config.upperWickRangePct) &&
         prev.h >= highSinceEntry &&
         b.o < prevParts.bodyMid
@@ -242,13 +253,17 @@ export function simulateSamV3(
     if (isUpperWickRejection(prev, config.wickBodyRatio, config.upperWickRangePct)) continue;
 
     const fill = applyLongFillPrice(b.o, config);
-    const stop = Math.max(trigger.stop, fill - config.atrStopMult * a[p]);
+    const stop = Math.min(
+      Math.max(trigger.stop, fill - config.atrStopMult * a[p]),
+      fill - config.minStopAtrMult * a[p],
+    );
     if (!(stop < fill)) continue;
 
     if (trigger.setup === config.crossSetupType) usedCrossIdx = lastCrossIdx;
     entrySetup = trigger.setup;
     entryPrice = fill;
     entryTime = t;
+    entryIdx = i;
     initialStop = stop;
     riskR = fill - stop;
     trailStop = stop;
@@ -260,7 +275,8 @@ export function simulateSamV3(
     reasons = [
       ...trigger.lines,
       `confirm: open ${b.o.toFixed(2)} >= previous close ${prev.c.toFixed(2)}, no upper-wick rejection`,
-      `stop ${stop.toFixed(2)} (R ${riskR.toFixed(2)}), trail after +${config.trailActivateR}R`,
+      `stop ${stop.toFixed(2)} (R ${riskR.toFixed(2)}, ${config.minStopAtrMult}-${config.atrStopMult}x ATR ${a[p].toFixed(3)}), trail after +${config.trailActivateR}R`,
+      `candle sells start after ${config.exitGraceBars} candles`,
     ];
     open = true;
 

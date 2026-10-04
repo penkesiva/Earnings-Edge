@@ -68,6 +68,12 @@ export const DEFAULT_SAM_V3_CONFIG: SamV3Config = {
   trailActivateR: 1,
   trailLookbackBars: 3,
   crossReversalStopLookbackBars: 3,
+  minStopAtrMult: 1,
+  exitGraceBars: 3,
+  gapExitMinAtr: 0.25,
+  ema50BreakBufferAtr: 0.1,
+  noNewEntriesAfterEt: '15:54',
+  forceFlatEt: '15:59',
 };
 
 export function samConfigForStrategy(strategyId: string | null | undefined): SamEma50200Config | null {

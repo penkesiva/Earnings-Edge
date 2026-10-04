@@ -64,7 +64,7 @@ export const INTRADAY_STRATEGIES = [
     id: INTRADAY_STRATEGY_SAM_EMA50_200_V3,
     label: 'SAM EMA 50/200 v3 · candles (experimental)',
     description:
-      '1m bars, decisions at the next candle open. Buys on v2 triggers or a hammer off EMA50, only if the open beats the previous close and the previous candle is not an upper-wick rejection. Sells on gap below previous low, EMA50 break confirmed by the next open, upper-wick rejection at highs, trailing stop under last 3 lows after +1R, EMA50 slope backup, EOD.',
+      '1m bars, decisions at the next candle open. Buys (until 15:54 ET) on v2 triggers or a hammer off EMA50, only if the open is at or above the previous close and the previous candle is not an upper-wick rejection. Stop 1-3x ATR below entry. After a 3-candle grace period, sells on a gap of 0.25x ATR below the previous low, an EMA50 break of 0.1x ATR confirmed by the next open, or an upper-wick rejection at highs. Trailing stop under last 3 lows after +1R, EMA50 slope backup, flat at 15:59 ET.',
   },
 ] as const;
 

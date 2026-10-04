@@ -258,6 +258,14 @@ export type SamV3Config = SamEma50200Config & {
   /** Initial stop for cross / reversal entries: lowest low of this many candles. */
   crossReversalStopLookbackBars: number;
   hammerSetupType: SetupType;
+  /** Initial stop is at least this many ATR below entry. */
+  minStopAtrMult: number;
+  /** Candle sells (gap / EMA50 break / upper wick) wait this many candles after entry. */
+  exitGraceBars: number;
+  /** Gap sell needs open at least this many ATR below the previous low. */
+  gapExitMinAtr: number;
+  /** EMA50 break needs a close at least this many ATR below EMA50. */
+  ema50BreakBufferAtr: number;
 };
 
 export type SignalLogEntry = {
