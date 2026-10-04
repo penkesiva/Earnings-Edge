@@ -6,6 +6,7 @@ import {
 } from '@/lib/intradayPageActions';
 import {
   uniqueTradeSessionDates,
+  type ChartLineSeries,
   type ChartMarkerPoint as ChartMarker,
 } from '@/lib/intraday/chart/chartDayPayload';
 import type { BacktestTrade } from '@/lib/intraday/types';
@@ -47,6 +48,57 @@ const BUY_COLOR = '#38bdf8';
 const TRADE_WIN = '#22c55e';
 const TRADE_LOSS = '#ef4444';
 
+const OVERLAY_GROUPS: { id: string; label: string }[] = [
+  { id: 'stops', label: 'Stop / trail' },
+  { id: 'atr', label: 'ATR' },
+  { id: 'atrBands', label: 'ATR stop range' },
+  { id: 'exitLevels', label: 'Exit levels' },
+  { id: 'slope', label: 'EMA slopes' },
+];
+const DEFAULT_OVERLAYS = ['stops', 'atr'];
+const OVERLAY_STORAGE_KEY = 'intraday-chart-overlays-v1';
+
+function loadOverlays(): Set<string> {
+  try {
+    const raw = window.localStorage.getItem(OVERLAY_STORAGE_KEY);
+    if (raw) return new Set(JSON.parse(raw) as string[]);
+  } catch {
+    /* ignore */
+  }
+  return new Set(DEFAULT_OVERLAYS);
+}
+
+const LINE_STYLE = { solid: LineStyle.Solid, dashed: LineStyle.Dashed, dotted: LineStyle.Dotted };
+
+type DrawnLine = { line: ChartLineSeries; series: ISeriesApi<'Line'> };
+type HoverRow = { label: string; color: string; value: string };
+type Hover = { time: string; ohlc: string; rows: HoverRow[] };
+
+function lineVisible(line: ChartLineSeries, on: Set<string>): boolean {
+  return !line.group || on.has(line.group);
+}
+
+/** Stack the price pane above the visible indicator panes. */
+function applyPaneLayout(chart: IChartApi, drawn: DrawnLine[], on: Set<string>) {
+  const hasPane = (pane: string) => drawn.some(d => d.line.pane === pane && lineVisible(d.line, on));
+  const showAtr = hasPane('atr');
+  const showSlope = hasPane('slope');
+  const lower = (showAtr ? 1 : 0) + (showSlope ? 1 : 0);
+  chart.priceScale('right').applyOptions({
+    scaleMargins: { top: 0.05, bottom: lower === 0 ? 0.05 : lower === 1 ? 0.26 : 0.42 },
+  });
+  if (drawn.some(d => d.line.pane === 'atr')) {
+    chart.priceScale('atr').applyOptions({
+      scaleMargins: showSlope ? { top: 0.6, bottom: 0.22 } : { top: 0.77, bottom: 0.02 },
+    });
+  }
+  if (drawn.some(d => d.line.pane === 'slope')) {
+    chart.priceScale('slope').applyOptions({
+      scaleMargins: showAtr ? { top: 0.8, bottom: 0.02 } : { top: 0.77, bottom: 0.02 },
+    });
+  }
+}
+
 type Props = {
   open: boolean;
   onClose: () => void;
@@ -76,6 +128,29 @@ export function IntradayBacktestChartModal({
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candleRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
+  const drawnRef = useRef<DrawnLine[]>([]);
+  const [overlays, setOverlays] = useState<Set<string>>(() => new Set(DEFAULT_OVERLAYS));
+  const overlaysRef = useRef(overlays);
+  overlaysRef.current = overlays;
+  const [hover, setHover] = useState<Hover | null>(null);
+
+  useEffect(() => {
+    setOverlays(loadOverlays());
+  }, []);
+
+  const toggleOverlay = (id: string) => {
+    setOverlays(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      try {
+        window.localStorage.setItem(OVERLAY_STORAGE_KEY, JSON.stringify([...next]));
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -168,16 +243,56 @@ export function IntradayBacktestChartModal({
     candleRef.current = candles;
     candles.setData(payload.candles as CandlestickData<Time>[]);
 
+    const drawn: DrawnLine[] = [];
+    let zeroLineDone = false;
     for (const line of payload.lines) {
+      const pane = line.pane ?? 'price';
       const s = chart.addLineSeries({
         color: line.color,
-        lineWidth: 2,
-        title: line.label,
+        lineWidth: line.width ?? 2,
+        lineStyle: LINE_STYLE[line.style ?? 'solid'],
+        priceScaleId: pane === 'price' ? 'right' : pane,
         priceLineVisible: false,
         lastValueVisible: false,
+        crosshairMarkerVisible: pane !== 'price' || !line.group,
+        visible: lineVisible(line, overlaysRef.current),
       });
       s.setData(line.points as LineData<Time>[]);
+      if (pane === 'slope' && !zeroLineDone) {
+        s.createPriceLine({
+          price: 0,
+          color: '#52525b',
+          lineWidth: 1,
+          lineStyle: LineStyle.Dotted,
+          axisLabelVisible: false,
+          title: '',
+        });
+        zeroLineDone = true;
+      }
+      drawn.push({ line, series: s });
     }
+    drawnRef.current = drawn;
+    applyPaneLayout(chart, drawn, overlaysRef.current);
+
+    chart.subscribeCrosshairMove(param => {
+      if (param.time == null) {
+        setHover(null);
+        return;
+      }
+      const c = param.seriesData.get(candles) as CandlestickData<Time> | undefined;
+      const rows: HoverRow[] = [];
+      for (const d of drawnRef.current) {
+        if (!lineVisible(d.line, overlaysRef.current)) continue;
+        const v = param.seriesData.get(d.series) as LineData<Time> | undefined;
+        if (!v || !Number.isFinite(v.value)) continue;
+        rows.push({ label: d.line.label, color: d.line.color, value: v.value.toFixed(d.line.precision ?? 2) });
+      }
+      setHover({
+        time: `${formatPtClock(param.time)} PT`,
+        ohlc: c ? `O ${c.open.toFixed(2)} H ${c.high.toFixed(2)} L ${c.low.toFixed(2)} C ${c.close.toFixed(2)}` : '',
+        rows,
+      });
+    });
 
     const byTrade = new Map<number, { entry?: ChartMarker; exit?: ChartMarker }>();
     for (const m of payload.markers) {
@@ -228,12 +343,22 @@ export function IntradayBacktestChartModal({
       chart.remove();
       chartRef.current = null;
       candleRef.current = null;
+      drawnRef.current = [];
+      setHover(null);
     };
   }, [open, payload]);
+
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart) return;
+    for (const d of drawnRef.current) d.series.applyOptions({ visible: lineVisible(d.line, overlays) });
+    applyPaneLayout(chart, drawnRef.current, overlays);
+  }, [overlays, payload]);
 
   if (!open) return null;
 
   const dayTrades = trades.filter(t => t.sessionDate === sessionDate);
+  const availableGroups = OVERLAY_GROUPS.filter(g => payload?.lines.some(l => l.group === g.id));
 
   return (
     <div
@@ -248,7 +373,11 @@ export function IntradayBacktestChartModal({
             {symbol} · {sessionDate || '—'} · {strategyLabel}
           </p>
           <p className="text-[10px] text-fg-dim">
-            {payload?.barLabel ?? 'RTH'} · {payload?.lines.map(l => l.label).join(' / ')}
+            {payload?.barLabel ?? 'RTH'} ·{' '}
+            {payload?.lines
+              .filter(l => !l.group)
+              .map(l => l.label)
+              .join(' / ')}
             {payload ? ' · ' : ''}
             {dayTrades.length} simulated trade(s) this session · times in Pacific (PT)
           </p>
@@ -301,7 +430,46 @@ export function IntradayBacktestChartModal({
         <p className="px-4 py-3 text-xs text-fg-dim">Loading Alpaca bars…</p>
       ) : null}
 
-      <div ref={containerRef} className="flex-1 min-h-[240px] w-full" />
+      {availableGroups.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-1.5 border-b border-border-subtle px-4 py-2 shrink-0">
+          <span className="text-[10px] font-bold tracking-widest text-fg-dim mr-1">OVERLAYS</span>
+          {availableGroups.map(g => {
+            const on = overlays.has(g.id);
+            return (
+              <button
+                key={g.id}
+                type="button"
+                aria-pressed={on}
+                onClick={() => toggleOverlay(g.id)}
+                className={`h-7 px-2.5 border text-[11px] font-bold transition-colors ${
+                  on
+                    ? 'border-accent bg-accent-muted text-accent'
+                    : 'border-border text-fg-dim hover:bg-bg-hover'
+                }`}
+              >
+                {g.label}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+
+      <div className="relative flex-1 min-h-[240px] w-full">
+        <div ref={containerRef} className="absolute inset-0" />
+        {hover ? (
+          <div className="pointer-events-none absolute left-2 top-2 z-10 max-w-[22rem] border border-border bg-bg/85 px-2 py-1.5 text-[10px] font-mono leading-tight backdrop-blur-sm">
+            <p className="font-bold text-fg">
+              {hover.time} <span className="font-normal text-fg-subtle">{hover.ohlc}</span>
+            </p>
+            {hover.rows.map(r => (
+              <p key={r.label} className="flex justify-between gap-3">
+                <span style={{ color: r.color }}>{r.label}</span>
+                <span className="text-fg">{r.value}</span>
+              </p>
+            ))}
+          </div>
+        ) : null}
+      </div>
 
       {dayTrades.length > 0 ? (
         <div className="shrink-0 max-h-28 overflow-auto border-t border-border-subtle px-4 py-2 text-[10px] font-mono text-fg-subtle divide-y divide-border-subtle">

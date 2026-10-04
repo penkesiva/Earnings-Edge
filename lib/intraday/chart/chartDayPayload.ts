@@ -11,7 +11,21 @@ export type ChartBarPoint = {
 
 export type ChartLinePoint = { time: number; value: number };
 
-export type ChartLineSeries = { label: string; color: string; points: ChartLinePoint[] };
+export type ChartPane = 'price' | 'atr' | 'slope';
+
+export type ChartLineSeries = {
+  label: string;
+  color: string;
+  points: ChartLinePoint[];
+  /** Defaults to 'price' (drawn over the candles). Other panes get their own scale below. */
+  pane?: ChartPane;
+  style?: 'solid' | 'dashed' | 'dotted';
+  width?: 1 | 2;
+  /** Overlay toggle group; lines without a group are always shown. */
+  group?: string;
+  /** Legend decimals. */
+  precision?: number;
+};
 
 export type ChartMarkerPoint = {
   time: number;
