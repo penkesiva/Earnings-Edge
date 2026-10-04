@@ -1,4 +1,5 @@
 import {
+  findBarByEt,
   markersForSessionTrades,
   toCandlePoints,
   toLinePoints,
@@ -10,9 +11,14 @@ import { DEFAULT_SAM_EMA50_200_CONFIG } from '@/lib/intraday/strategies/samEma50
 import { aggregateBars, ema, type AggBar } from '@/lib/intraday/strategies/samEma50200/indicators';
 import type { BacktestTrade, MinuteBar, SamEma50200Config } from '@/lib/intraday/types';
 
-/** SAM trade times are 5m bar close times, so match on `endEt`. */
+/** v1/v2 trade times are bar close times, so match on `endEt`. */
 function findAggBarByEndEt(bars: MinuteBar[], hhmm: string): MinuteBar | null {
   return (bars as AggBar[]).find(b => b.endEt === hhmm) ?? null;
+}
+
+/** v3 fills at the bar open; `session_end` exits still use the last bar's close time. */
+function findAggBarByStartEt(bars: MinuteBar[], hhmm: string): MinuteBar | null {
+  return findBarByEt(bars, hhmm) ?? findAggBarByEndEt(bars, hhmm);
 }
 
 export function buildSamChartDay(
@@ -38,6 +44,11 @@ export function buildSamChartDay(
       { label: `EMA${config.emaFast}`, color: '#fbbf24', points: toLinePoints(today, todayE50) },
       { label: `EMA${config.emaSlow}`, color: '#c084fc', points: toLinePoints(today, todayE200) },
     ],
-    markers: markersForSessionTrades(sessionDate, today, trades, findAggBarByEndEt),
+    markers: markersForSessionTrades(
+      sessionDate,
+      today,
+      trades,
+      config.tradeTimeAnchor === 'bar_start' ? findAggBarByStartEt : findAggBarByEndEt,
+    ),
   };
 }

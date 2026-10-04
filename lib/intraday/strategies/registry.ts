@@ -5,6 +5,7 @@ import {
   INTRADAY_STRATEGY_EMA_TREND_DAY_V2,
   INTRADAY_STRATEGY_SAM_EMA50_200_V1,
   INTRADAY_STRATEGY_SAM_EMA50_200_V2,
+  INTRADAY_STRATEGY_SAM_EMA50_200_V3,
   INTRADAY_STRATEGY_TREND_RESUMPTION_V1_CONFIRMED,
   INTRADAY_STRATEGY_TREND_RESUMPTION_V1_EARLY,
   INTRADAY_STRATEGY_VWAP_OR_V1,
@@ -58,6 +59,12 @@ export const INTRADAY_STRATEGIES = [
     label: 'SAM EMA 50/200 v2 · 1-min (experimental)',
     description:
       '1m bars. Buys on EMA50/200 bull cross, or when EMA50 and EMA200 were both sliding down slowly and both turn to a positive slope. Same exits as v1: EMA50 slope reversal to -2/3 of peak, 3x ATR disaster stop, EOD flat.',
+  },
+  {
+    id: INTRADAY_STRATEGY_SAM_EMA50_200_V3,
+    label: 'SAM EMA 50/200 v3 · candles (experimental)',
+    description:
+      '1m bars, decisions at the next candle open. Buys on v2 triggers or a hammer off EMA50, only if the open beats the previous close and the previous candle is not an upper-wick rejection. Sells on gap below previous low, EMA50 break confirmed by the next open, upper-wick rejection at highs, trailing stop under last 3 lows after +1R, EMA50 slope backup, EOD.',
   },
 ] as const;
 

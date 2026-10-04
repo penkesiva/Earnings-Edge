@@ -1,7 +1,9 @@
 import {
   INTRADAY_STRATEGY_SAM_EMA50_200_V1,
   INTRADAY_STRATEGY_SAM_EMA50_200_V2,
+  INTRADAY_STRATEGY_SAM_EMA50_200_V3,
   type SamEma50200Config,
+  type SamV3Config,
 } from '@/lib/intraday/types';
 
 /** Baseline params — not optimized. */
@@ -29,6 +31,7 @@ export const DEFAULT_SAM_EMA50_200_CONFIG: SamEma50200Config = {
   cooldownBars: 2,
   slippageBps: 0,
   commissionPerShare: 0,
+  tradeTimeAnchor: 'bar_end',
 };
 
 /**
@@ -53,8 +56,23 @@ export const DEFAULT_SAM_EMA50_200_V2_CONFIG: SamEma50200Config = {
   cooldownBars: 5,
 };
 
+/** v3: v2 triggers + hammer entry, candle-based exits, all decided at the next candle's open. */
+export const DEFAULT_SAM_V3_CONFIG: SamV3Config = {
+  ...DEFAULT_SAM_EMA50_200_V2_CONFIG,
+  crossSetupType: 'sam_v3_cross',
+  reversalSetupType: 'sam_v3_reversal',
+  hammerSetupType: 'sam_v3_hammer',
+  tradeTimeAnchor: 'bar_start',
+  wickBodyRatio: 2,
+  upperWickRangePct: 0.6,
+  trailActivateR: 1,
+  trailLookbackBars: 3,
+  crossReversalStopLookbackBars: 3,
+};
+
 export function samConfigForStrategy(strategyId: string | null | undefined): SamEma50200Config | null {
   if (strategyId === INTRADAY_STRATEGY_SAM_EMA50_200_V1) return DEFAULT_SAM_EMA50_200_CONFIG;
   if (strategyId === INTRADAY_STRATEGY_SAM_EMA50_200_V2) return DEFAULT_SAM_EMA50_200_V2_CONFIG;
+  if (strategyId === INTRADAY_STRATEGY_SAM_EMA50_200_V3) return DEFAULT_SAM_V3_CONFIG;
   return null;
 }

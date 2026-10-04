@@ -6,6 +6,7 @@ export const INTRADAY_STRATEGY_TREND_RESUMPTION_V1_EARLY = 'trend_resumption_v1_
 export const INTRADAY_STRATEGY_TREND_RESUMPTION_V1_CONFIRMED = 'trend_resumption_v1_confirmed' as const;
 export const INTRADAY_STRATEGY_SAM_EMA50_200_V1 = 'sam_ema50_200_v1' as const;
 export const INTRADAY_STRATEGY_SAM_EMA50_200_V2 = 'sam_ema50_200_v2' as const;
+export const INTRADAY_STRATEGY_SAM_EMA50_200_V3 = 'sam_ema50_200_v3' as const;
 
 export type IntradayStrategyId =
   | typeof INTRADAY_STRATEGY_VWAP_OR_V1
@@ -15,7 +16,8 @@ export type IntradayStrategyId =
   | typeof INTRADAY_STRATEGY_TREND_RESUMPTION_V1_EARLY
   | typeof INTRADAY_STRATEGY_TREND_RESUMPTION_V1_CONFIRMED
   | typeof INTRADAY_STRATEGY_SAM_EMA50_200_V1
-  | typeof INTRADAY_STRATEGY_SAM_EMA50_200_V2;
+  | typeof INTRADAY_STRATEGY_SAM_EMA50_200_V2
+  | typeof INTRADAY_STRATEGY_SAM_EMA50_200_V3;
 
 export type IntradayRunMode = 'backtest' | 'paper' | 'live';
 
@@ -46,7 +48,10 @@ export type SetupType =
   | 'trend_resumption_expanding'
   | 'sam_ema50_200'
   | 'sam_v2_cross'
-  | 'sam_v2_reversal';
+  | 'sam_v2_reversal'
+  | 'sam_v3_cross'
+  | 'sam_v3_reversal'
+  | 'sam_v3_hammer';
 
 export type MinuteBar = {
   t: string;
@@ -236,6 +241,23 @@ export type SamEma50200Config = {
   cooldownBars: number;
   slippageBps: number;
   commissionPerShare: number;
+  /** Which bar time trade times refer to: close of the signal bar, or open of the fill bar. */
+  tradeTimeAnchor: 'bar_end' | 'bar_start';
+};
+
+/** SAM v3 — candle-based entries/exits decided at the open of the next candle. */
+export type SamV3Config = SamEma50200Config & {
+  /** Wick must be at least this multiple of the body (hammer / upper-wick rejection). */
+  wickBodyRatio: number;
+  /** Upper wick share of the candle range for an upper-wick rejection. */
+  upperWickRangePct: number;
+  /** Trailing stop activates once the high since entry reaches entry + this many R. */
+  trailActivateR: number;
+  /** Trailing stop sits under the lowest low of this many completed candles. */
+  trailLookbackBars: number;
+  /** Initial stop for cross / reversal entries: lowest low of this many candles. */
+  crossReversalStopLookbackBars: number;
+  hammerSetupType: SetupType;
 };
 
 export type SignalLogEntry = {
@@ -277,7 +299,11 @@ export type TradeExitReason =
   | 'session_halt_losses'
   | 'ema50_close'
   | 'macd_cross_down'
-  | 'ema50_slope_reversal';
+  | 'ema50_slope_reversal'
+  | 'gap_below_prev_low'
+  | 'ema50_break_confirmed'
+  | 'upper_wick_rejection'
+  | 'trailing_stop';
 
 export type BacktestTrade = {
   sessionDate: string;

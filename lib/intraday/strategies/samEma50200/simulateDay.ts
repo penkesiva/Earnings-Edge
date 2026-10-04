@@ -186,7 +186,7 @@ export function simulateSamEma50200(
  * EMA50 usually turns well before EMA200, so the slow-decline window ends at the last bar where
  * both were still falling, which must be within `reversalMaxTurnBars` of the turn.
  */
-function dualSlopeReversal(
+export function dualSlopeReversal(
   s50: number[],
   s200: number[],
   i: number,
