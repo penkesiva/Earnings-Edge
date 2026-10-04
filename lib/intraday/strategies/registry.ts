@@ -3,6 +3,7 @@ import {
   INTRADAY_STRATEGY_BUY_WEAK_SELL_STRONG_V1,
   INTRADAY_STRATEGY_EMA_TREND_DAY_V1,
   INTRADAY_STRATEGY_EMA_TREND_DAY_V2,
+  INTRADAY_STRATEGY_SAM_EMA11_50_V1,
   INTRADAY_STRATEGY_SAM_EMA50_200_V1,
   INTRADAY_STRATEGY_SAM_EMA50_200_V2,
   INTRADAY_STRATEGY_SAM_EMA50_200_V3,
@@ -65,6 +66,12 @@ export const INTRADAY_STRATEGIES = [
     label: 'SAM EMA 50/200 v3 · candles (experimental)',
     description:
       '1m bars, decisions at the next candle open. Buys (until 15:54 ET) on v2 triggers or a hammer off EMA50, only if the open is at or above the previous close and the previous candle is not an upper-wick rejection. Stop 1-3x ATR below entry. After a 3-candle grace period, sells on a gap of 0.25x ATR below the previous low, an EMA50 break of 0.1x ATR confirmed by the next open, or an upper-wick rejection at highs. Trailing stop under last 3 lows after +1R, EMA50 slope backup, flat at 15:59 ET.',
+  },
+  {
+    id: INTRADAY_STRATEGY_SAM_EMA11_50_V1,
+    label: 'SAM EMA 11/50 · candles (experiment)',
+    description:
+      'Same rules as SAM v3, with EMA11 in place of EMA50 and EMA50 in place of EMA200: EMA11/50 cross or dual slope turn, hammer off EMA11, EMA11 break and EMA11 slope exits. EMA200 is drawn on the chart for reference only.',
   },
 ] as const;
 

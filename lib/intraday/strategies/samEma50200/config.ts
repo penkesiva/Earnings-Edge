@@ -1,4 +1,5 @@
 import {
+  INTRADAY_STRATEGY_SAM_EMA11_50_V1,
   INTRADAY_STRATEGY_SAM_EMA50_200_V1,
   INTRADAY_STRATEGY_SAM_EMA50_200_V2,
   INTRADAY_STRATEGY_SAM_EMA50_200_V3,
@@ -32,6 +33,7 @@ export const DEFAULT_SAM_EMA50_200_CONFIG: SamEma50200Config = {
   slippageBps: 0,
   commissionPerShare: 0,
   tradeTimeAnchor: 'bar_end',
+  chartReferenceEmas: [11],
 };
 
 /**
@@ -76,9 +78,25 @@ export const DEFAULT_SAM_V3_CONFIG: SamV3Config = {
   forceFlatEt: '15:59',
 };
 
+/** Experiment: v3 rules on EMA11/EMA50. EMA200 is drawn on the chart only. */
+export const DEFAULT_SAM_EMA11_50_CONFIG: SamV3Config = {
+  ...DEFAULT_SAM_V3_CONFIG,
+  emaFast: 11,
+  emaSlow: 50,
+  crossSetupType: 'sam_11_50_cross',
+  reversalSetupType: 'sam_11_50_reversal',
+  hammerSetupType: 'sam_11_50_hammer',
+  chartReferenceEmas: [200],
+};
+
+export function isSamV3Config(config: SamEma50200Config): config is SamV3Config {
+  return 'minStopAtrMult' in config;
+}
+
 export function samConfigForStrategy(strategyId: string | null | undefined): SamEma50200Config | null {
   if (strategyId === INTRADAY_STRATEGY_SAM_EMA50_200_V1) return DEFAULT_SAM_EMA50_200_CONFIG;
   if (strategyId === INTRADAY_STRATEGY_SAM_EMA50_200_V2) return DEFAULT_SAM_EMA50_200_V2_CONFIG;
   if (strategyId === INTRADAY_STRATEGY_SAM_EMA50_200_V3) return DEFAULT_SAM_V3_CONFIG;
+  if (strategyId === INTRADAY_STRATEGY_SAM_EMA11_50_V1) return DEFAULT_SAM_EMA11_50_CONFIG;
   return null;
 }

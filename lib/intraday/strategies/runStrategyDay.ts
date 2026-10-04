@@ -3,10 +3,7 @@ import { DEFAULT_EMA_TREND_DAY_V2_CONFIG } from '@/lib/intraday/strategies/emaTr
 import { simulateBuyWeakSellStrongDay } from '@/lib/intraday/strategies/buyWeakSellStrong/simulateDay';
 import { simulateEmaTrendDayV2 } from '@/lib/intraday/strategies/emaTrendDayV2/simulateDay';
 import { simulateEmaTrendDay } from '@/lib/intraday/strategies/emaTrendDay/simulateDay';
-import {
-  DEFAULT_SAM_V3_CONFIG,
-  samConfigForStrategy,
-} from '@/lib/intraday/strategies/samEma50200/config';
+import { isSamV3Config, samConfigForStrategy } from '@/lib/intraday/strategies/samEma50200/config';
 import { simulateSamEma50200 } from '@/lib/intraday/strategies/samEma50200/simulateDay';
 import { simulateSamV3 } from '@/lib/intraday/strategies/samEma50200/simulateDayV3';
 import { trendResumptionV1Config } from '@/lib/intraday/strategies/trendResumptionV1/config';
@@ -16,7 +13,6 @@ import {
   INTRADAY_STRATEGY_BUY_WEAK_SELL_STRONG_V1,
   INTRADAY_STRATEGY_EMA_TREND_DAY_V1,
   INTRADAY_STRATEGY_EMA_TREND_DAY_V2,
-  INTRADAY_STRATEGY_SAM_EMA50_200_V3,
   INTRADAY_STRATEGY_TREND_RESUMPTION_V1_EARLY,
   INTRADAY_STRATEGY_TREND_RESUMPTION_V1_CONFIRMED,
   INTRADAY_STRATEGY_VWAP_OR_V1,
@@ -37,19 +33,13 @@ export function simulateStrategyDay(
   effectiveBudgetUsd: number,
   opts?: { priorBars?: MinuteBar[] },
 ): StrategyDaySimResult {
-  if (strategyId === INTRADAY_STRATEGY_SAM_EMA50_200_V3) {
+  const samConfig = samConfigForStrategy(strategyId);
+  if (samConfig && isSamV3Config(samConfig)) {
     return {
-      trades: simulateSamV3(
-        sessionDate,
-        bars,
-        effectiveBudgetUsd,
-        DEFAULT_SAM_V3_CONFIG,
-        opts?.priorBars ?? [],
-      ).trades,
+      trades: simulateSamV3(sessionDate, bars, effectiveBudgetUsd, samConfig, opts?.priorBars ?? [])
+        .trades,
     };
   }
-
-  const samConfig = samConfigForStrategy(strategyId);
   if (samConfig) {
     return {
       trades: simulateSamEma50200(

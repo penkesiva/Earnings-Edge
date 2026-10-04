@@ -7,6 +7,7 @@ export const INTRADAY_STRATEGY_TREND_RESUMPTION_V1_CONFIRMED = 'trend_resumption
 export const INTRADAY_STRATEGY_SAM_EMA50_200_V1 = 'sam_ema50_200_v1' as const;
 export const INTRADAY_STRATEGY_SAM_EMA50_200_V2 = 'sam_ema50_200_v2' as const;
 export const INTRADAY_STRATEGY_SAM_EMA50_200_V3 = 'sam_ema50_200_v3' as const;
+export const INTRADAY_STRATEGY_SAM_EMA11_50_V1 = 'sam_ema11_50_v1' as const;
 
 export type IntradayStrategyId =
   | typeof INTRADAY_STRATEGY_VWAP_OR_V1
@@ -17,7 +18,8 @@ export type IntradayStrategyId =
   | typeof INTRADAY_STRATEGY_TREND_RESUMPTION_V1_CONFIRMED
   | typeof INTRADAY_STRATEGY_SAM_EMA50_200_V1
   | typeof INTRADAY_STRATEGY_SAM_EMA50_200_V2
-  | typeof INTRADAY_STRATEGY_SAM_EMA50_200_V3;
+  | typeof INTRADAY_STRATEGY_SAM_EMA50_200_V3
+  | typeof INTRADAY_STRATEGY_SAM_EMA11_50_V1;
 
 export type IntradayRunMode = 'backtest' | 'paper' | 'live';
 
@@ -51,7 +53,10 @@ export type SetupType =
   | 'sam_v2_reversal'
   | 'sam_v3_cross'
   | 'sam_v3_reversal'
-  | 'sam_v3_hammer';
+  | 'sam_v3_hammer'
+  | 'sam_11_50_cross'
+  | 'sam_11_50_reversal'
+  | 'sam_11_50_hammer';
 
 export type MinuteBar = {
   t: string;
@@ -243,6 +248,8 @@ export type SamEma50200Config = {
   commissionPerShare: number;
   /** Which bar time trade times refer to: close of the signal bar, or open of the fill bar. */
   tradeTimeAnchor: 'bar_end' | 'bar_start';
+  /** Chart-only EMA lines; no rule reads them. */
+  chartReferenceEmas: number[];
 };
 
 /** SAM v3 — candle-based entries/exits decided at the open of the next candle. */
@@ -264,7 +271,7 @@ export type SamV3Config = SamEma50200Config & {
   exitGraceBars: number;
   /** Gap sell needs open at least this many ATR below the previous low. */
   gapExitMinAtr: number;
-  /** EMA50 break needs a close at least this many ATR below EMA50. */
+  /** Fast-EMA break needs a close at least this many ATR below the fast EMA. */
   ema50BreakBufferAtr: number;
 };
 

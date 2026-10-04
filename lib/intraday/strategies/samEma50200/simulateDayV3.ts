@@ -42,6 +42,8 @@ export function simulateSamV3(
   const totalShares = sharesFromBudget(effectiveBudgetUsd, series[firstToday].o);
   if (!totalShares) return { trades };
 
+  const F = `EMA${config.emaFast}`;
+  const S = `EMA${config.emaSlow}`;
   const firstEntry = etHHMMToMinutes(config.firstEntryEt);
   const noNewEntriesAfter = etHHMMToMinutes(config.noNewEntriesAfterEt);
   const forceFlat = etHHMMToMinutes(config.forceFlatEt);
@@ -161,7 +163,7 @@ export function simulateSamV3(
       ) {
         exit = {
           reason: 'ema50_break_confirmed',
-          line: `previous close ${prev.c.toFixed(2)} < EMA50 ${e50[p].toFixed(2)} - ${config.ema50BreakBufferAtr}x ATR = ${ema50BreakLevel.toFixed(2)}; open ${b.o.toFixed(2)} below EMA50`,
+          line: `previous close ${prev.c.toFixed(2)} < ${F} ${e50[p].toFixed(2)} - ${config.ema50BreakBufferAtr}x ATR = ${ema50BreakLevel.toFixed(2)}; open ${b.o.toFixed(2)} below ${F}`,
         };
       } else if (
         candleSellsActive &&
@@ -180,7 +182,7 @@ export function simulateSamV3(
       ) {
         exit = {
           reason: 'ema50_slope_reversal',
-          line: `EMA50 slope ${s50[p].toFixed(4)}% <= -${config.exitSlopeReversalRatio.toFixed(2)} x peak ${peakSlope.toFixed(4)}%`,
+          line: `${F} slope ${s50[p].toFixed(4)}% <= -${config.exitSlopeReversalRatio.toFixed(2)} x peak ${peakSlope.toFixed(4)}%`,
         };
       } else if (tMin >= forceFlat) {
         exit = { reason: 'eod_flat', line: `end of day ${t} ET` };
@@ -214,8 +216,8 @@ export function simulateSamV3(
         setup: config.crossSetupType,
         stop: lowestLow(p - config.crossReversalStopLookbackBars + 1, p),
         lines: [
-          `EMA50 crossed above EMA200 at ${series[lastCrossIdx].endEt} (${series[lastCrossIdx].sessionDate})`,
-          `previous close ${prev.c.toFixed(2)} > EMA50 ${e50[p].toFixed(2)} > EMA200 ${e200[p].toFixed(2)}`,
+          `${F} crossed above ${S} at ${series[lastCrossIdx].endEt} (${series[lastCrossIdx].sessionDate})`,
+          `previous close ${prev.c.toFixed(2)} > ${F} ${e50[p].toFixed(2)} > ${S} ${e200[p].toFixed(2)}`,
         ],
       };
     } else {
@@ -225,7 +227,7 @@ export function simulateSamV3(
           setup: config.reversalSetupType,
           stop: lowestLow(p - config.crossReversalStopLookbackBars + 1, p),
           lines: [
-            `EMA50 + EMA200 slopes both turned positive (${s50[p].toFixed(4)}% / ${s200[p].toFixed(4)}%)`,
+            `${F} + ${S} slopes both turned positive (${s50[p].toFixed(4)}% / ${s200[p].toFixed(4)}%)`,
             `slow decline before the turn: ${rev.downBars}/${config.reversalLookbackBars} bars both falling`,
           ],
         };
@@ -240,7 +242,7 @@ export function simulateSamV3(
           setup: config.hammerSetupType,
           stop: prev.l,
           lines: [
-            `hammer off EMA50 ${e50[p].toFixed(2)}: low ${prev.l.toFixed(2)}, close ${prev.c.toFixed(2)}`,
+            `hammer off ${F} ${e50[p].toFixed(2)}: low ${prev.l.toFixed(2)}, close ${prev.c.toFixed(2)}`,
             `lower wick ${pp.lowerWick.toFixed(2)} vs body ${pp.body.toFixed(2)}`,
           ],
         };

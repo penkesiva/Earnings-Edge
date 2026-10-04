@@ -9,12 +9,16 @@ import {
   type ChartLineSeries,
   type ChartMarkerPoint,
 } from '@/lib/intraday/chart/chartDayPayload';
-import { DEFAULT_SAM_EMA50_200_CONFIG } from '@/lib/intraday/strategies/samEma50200/config';
+import {
+  DEFAULT_SAM_EMA50_200_CONFIG,
+  isSamV3Config as isV3,
+} from '@/lib/intraday/strategies/samEma50200/config';
 import { aggregateBars, atr, ema, slopePct, type AggBar } from '@/lib/intraday/strategies/samEma50200/indicators';
-import type { BacktestTrade, MinuteBar, SamEma50200Config, SamV3Config } from '@/lib/intraday/types';
+import type { BacktestTrade, MinuteBar, SamEma50200Config } from '@/lib/intraday/types';
 
-/** Chart-only reference line; no SAM rule reads it. */
-const REFERENCE_EMA = 11;
+/** Same period keeps the same color across SAM variants. */
+const EMA_COLORS: Record<number, string> = { 11: '#2dd4bf', 50: '#fbbf24', 200: '#c084fc' };
+const EMA_FALLBACK_COLORS = ['#fbbf24', '#c084fc', '#2dd4bf'];
 
 /** v1/v2 trade times are bar close times, so match on `endEt`. */
 function findAggBarByEndEt(bars: MinuteBar[], hhmm: string): MinuteBar | null {
@@ -24,10 +28,6 @@ function findAggBarByEndEt(bars: MinuteBar[], hhmm: string): MinuteBar | null {
 /** v3 fills at the bar open; `session_end` exits still use the last bar's close time. */
 function findAggBarByStartEt(bars: MinuteBar[], hhmm: string): MinuteBar | null {
   return findBarByEt(bars, hhmm) ?? findAggBarByEndEt(bars, hhmm);
-}
-
-function isV3(config: SamEma50200Config): config is SamV3Config {
-  return 'minStopAtrMult' in config;
 }
 
 /** Initial stop from the entry reasons ("stop 363.79 (R ..." in v3, "disaster stop 99.12 (..." in v1/v2). */
@@ -87,7 +87,6 @@ export function buildSamChartDay(
   const closes = series.map(b => b.c);
   const e50 = ema(closes, config.emaFast);
   const e200 = ema(closes, config.emaSlow);
-  const eRef = ema(closes, REFERENCE_EMA);
   const a = atr(series, config.atrPeriod);
   const s50 = series.map((_, i) => slopePct(e50, i, config.slopeLookbackBars));
   const s200 = series.map((_, i) => slopePct(e200, i, config.slopeLookbackBars));
@@ -98,10 +97,17 @@ export function buildSamChartDay(
   /** Value at candle i computed from the previous candle (what the simulator sees at open[i]). */
   const atOpen = (f: (i: number) => number) => today.map((_, k) => (first + k > 0 ? f(first + k) : NaN));
 
+  const emaLine = (period: number, values: number[], fallback: number, ref: boolean): ChartLineSeries => ({
+    label: ref ? `EMA${period} (ref)` : `EMA${period}`,
+    color: EMA_COLORS[period] ?? EMA_FALLBACK_COLORS[fallback],
+    points: toLinePoints(today, fromToday(values)),
+  });
+  const refs = config.chartReferenceEmas.filter(n => n !== config.emaFast && n !== config.emaSlow);
+
   const lines: ChartLineSeries[] = [
-    { label: `EMA${REFERENCE_EMA}`, color: '#2dd4bf', points: toLinePoints(today, fromToday(eRef)) },
-    { label: `EMA${config.emaFast}`, color: '#fbbf24', points: toLinePoints(today, fromToday(e50)) },
-    { label: `EMA${config.emaSlow}`, color: '#c084fc', points: toLinePoints(today, fromToday(e200)) },
+    ...refs.map(n => emaLine(n, ema(closes, n), 2, true)),
+    emaLine(config.emaFast, e50, 0, false),
+    emaLine(config.emaSlow, e200, 1, false),
     {
       label: `ATR${config.atrPeriod}`,
       color: '#f472b6',
@@ -112,7 +118,7 @@ export function buildSamChartDay(
     },
     {
       label: `EMA${config.emaFast} slope %`,
-      color: '#fbbf24',
+      color: EMA_COLORS[config.emaFast] ?? EMA_FALLBACK_COLORS[0],
       pane: 'slope',
       group: 'slope',
       precision: 4,
@@ -120,7 +126,7 @@ export function buildSamChartDay(
     },
     {
       label: `EMA${config.emaSlow} slope %`,
-      color: '#c084fc',
+      color: EMA_COLORS[config.emaSlow] ?? EMA_FALLBACK_COLORS[1],
       pane: 'slope',
       group: 'slope',
       precision: 4,
@@ -151,7 +157,7 @@ export function buildSamChartDay(
   if (isV3(config)) {
     lines.push(
       {
-        label: `EMA50 break level (-${config.ema50BreakBufferAtr}x ATR)`,
+        label: `EMA${config.emaFast} break level (-${config.ema50BreakBufferAtr}x ATR)`,
         color: '#f59e0b',
         style: 'dashed',
         width: 1,
