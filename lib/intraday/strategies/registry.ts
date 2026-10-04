@@ -3,6 +3,7 @@ import {
   INTRADAY_STRATEGY_BUY_WEAK_SELL_STRONG_V1,
   INTRADAY_STRATEGY_EMA_TREND_DAY_V1,
   INTRADAY_STRATEGY_EMA_TREND_DAY_V2,
+  INTRADAY_STRATEGY_SAM_EMA11_200_V1,
   INTRADAY_STRATEGY_SAM_EMA11_50_V1,
   INTRADAY_STRATEGY_SAM_EMA50_200_V1,
   INTRADAY_STRATEGY_SAM_EMA50_200_V2,
@@ -72,6 +73,12 @@ export const INTRADAY_STRATEGIES = [
     label: 'SAM EMA 11/50 · candles (experiment)',
     description:
       'Same rules as SAM v3, with EMA11 in place of EMA50 and EMA50 in place of EMA200: EMA11/50 cross or dual slope turn, hammer off EMA11, EMA11 break and EMA11 slope exits. EMA200 is drawn on the chart for reference only.',
+  },
+  {
+    id: INTRADAY_STRATEGY_SAM_EMA11_200_V1,
+    label: 'SAM EMA 11/200 · candles (experiment)',
+    description:
+      'Same rules as SAM v3, with EMA11 in place of EMA50 (EMA200 stays): EMA11/200 cross or dual slope turn, hammer off EMA11, EMA11 break and EMA11 slope exits. EMA50 is drawn on the chart for reference only.',
   },
 ] as const;
 
