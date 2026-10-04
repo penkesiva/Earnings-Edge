@@ -61,7 +61,10 @@ export type SetupType =
   | 'sam_11_50_hammer'
   | 'sam_11_200_cross'
   | 'sam_11_200_reversal'
-  | 'sam_11_200_hammer';
+  | 'sam_11_200_hammer'
+  | 'sam_v3_reentry'
+  | 'sam_11_50_reentry'
+  | 'sam_11_200_reentry';
 
 export type MinuteBar = {
   t: string;
@@ -270,6 +273,9 @@ export type SamV3Config = SamEma50200Config & {
   /** Initial stop for cross / reversal entries: lowest low of this many candles. */
   crossReversalStopLookbackBars: number;
   hammerSetupType: SetupType;
+  /** After an initial-stop exit, buy once more if a candle closes back above that buy price within this many candles (trend still up). 0 = off. */
+  reentryAfterStopBars: number;
+  reentrySetupType: SetupType;
   /** Initial stop is at least this many ATR below entry. */
   minStopAtrMult: number;
   /** Candle sells (gap / EMA50 break / upper wick) wait this many candles after entry. */

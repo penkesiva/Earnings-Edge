@@ -65,6 +65,8 @@ export const DEFAULT_SAM_V3_CONFIG: SamV3Config = {
   crossSetupType: 'sam_v3_cross',
   reversalSetupType: 'sam_v3_reversal',
   hammerSetupType: 'sam_v3_hammer',
+  reentrySetupType: 'sam_v3_reentry',
+  reentryAfterStopBars: 10,
   tradeTimeAnchor: 'bar_start',
   wickBodyRatio: 2,
   upperWickRangePct: 0.6,
@@ -89,6 +91,7 @@ export const DEFAULT_SAM_EMA11_50_CONFIG: SamV3Config = {
   crossSetupType: 'sam_11_50_cross',
   reversalSetupType: 'sam_11_50_reversal',
   hammerSetupType: 'sam_11_50_hammer',
+  reentrySetupType: 'sam_11_50_reentry',
   chartReferenceEmas: [200],
 };
 
@@ -100,6 +103,7 @@ export const DEFAULT_SAM_EMA11_200_CONFIG: SamV3Config = {
   crossSetupType: 'sam_11_200_cross',
   reversalSetupType: 'sam_11_200_reversal',
   hammerSetupType: 'sam_11_200_hammer',
+  reentrySetupType: 'sam_11_200_reentry',
   chartReferenceEmas: [50],
 };
 

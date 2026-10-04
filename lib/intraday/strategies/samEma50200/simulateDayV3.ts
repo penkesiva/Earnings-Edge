@@ -66,6 +66,8 @@ export function simulateSamV3(
   let cooldownUntil = 0;
   let lastCrossIdx = -1;
   let usedCrossIdx = -1;
+  // Cast keeps TS from narrowing to null: it is reassigned inside afterClose().
+  let reentry = null as { price: number; untilIdx: number } | null;
 
   const lowestLow = (from: number, to: number) => {
     let lo = Infinity;
@@ -110,6 +112,19 @@ export function simulateSamV3(
         : `low ${b.l.toFixed(2)} hit initial stop ${level.toFixed(2)}`,
     );
     return true;
+  };
+
+  /** Bookkeeping once a trade has closed on candle i. A re-entry that stops out does not arm another. */
+  const afterClose = (i: number) => {
+    roundTrips += 1;
+    cooldownUntil = i + config.cooldownBars + 1;
+    const last = trades[trades.length - 1];
+    reentry =
+      config.reentryAfterStopBars > 0 &&
+      last?.exitReason === 'stop' &&
+      last.setupType !== config.reentrySetupType
+        ? { price: last.entryPrice, untilIdx: i + config.reentryAfterStopBars }
+        : null;
   };
 
   /** Fold completed candle i into the open trade's running state. */
@@ -193,10 +208,7 @@ export function simulateSamV3(
       } else if (!checkStops(i, t)) {
         updateOpenState(i);
       }
-      if (!open) {
-        roundTrips += 1;
-        cooldownUntil = i + config.cooldownBars + 1;
-      }
+      if (!open) afterClose(i);
       continue;
     }
 
@@ -246,6 +258,15 @@ export function simulateSamV3(
             `lower wick ${pp.lowerWick.toFixed(2)} vs body ${pp.body.toFixed(2)}`,
           ],
         };
+      } else if (reentry && p <= reentry.untilIdx && trend && prev.c > reentry.price) {
+        trigger = {
+          setup: config.reentrySetupType,
+          stop: lowestLow(p - config.crossReversalStopLookbackBars + 1, p),
+          lines: [
+            `re-entry: close ${prev.c.toFixed(2)} back above stopped-out buy ${reentry.price.toFixed(2)} (within ${config.reentryAfterStopBars} candles of the stop)`,
+            `${F} ${e50[p].toFixed(2)} > ${S} ${e200[p].toFixed(2)}, ${F} rising`,
+          ],
+        };
       }
     }
     if (!trigger) continue;
@@ -262,6 +283,7 @@ export function simulateSamV3(
     if (!(stop < fill)) continue;
 
     if (trigger.setup === config.crossSetupType) usedCrossIdx = lastCrossIdx;
+    reentry = null;
     entrySetup = trigger.setup;
     entryPrice = fill;
     entryTime = t;
@@ -283,8 +305,7 @@ export function simulateSamV3(
     open = true;
 
     if (checkStops(i, t)) {
-      roundTrips += 1;
-      cooldownUntil = i + config.cooldownBars + 1;
+      afterClose(i);
     } else {
       updateOpenState(i);
     }
