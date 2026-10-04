@@ -18,6 +18,9 @@ export type ChartMarkerPoint = {
   kind: 'entry' | 'exit';
   price: number;
   text: string;
+  /** Pairs an entry with its exit (index in the session's trade list). */
+  tradeIndex: number;
+  pnlUsd: number;
 };
 
 export function barUnixSeconds(iso: string): number {
@@ -58,8 +61,8 @@ export function markersForSessionTrades(
   findBar: (bars: MinuteBar[], hhmm: string) => MinuteBar | null = findBarByEt,
 ): ChartMarkerPoint[] {
   const markers: ChartMarkerPoint[] = [];
-  for (const t of trades) {
-    if (t.sessionDate !== sessionDate) continue;
+  const dayTrades = trades.filter(t => t.sessionDate === sessionDate);
+  dayTrades.forEach((t, tradeIndex) => {
     const entryBar = findBar(bars, t.entryTimeEt);
     const exitBar = findBar(bars, t.exitTimeEt);
     const pnl = t.pnlUsd;
@@ -68,19 +71,24 @@ export function markersForSessionTrades(
         time: barUnixSeconds(entryBar.t),
         kind: 'entry',
         price: t.entryPrice,
-        text: `E ${t.setupType}`,
+        text: `BUY ${t.entryPrice.toFixed(2)}`,
+        tradeIndex,
+        pnlUsd: pnl,
       });
     }
     if (exitBar) {
+      const sign = pnl >= 0 ? '+' : '-';
       const exitTag = t.exitReason ? ` · ${t.exitReason}` : '';
       markers.push({
         time: barUnixSeconds(exitBar.t),
         kind: 'exit',
         price: t.exitPrice,
-        text: `X $${pnl.toFixed(0)}${exitTag}`,
+        text: `SELL ${t.exitPrice.toFixed(2)} ${sign}$${Math.abs(pnl).toFixed(0)}${exitTag}`,
+        tradeIndex,
+        pnlUsd: pnl,
       });
     }
-  }
+  });
   return markers.sort((a, b) => a.time - b.time);
 }
 

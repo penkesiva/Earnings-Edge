@@ -50,7 +50,7 @@ export const INTRADAY_STRATEGIES = [
     id: INTRADAY_STRATEGY_SAM_EMA50_200_V1,
     label: 'SAM EMA 50/200 (experimental)',
     description:
-      '5m bars, EMAs warmed from prior sessions. Long when price > EMA50 > EMA200 and EMA50 slope is sharp and accelerating, confirmed by MACD + RSI. Exit on 1.5 ATR stop, close below EMA50, MACD cross down in profit, or EOD.',
+      '5m bars, EMAs warmed from prior sessions. Buy when EMA50 crosses above EMA200 while rising and price > EMA50. Sell all when EMA50 slope turns down to -2/3 of its peak since entry. 3x ATR disaster stop, EOD flat.',
   },
 ] as const;
 

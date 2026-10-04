@@ -81,43 +81,6 @@ export function ema(values: number[], period: number): number[] {
   return out;
 }
 
-export function macd(
-  closes: number[],
-  fast: number,
-  slow: number,
-  signalPeriod: number,
-): { line: number[]; signal: number[]; hist: number[] } {
-  const ef = ema(closes, fast);
-  const es = ema(closes, slow);
-  const line = closes.map((_, i) => ef[i] - es[i]);
-  const signal = ema(line, signalPeriod);
-  const hist = line.map((v, i) => v - signal[i]);
-  return { line, signal, hist };
-}
-
-/** Wilder RSI. */
-export function rsi(closes: number[], period: number): number[] {
-  const out = new Array<number>(closes.length).fill(NaN);
-  if (closes.length <= period) return out;
-  let gain = 0;
-  let loss = 0;
-  for (let i = 1; i <= period; i++) {
-    const d = closes[i] - closes[i - 1];
-    if (d >= 0) gain += d;
-    else loss -= d;
-  }
-  let avgGain = gain / period;
-  let avgLoss = loss / period;
-  out[period] = avgLoss === 0 ? 100 : 100 - 100 / (1 + avgGain / avgLoss);
-  for (let i = period + 1; i < closes.length; i++) {
-    const d = closes[i] - closes[i - 1];
-    avgGain = (avgGain * (period - 1) + Math.max(d, 0)) / period;
-    avgLoss = (avgLoss * (period - 1) + Math.max(-d, 0)) / period;
-    out[i] = avgLoss === 0 ? 100 : 100 - 100 / (1 + avgGain / avgLoss);
-  }
-  return out;
-}
-
 /** Wilder ATR. */
 export function atr(bars: MinuteBar[], period: number): number[] {
   const out = new Array<number>(bars.length).fill(NaN);

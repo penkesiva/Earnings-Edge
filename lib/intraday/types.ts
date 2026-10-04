@@ -206,14 +206,12 @@ export type SamEma50200Config = {
   emaFast: number;
   emaSlow: number;
   slopeLookbackBars: number;
-  minEma50SlopePct: number;
-  macdFast: number;
-  macdSlow: number;
-  macdSignal: number;
-  rsiPeriod: number;
-  rsiMin: number;
-  rsiMax: number;
+  /** Bars after the EMA50/EMA200 bull cross during which entry is still allowed. */
+  crossEntryWindowBars: number;
+  /** Exit when EMA50 slope <= -ratio x peak slope since entry (slope must be negative). */
+  exitSlopeReversalRatio: number;
   atrPeriod: number;
+  /** Disaster stop only; the slope reversal is the main exit. */
   atrStopMult: number;
   firstEntryEt: string;
   noNewEntriesAfterEt: string;
@@ -262,7 +260,8 @@ export type TradeExitReason =
   | 'swing_low_break'
   | 'session_halt_losses'
   | 'ema50_close'
-  | 'macd_cross_down';
+  | 'macd_cross_down'
+  | 'ema50_slope_reversal';
 
 export type BacktestTrade = {
   sessionDate: string;

@@ -4,10 +4,14 @@ import {
   loadIntradayBacktestChartDayAction,
   type IntradayChartDayPayload,
 } from '@/lib/intradayPageActions';
-import { uniqueTradeSessionDates } from '@/lib/intraday/chart/chartDayPayload';
+import {
+  uniqueTradeSessionDates,
+  type ChartMarkerPoint as ChartMarker,
+} from '@/lib/intraday/chart/chartDayPayload';
 import type { BacktestTrade } from '@/lib/intraday/types';
 import {
   createChart,
+  LineStyle,
   type IChartApi,
   type ISeriesApi,
   type SeriesMarker,
@@ -16,6 +20,10 @@ import {
   type LineData,
 } from 'lightweight-charts';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+
+const BUY_COLOR = '#38bdf8';
+const TRADE_WIN = '#22c55e';
+const TRADE_LOSS = '#ef4444';
 
 type Props = {
   open: boolean;
@@ -130,15 +138,44 @@ export function IntradayBacktestChartModal({
     candles.setData(payload.candles as CandlestickData<Time>[]);
 
     for (const line of payload.lines) {
-      const s = chart.addLineSeries({ color: line.color, lineWidth: 1, title: line.label });
+      const s = chart.addLineSeries({
+        color: line.color,
+        lineWidth: 2,
+        title: line.label,
+        priceLineVisible: false,
+        lastValueVisible: false,
+      });
       s.setData(line.points as LineData<Time>[]);
+    }
+
+    const byTrade = new Map<number, { entry?: ChartMarker; exit?: ChartMarker }>();
+    for (const m of payload.markers) {
+      const pair = byTrade.get(m.tradeIndex) ?? {};
+      pair[m.kind] = m;
+      byTrade.set(m.tradeIndex, pair);
+    }
+    for (const { entry, exit } of byTrade.values()) {
+      if (!entry || !exit || exit.time <= entry.time) continue;
+      const seg = chart.addLineSeries({
+        color: exit.pnlUsd >= 0 ? TRADE_WIN : TRADE_LOSS,
+        lineWidth: 2,
+        lineStyle: LineStyle.Dashed,
+        priceLineVisible: false,
+        lastValueVisible: false,
+        crosshairMarkerVisible: false,
+      });
+      seg.setData([
+        { time: entry.time as Time, value: entry.price },
+        { time: exit.time as Time, value: exit.price },
+      ]);
     }
 
     const seriesMarkers: SeriesMarker<Time>[] = payload.markers.map(m => ({
       time: m.time as Time,
       position: m.kind === 'entry' ? 'belowBar' : 'aboveBar',
-      color: m.kind === 'entry' ? '#4ade80' : '#f87171',
+      color: m.kind === 'entry' ? BUY_COLOR : m.pnlUsd >= 0 ? TRADE_WIN : TRADE_LOSS,
       shape: m.kind === 'entry' ? 'arrowUp' : 'arrowDown',
+      size: 2,
       text: m.text,
     }));
     candles.setMarkers(seriesMarkers);
@@ -238,8 +275,18 @@ export function IntradayBacktestChartModal({
       {dayTrades.length > 0 ? (
         <div className="shrink-0 max-h-28 overflow-auto border-t border-border-subtle px-4 py-2 text-[10px] font-mono text-fg-subtle divide-y divide-border-subtle">
           {dayTrades.map((t, i) => (
-            <p key={i}>
-              {t.setupType} {t.entryTimeEt}→{t.exitTimeEt} ${t.pnlUsd.toFixed(2)}
+            <p key={i} className="py-0.5">
+              <span style={{ color: BUY_COLOR }} className="font-bold">
+                BUY {t.entryTimeEt} @ {t.entryPrice.toFixed(2)}
+              </span>
+              {' → '}
+              <span
+                style={{ color: t.pnlUsd >= 0 ? TRADE_WIN : TRADE_LOSS }}
+                className="font-bold"
+              >
+                SELL {t.exitTimeEt} @ {t.exitPrice.toFixed(2)} {t.pnlUsd >= 0 ? '+' : '-'}$
+                {Math.abs(t.pnlUsd).toFixed(2)}
+              </span>
               {t.exitReason ? ` (${t.exitReason})` : ''}
             </p>
           ))}
