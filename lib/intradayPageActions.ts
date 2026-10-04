@@ -21,7 +21,7 @@ import { validateTradingBudget } from '@/lib/intraday/sizing/computeShares';
 import { INTRADAY_STRATEGIES, strategyLabel } from '@/lib/intraday/strategies/registry';
 import { runEmaV2ForensicsReport } from '@/lib/intraday/diagnostics/runEmaV2ForensicsReport';
 import { validateIntradayTicker, normalizeTickerInput } from '@/lib/intraday/validateIntradayTicker';
-import { INTRADAY_STRATEGY_SAM_EMA50_200_V1, INTRADAY_STRATEGY_VWAP_OR_V1 } from '@/lib/intraday/types';
+import { INTRADAY_STRATEGY_VWAP_OR_V1 } from '@/lib/intraday/types';
 import type { BacktestTrade } from '@/lib/intraday/types';
 import { revalidatePath } from 'next/cache';
 
@@ -283,12 +283,10 @@ export async function loadIntradayBacktestChartDayAction(
 
     const dayTrades = tradesJson.filter(t => t.sessionDate === sessionDate);
 
-    if (strategyId === INTRADAY_STRATEGY_SAM_EMA50_200_V1) {
+    const { samConfigForStrategy } = await import('@/lib/intraday/strategies/samEma50200/config');
+    const cfg = samConfigForStrategy(strategyId);
+    if (cfg) {
       const { buildSamChartDay } = await import('@/lib/intraday/strategies/samEma50200/chart');
-      const { DEFAULT_SAM_EMA50_200_CONFIG } = await import(
-        '@/lib/intraday/strategies/samEma50200/config'
-      );
-      const cfg = DEFAULT_SAM_EMA50_200_CONFIG;
       const priorBars = await fetchPriorSessionBars(sym, sessionDate, cfg.warmupSessions, auth);
       const sam = buildSamChartDay(sessionDate, bars, priorBars, dayTrades, cfg);
       return {

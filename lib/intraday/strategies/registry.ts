@@ -1,9 +1,10 @@
-import { DEFAULT_SAM_EMA50_200_CONFIG } from '@/lib/intraday/strategies/samEma50200/config';
+import { samConfigForStrategy } from '@/lib/intraday/strategies/samEma50200/config';
 import {
   INTRADAY_STRATEGY_BUY_WEAK_SELL_STRONG_V1,
   INTRADAY_STRATEGY_EMA_TREND_DAY_V1,
   INTRADAY_STRATEGY_EMA_TREND_DAY_V2,
   INTRADAY_STRATEGY_SAM_EMA50_200_V1,
+  INTRADAY_STRATEGY_SAM_EMA50_200_V2,
   INTRADAY_STRATEGY_TREND_RESUMPTION_V1_CONFIRMED,
   INTRADAY_STRATEGY_TREND_RESUMPTION_V1_EARLY,
   INTRADAY_STRATEGY_VWAP_OR_V1,
@@ -52,6 +53,12 @@ export const INTRADAY_STRATEGIES = [
     description:
       '5m bars, EMAs warmed from prior sessions. Buy when EMA50 crosses above EMA200 while rising and price > EMA50. Sell all when EMA50 slope turns down to -2/3 of its peak since entry. 3x ATR disaster stop, EOD flat.',
   },
+  {
+    id: INTRADAY_STRATEGY_SAM_EMA50_200_V2,
+    label: 'SAM EMA 50/200 v2 · 1-min (experimental)',
+    description:
+      '1m bars. Buys on EMA50/200 bull cross, or when EMA50 and EMA200 were both sliding down slowly and both turn to a positive slope. Same exits as v1: EMA50 slope reversal to -2/3 of peak, 3x ATR disaster stop, EOD flat.',
+  },
 ] as const;
 
 export function strategyLabel(id: string): string {
@@ -60,5 +67,5 @@ export function strategyLabel(id: string): string {
 
 /** Prior RTH sessions of 1m bars the strategy needs before the session being simulated. */
 export function strategyWarmupSessions(id: string): number {
-  return id === INTRADAY_STRATEGY_SAM_EMA50_200_V1 ? DEFAULT_SAM_EMA50_200_CONFIG.warmupSessions : 0;
+  return samConfigForStrategy(id)?.warmupSessions ?? 0;
 }

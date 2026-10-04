@@ -12,6 +12,7 @@ import type { BacktestTrade } from '@/lib/intraday/types';
 import {
   createChart,
   LineStyle,
+  TickMarkType,
   type IChartApi,
   type ISeriesApi,
   type SeriesMarker,
@@ -20,6 +21,27 @@ import {
   type LineData,
 } from 'lightweight-charts';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+
+const CHART_TZ = 'America/Los_Angeles';
+const ptClock = new Intl.DateTimeFormat('en-US', {
+  timeZone: CHART_TZ,
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false,
+});
+const ptDay = new Intl.DateTimeFormat('en-US', { timeZone: CHART_TZ, month: 'short', day: 'numeric' });
+
+function formatPtClock(time: Time): string {
+  return typeof time === 'number' ? ptClock.format(new Date(time * 1000)) : String(time);
+}
+
+/** ET and PT switch DST on the same local date, so during RTH they are always 3h apart. */
+function etHHMMToPt(hhmm: string): string {
+  const [h, m] = hhmm.split(':').map(Number);
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return hhmm;
+  const mins = (h * 60 + m - 180 + 1440) % 1440;
+  return `${String(Math.floor(mins / 60)).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}`;
+}
 
 const BUY_COLOR = '#38bdf8';
 const TRADE_WIN = '#22c55e';
@@ -121,6 +143,15 @@ export function IntradayBacktestChartModal({
         borderColor: '#3a3a40',
         timeVisible: true,
         secondsVisible: false,
+        tickMarkFormatter: (time: Time, type: TickMarkType) =>
+          type === TickMarkType.Time || type === TickMarkType.TimeWithSeconds
+            ? formatPtClock(time)
+            : typeof time === 'number'
+              ? ptDay.format(new Date(time * 1000))
+              : String(time),
+      },
+      localization: {
+        timeFormatter: (time: Time) => `${formatPtClock(time)} PT`,
       },
       crosshair: { vertLine: { labelBackgroundColor: '#3a3a40' } },
     });
@@ -219,7 +250,7 @@ export function IntradayBacktestChartModal({
           <p className="text-[10px] text-fg-dim">
             {payload?.barLabel ?? 'RTH'} · {payload?.lines.map(l => l.label).join(' / ')}
             {payload ? ' · ' : ''}
-            {dayTrades.length} simulated trade(s) this session · E / X markers
+            {dayTrades.length} simulated trade(s) this session · times in Pacific (PT)
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -277,14 +308,14 @@ export function IntradayBacktestChartModal({
           {dayTrades.map((t, i) => (
             <p key={i} className="py-0.5">
               <span style={{ color: BUY_COLOR }} className="font-bold">
-                BUY {t.entryTimeEt} @ {t.entryPrice.toFixed(2)}
+                BUY {etHHMMToPt(t.entryTimeEt)} PT @ {t.entryPrice.toFixed(2)}
               </span>
               {' → '}
               <span
                 style={{ color: t.pnlUsd >= 0 ? TRADE_WIN : TRADE_LOSS }}
                 className="font-bold"
               >
-                SELL {t.exitTimeEt} @ {t.exitPrice.toFixed(2)} {t.pnlUsd >= 0 ? '+' : '-'}$
+                SELL {etHHMMToPt(t.exitTimeEt)} PT @ {t.exitPrice.toFixed(2)} {t.pnlUsd >= 0 ? '+' : '-'}$
                 {Math.abs(t.pnlUsd).toFixed(2)}
               </span>
               {t.exitReason ? ` (${t.exitReason})` : ''}

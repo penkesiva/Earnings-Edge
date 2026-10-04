@@ -17,6 +17,7 @@ export type SamEma50200DayResult = { trades: BacktestTrade[] };
  * valid at the open; trades only on `sessionDate`, always flat by `forceFlatEt`.
  *
  * Entry: EMA50 crosses above EMA200 (within `crossEntryWindowBars`), EMA50 rising, close > EMA50.
+ * With `dualSlopeReversalEntry` (v2), also at the bar where both EMA slopes turn positive after a slow joint decline.
  * Exit: EMA50 slope turns negative and reaches -ratio x its peak since entry; disaster ATR stop; EOD.
  */
 export function simulateSamEma50200(
@@ -35,6 +36,8 @@ export function simulateSamEma50200(
   const e50 = ema(closes, config.emaFast);
   const e200 = ema(closes, config.emaSlow);
   const a = atr(series, config.atrPeriod);
+  const s50 = series.map((_, i) => slopePct(e50, i, config.slopeLookbackBars));
+  const s200 = series.map((_, i) => slopePct(e200, i, config.slopeLookbackBars));
 
   const totalShares = sharesFromBudget(effectiveBudgetUsd, series[firstToday].c);
   if (!totalShares) return { trades };
@@ -56,13 +59,14 @@ export function simulateSamEma50200(
   let cooldownUntil = 0;
   let lastCrossIdx = -1;
   let usedCrossIdx = -1;
+  let entrySetup = config.crossSetupType;
 
   const close = (exitTime: string, rawExit: number, exitReason: TradeExitReason) => {
     let pnlUsd = (applyLongExitPrice(rawExit, config) - entryPrice) * totalShares;
     pnlUsd -= commissionCost(totalShares, config) * 2;
     trades.push({
       sessionDate,
-      setupType: 'sam_ema50_200',
+      setupType: entrySetup,
       entryTimeEt: entryTime,
       exitTimeEt: exitTime,
       entryPrice,
@@ -127,14 +131,35 @@ export function simulateSamEma50200(
 
     if (tMin < firstEntry || tMin > noNewEntriesAfter) continue;
     if (roundTrips >= config.maxTradesPerDay || i < cooldownUntil) continue;
-    if (lastCrossIdx < 0 || lastCrossIdx === usedCrossIdx) continue;
-    if (i - lastCrossIdx > config.crossEntryWindowBars) continue;
     if (![e50[i], e200[i], slopeNow, a[i]].every(Number.isFinite)) continue;
 
-    const bullish = e50[i] > e200[i] && slopeNow > 0 && b.c > e50[i];
-    if (!bullish) continue;
+    let entryLines: string[] | null = null;
 
-    usedCrossIdx = lastCrossIdx;
+    const crossFresh =
+      lastCrossIdx >= 0 &&
+      lastCrossIdx !== usedCrossIdx &&
+      i - lastCrossIdx <= config.crossEntryWindowBars;
+    if (crossFresh && e50[i] > e200[i] && slopeNow > 0 && b.c > e50[i]) {
+      usedCrossIdx = lastCrossIdx;
+      entrySetup = config.crossSetupType;
+      entryLines = [
+        `EMA50 crossed above EMA200 at ${series[lastCrossIdx].endEt} (${series[lastCrossIdx].sessionDate})`,
+        `close ${b.c.toFixed(2)} > EMA50 ${e50[i].toFixed(2)} > EMA200 ${e200[i].toFixed(2)}`,
+        `EMA50 slope ${slopeNow.toFixed(3)}% rising`,
+      ];
+    } else if (config.dualSlopeReversalEntry) {
+      const rev = dualSlopeReversal(s50, s200, i, config);
+      if (rev) {
+        entrySetup = config.reversalSetupType;
+        entryLines = [
+          `EMA50 + EMA200 slopes both turned positive (${s50[i].toFixed(4)}% / ${s200[i].toFixed(4)}%)`,
+          `slow decline before the turn: ${rev.downBars}/${config.reversalLookbackBars} bars both falling, steepest EMA50 slope ${rev.minSlope50.toFixed(3)}%`,
+          `close ${b.c.toFixed(2)}, EMA50 ${e50[i].toFixed(2)}, EMA200 ${e200[i].toFixed(2)}`,
+        ];
+      }
+    }
+    if (!entryLines) continue;
+
     entryPrice = applyLongFillPrice(b.c, config);
     entryTime = b.endEt;
     stopPrice = entryPrice - config.atrStopMult * a[i];
@@ -142,9 +167,7 @@ export function simulateSamEma50200(
     mfeUsd = 0;
     maeUsd = 0;
     reasons = [
-      `EMA50 crossed above EMA200 at ${series[lastCrossIdx].endEt} (${series[lastCrossIdx].sessionDate})`,
-      `close ${b.c.toFixed(2)} > EMA50 ${e50[i].toFixed(2)} > EMA200 ${e200[i].toFixed(2)}`,
-      `EMA50 slope ${slopeNow.toFixed(3)}% rising`,
+      ...entryLines,
       `disaster stop ${stopPrice.toFixed(2)} (${config.atrStopMult}x ATR ${a[i].toFixed(3)})`,
     ];
     open = true;
@@ -156,4 +179,42 @@ export function simulateSamEma50200(
   }
 
   return { trades };
+}
+
+/**
+ * Turn bar: both slopes positive now and not both positive on the previous bar.
+ * EMA50 usually turns well before EMA200, so the slow-decline window ends at the last bar where
+ * both were still falling, which must be within `reversalMaxTurnBars` of the turn.
+ */
+function dualSlopeReversal(
+  s50: number[],
+  s200: number[],
+  i: number,
+  config: SamEma50200Config,
+): { downBars: number; minSlope50: number } | null {
+  if (!(s50[i] > 0 && s200[i] > 0)) return null;
+  if (s50[i - 1] > 0 && s200[i - 1] > 0) return null;
+
+  let lastBothDown = -1;
+  for (let j = i - 1; j >= Math.max(0, i - config.reversalMaxTurnBars); j--) {
+    if (s50[j] < 0 && s200[j] < 0) {
+      lastBothDown = j;
+      break;
+    }
+  }
+  if (lastBothDown < 0) return null;
+
+  const W = config.reversalLookbackBars;
+  const from = lastBothDown - W + 1;
+  if (from < 0) return null;
+  let downBars = 0;
+  let minSlope50 = Infinity;
+  for (let j = from; j <= lastBothDown; j++) {
+    if (!Number.isFinite(s50[j]) || !Number.isFinite(s200[j])) return null;
+    if (s50[j] < 0 && s200[j] < 0) downBars += 1;
+    minSlope50 = Math.min(minSlope50, s50[j]);
+  }
+  if (downBars < config.reversalMinDownBars) return null;
+  if (minSlope50 < -config.reversalMaxDeclineSlopePct) return null;
+  return { downBars, minSlope50 };
 }

@@ -5,6 +5,7 @@ export const INTRADAY_STRATEGY_EMA_TREND_DAY_V2 = 'ema_trend_day_v2' as const;
 export const INTRADAY_STRATEGY_TREND_RESUMPTION_V1_EARLY = 'trend_resumption_v1_early' as const;
 export const INTRADAY_STRATEGY_TREND_RESUMPTION_V1_CONFIRMED = 'trend_resumption_v1_confirmed' as const;
 export const INTRADAY_STRATEGY_SAM_EMA50_200_V1 = 'sam_ema50_200_v1' as const;
+export const INTRADAY_STRATEGY_SAM_EMA50_200_V2 = 'sam_ema50_200_v2' as const;
 
 export type IntradayStrategyId =
   | typeof INTRADAY_STRATEGY_VWAP_OR_V1
@@ -13,7 +14,8 @@ export type IntradayStrategyId =
   | typeof INTRADAY_STRATEGY_EMA_TREND_DAY_V2
   | typeof INTRADAY_STRATEGY_TREND_RESUMPTION_V1_EARLY
   | typeof INTRADAY_STRATEGY_TREND_RESUMPTION_V1_CONFIRMED
-  | typeof INTRADAY_STRATEGY_SAM_EMA50_200_V1;
+  | typeof INTRADAY_STRATEGY_SAM_EMA50_200_V1
+  | typeof INTRADAY_STRATEGY_SAM_EMA50_200_V2;
 
 export type IntradayRunMode = 'backtest' | 'paper' | 'live';
 
@@ -42,7 +44,9 @@ export type SetupType =
   | 'ema_pullback_confirmed'
   | 'trend_resumption_building'
   | 'trend_resumption_expanding'
-  | 'sam_ema50_200';
+  | 'sam_ema50_200'
+  | 'sam_v2_cross'
+  | 'sam_v2_reversal';
 
 export type MinuteBar = {
   t: string;
@@ -199,7 +203,7 @@ export type TrendResumptionV1Config = {
   exitOnBearCross: boolean;
 };
 
-/** SAM EMA 50/200 — 5m bars, EMAs warmed up from prior sessions. */
+/** SAM EMA 50/200 — N-minute bars, EMAs warmed up from prior sessions. */
 export type SamEma50200Config = {
   barMinutes: number;
   warmupSessions: number;
@@ -208,6 +212,18 @@ export type SamEma50200Config = {
   slopeLookbackBars: number;
   /** Bars after the EMA50/EMA200 bull cross during which entry is still allowed. */
   crossEntryWindowBars: number;
+  /** v2: also buy when both EMAs were sliding down slowly and both turn to a positive slope. */
+  dualSlopeReversalEntry: boolean;
+  /** Bars checked for the slow decline, ending at the last bar where both slopes were negative. */
+  reversalLookbackBars: number;
+  /** Max bars from that last joint-decline bar to the bar where both slopes are positive. */
+  reversalMaxTurnBars: number;
+  /** Min bars in that window where both EMA slopes were negative. */
+  reversalMinDownBars: number;
+  /** "Slowly": EMA50 slope never fell below -this % during the decline window. */
+  reversalMaxDeclineSlopePct: number;
+  crossSetupType: SetupType;
+  reversalSetupType: SetupType;
   /** Exit when EMA50 slope <= -ratio x peak slope since entry (slope must be negative). */
   exitSlopeReversalRatio: number;
   atrPeriod: number;
