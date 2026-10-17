@@ -9,6 +9,44 @@ import {
 import { computeMorningThesisGrade } from '@/lib/predictMarket/morningThesisGrade';
 
 const PROXY = 'SPY';
+/** Forecast ranges are SPX index levels. Daily bars are SPY. */
+const SPX_PER_SPY = 10;
+
+type SpyBar = { o?: number; h?: number; l?: number; c?: number; t?: string };
+
+/** Alpaca daily bar `t` starts with the session date, YYYY-MM-DD. */
+export function barCalendarDay(t?: string): string | null {
+  if (!t || t.length < 10) return null;
+  return t.slice(0, 10);
+}
+
+/**
+ * Last daily close from a session before `sessionDate`.
+ * The session day's own bar must not be used: its close made every graded
+ * day look flat (0% return, NEUTRAL).
+ */
+export function previousCloseBeforeSession(bars: SpyBar[], sessionDate: string): number | null {
+  const older = bars
+    .filter(b => {
+      const day = barCalendarDay(b.t);
+      return b.c != null && day != null && day < sessionDate;
+    })
+    .sort((a, b) => (a.t! < b.t! ? -1 : a.t! > b.t! ? 1 : 0));
+  return older.length ? older[older.length - 1].c! : null;
+}
+
+/** Forecast levels above 1000 are SPX. Bars are SPY, so scale those up before comparing. */
+export function rangeOnForecastScale(
+  spyLow: number,
+  spyHigh: number,
+  expLow: number,
+  expHigh: number,
+): { low: number; high: number } {
+  if (expLow > 1000 || expHigh > 1000) {
+    return { low: spyLow * SPX_PER_SPY, high: spyHigh * SPX_PER_SPY };
+  }
+  return { low: spyLow, high: spyHigh };
+}
 
 /** Grade session after close using SPY daily bar as SPX proxy (Phase 2). */
 export async function gradePredictMarketSession(
@@ -20,26 +58,28 @@ export async function gradePredictMarketSession(
   const start = sessionDate;
   const end = addCalendarDays(sessionDate, 1);
 
-  let bars: Array<{ o?: number; h?: number; l?: number; c?: number; t?: string }>;
+  let bars: SpyBar[];
   try {
     const raw = await getHistoricalBars(PROXY, start, end, '1Day', null);
-    bars = (raw as Array<{ o?: number; h?: number; l?: number; c?: number; t?: string }>) ?? [];
+    bars = (raw as SpyBar[]) ?? [];
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     throw new Error(`Could not load ${PROXY} bars: ${msg}`);
   }
 
-  const dayBar = bars.find(b => b.c != null) ?? bars[0];
+  const dayBar =
+    bars.find(b => barCalendarDay(b.t) === sessionDate && b.c != null) ??
+    bars.find(b => b.c != null) ??
+    bars[0];
   if (!dayBar?.c) {
     return 'No daily bar yet — market may still be open or data delayed.';
   }
 
   const prevEnd = sessionDate;
-  const prevStart = addCalendarDays(sessionDate, -5);
+  const prevStart = addCalendarDays(sessionDate, -10);
   const prevBarsRaw = await getHistoricalBars(PROXY, prevStart, prevEnd, '1Day', null);
-  const prevBars = (prevBarsRaw as Array<{ c?: number; o?: number; t?: string }>) ?? [];
-  const prior = [...prevBars].reverse().find(b => b.c != null && b.c !== dayBar.o);
-  const previousClose = prior?.c ?? dayBar.o ?? null;
+  const prevBars = (prevBarsRaw as SpyBar[]) ?? [];
+  const previousClose = previousCloseBeforeSession(prevBars, sessionDate);
   const open = dayBar.o ?? null;
   const high = dayBar.h ?? null;
   const low = dayBar.l ?? null;
@@ -136,9 +176,10 @@ export async function gradePredictMarketSession(
     let maeHigh: number | null = null;
     let maeLow: number | null = null;
     if (high != null && low != null && expLow != null && expHigh != null) {
-      rangeCoverage = low >= expLow && high <= expHigh;
-      maeHigh = Math.abs(high - expHigh);
-      maeLow = Math.abs(low - expLow);
+      const scaled = rangeOnForecastScale(low, high, expLow, expHigh);
+      rangeCoverage = scaled.low >= expLow && scaled.high <= expHigh;
+      maeHigh = Math.abs(scaled.high - expHigh);
+      maeLow = Math.abs(scaled.low - expLow);
     }
 
     const conf = Number(p.confidence);
