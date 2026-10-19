@@ -26,7 +26,7 @@ export type ServerEnvRequirement = {
 
 export const SYSTEM_STATUS_MANIFEST = {
   /** Bump when you change phases, migrations, or env requirements below. */
-  manifestVersion: '2026-09-25',
+  manifestVersion: '2026-10-19',
 
   phases: [
     {
@@ -100,6 +100,12 @@ export const SYSTEM_STATUS_MANIFEST = {
       name: 'Intraday — ticker strategies, backtest, paper/live automation',
       route: '/intraday',
       migration: '0026',
+      status: 'shipped',
+    },
+    {
+      id: 'marketlens',
+      name: 'MarketLens — SPY paper setups (S1–S3), backtest, no live orders',
+      route: '/marketlens',
       status: 'shipped',
     },
   ] satisfies SystemPhase[],

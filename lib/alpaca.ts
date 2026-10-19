@@ -117,6 +117,34 @@ export async function getHistoricalBars(
   return data.bars || [];
 }
 
+/** Follow Alpaca page tokens. One-minute history is longer than one response. */
+export async function getHistoricalBarsAll(
+  ticker: string,
+  start: string,
+  end: string,
+  timeframe = '1Day',
+  auth?: AlpacaAuth | null,
+) {
+  const a = resolveAuth(auth);
+  const bars: Array<Record<string, unknown>> = [];
+  let pageToken: string | undefined;
+  for (let page = 0; page < 30; page++) {
+    const url = new URL(`${a.dataBaseUrl}/v2/stocks/${ticker}/bars`);
+    url.searchParams.set('start', start);
+    url.searchParams.set('end', end);
+    url.searchParams.set('timeframe', timeframe);
+    url.searchParams.set('adjustment', 'split');
+    url.searchParams.set('limit', '10000');
+    if (pageToken) url.searchParams.set('page_token', pageToken);
+    const data = await fetchJson(url.toString(), a);
+    const chunk = (data.bars || []) as Array<Record<string, unknown>>;
+    bars.push(...chunk);
+    pageToken = data.next_page_token as string | undefined;
+    if (!pageToken) break;
+  }
+  return bars;
+}
+
 // ----- Options -----
 export async function getOptionChain(
   ticker: string,

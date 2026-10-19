@@ -14,6 +14,7 @@ const PRIMARY_LINKS: NavLink[] = [
   { href: '/trade', label: 'Trade' },
   { href: '/intraday', label: 'Intraday' },
   { href: '/predictmarket', label: 'PredictMarket' },
+  { href: '/marketlens', label: 'MarketLens' },
 ];
 
 const SECONDARY_LINKS: NavLink[] = [
