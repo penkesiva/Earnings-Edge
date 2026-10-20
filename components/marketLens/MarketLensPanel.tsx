@@ -1,6 +1,6 @@
 import { macroEventOn } from '@/lib/marketLens/events';
 import { planPaperOrder } from '@/lib/marketLens/paper';
-import type { DayReplay } from '@/lib/marketLens/types';
+import type { BacktestSummary, DayReplay } from '@/lib/marketLens/types';
 
 function fmtPt(iso: string): string {
   return new Date(iso).toLocaleTimeString('en-US', {
@@ -17,9 +17,15 @@ function money(n: number): string {
 export function MarketLensPanel({
   replay,
   error,
+  summary,
+  days,
+  runDays,
 }: {
   replay: DayReplay | null;
   error: string | null;
+  summary: BacktestSummary | null;
+  days: DayReplay[];
+  runDays: number | null;
 }) {
   const event = replay ? macroEventOn(replay.sessionDate) : null;
   const trade = replay?.trades[0] ?? null;
@@ -86,12 +92,48 @@ export function MarketLensPanel({
             <span className="page-chevron">›</span> Backtest
           </h3>
         </div>
-        <div className="px-4 py-4 space-y-2 text-xs text-fg-subtle">
-          <p>Uses the same Alpaca bars as the rest of the app. Output is R per hypothetical share, after 1 cent of slippage.</p>
-          <p className="font-mono text-[11px] text-fg">npm run marketlens</p>
-          <p className="font-mono text-[11px] text-fg">npm run marketlens -- 20</p>
-          <p className="font-mono text-[11px] text-fg">npm run marketlens -- 2026-10-01 2026-10-16</p>
-          <p>Live and paper order routing stays off until a walk-forward test says a setup is worth sending.</p>
+        <div className="px-4 py-4 space-y-3 text-xs text-fg-subtle">
+          <p>Runs in the browser against Alpaca. 20 finished sessions is the cap on this page. Longer ranges stay on the command line.</p>
+          <form method="get" className="flex flex-wrap items-center gap-2">
+            <select
+              name="days"
+              defaultValue={String(runDays ?? 10)}
+              className="h-9 border border-border bg-transparent px-2 text-xs text-fg"
+            >
+              <option value="5">5 sessions</option>
+              <option value="10">10 sessions</option>
+              <option value="20">20 sessions</option>
+            </select>
+            <button
+              type="submit"
+              className="inline-flex h-9 items-center justify-center border border-border px-4 text-xs font-bold tracking-wide text-fg-subtle hover:border-accent hover:text-accent"
+            >
+              Run backtest
+            </button>
+          </form>
+          {summary ? (
+            <div className="space-y-2">
+              <p className="text-sm font-bold text-fg">
+                {summary.sessions} sessions · {summary.trades} trades · {summary.wins} wins · {summary.losses} losses · total R {summary.totalR.toFixed(2)}
+              </p>
+              <p>Probability is INSUFFICIENT_EVIDENCE. A negative total R means the rules lost on this sample.</p>
+              <div className="divide-y divide-border-subtle border border-border">
+                {days.flatMap(day =>
+                  day.trades.length
+                    ? day.trades.map(t => (
+                        <div key={`${day.sessionDate}-${t.signalTime}`} className="px-3 py-2">
+                          {day.sessionDate} · {t.setup} · {t.side} · {t.exitReason} · R {t.rMultiple.toFixed(2)}
+                        </div>
+                      ))
+                    : [
+                        <div key={day.sessionDate} className="px-3 py-2 text-fg-dim">
+                          {day.sessionDate} · no trade
+                        </div>,
+                      ],
+                )}
+              </div>
+            </div>
+          ) : null}
         </div>
       </section>
     </div>

@@ -29,6 +29,14 @@ export function previousTradingDay(iso: string): string {
   return d;
 }
 
+/** Walk back `sessions` finished trading days, including `end`. Capped at 20. */
+export function sessionWindow(end: string, sessions: number): { start: string; end: string } {
+  const n = Math.min(20, Math.max(1, Math.floor(sessions)));
+  let start = end;
+  for (let i = 1; i < n; i++) start = previousTradingDay(start);
+  return { start, end };
+}
+
 /** Last regular session that has already finished (4:05 PM ET). */
 export function lastCompletedSessionDate(now = new Date()): string {
   const et = etStamp(now.toISOString());

@@ -1,15 +1,35 @@
 import { MarketLensPanel } from '@/components/marketLens/MarketLensPanel';
-import { replaySavedSession } from '@/lib/marketLens/backtest';
-import { lastCompletedSessionDate } from '@/lib/marketLens/sessionTime';
+import { replaySavedSession, runMarketLensBacktest } from '@/lib/marketLens/backtest';
+import type { BacktestSummary, DayReplay } from '@/lib/marketLens/types';
+import { lastCompletedSessionDate, sessionWindow } from '@/lib/marketLens/sessionTime';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
-export default async function MarketLensPage() {
+export default async function MarketLensPage({
+  searchParams,
+}: {
+  searchParams: { days?: string };
+}) {
   const sessionDate = lastCompletedSessionDate();
-  let replay = null;
+  const requested = Number(searchParams.days);
+  const runDays = Number.isFinite(requested) && requested > 0 ? Math.min(20, Math.floor(requested)) : null;
+
+  let replay: DayReplay | null = null;
   let error: string | null = null;
+  let summary: BacktestSummary | null = null;
+  let days: DayReplay[] = [];
+
   try {
-    replay = await replaySavedSession(sessionDate);
+    if (runDays) {
+      const window = sessionWindow(sessionDate, runDays);
+      const result = await runMarketLensBacktest(window.start, window.end);
+      days = result.days;
+      summary = result.summary;
+      replay = days[days.length - 1] ?? null;
+    } else {
+      replay = await replaySavedSession(sessionDate);
+    }
   } catch (e) {
     error = e instanceof Error ? e.message : 'Could not load SPY bars.';
   }
@@ -24,7 +44,7 @@ export default async function MarketLensPage() {
           SPY intraday structure. Paper research only. PredictMarket can add context later. It does not place the trade.
         </p>
       </div>
-      <MarketLensPanel replay={replay} error={error} />
+      <MarketLensPanel replay={replay} error={error} summary={summary} days={days} runDays={runDays} />
     </div>
   );
 }
