@@ -51,6 +51,30 @@ function levelsBelow(price: number, vals: Array<number | null>): number | null {
   return Math.max(...below);
 }
 
+export type CandlePoint = {
+  time: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+};
+
+export function sessionCandles(sessionDate: string, bars: SpyBar[]): CandlePoint[] {
+  return bars
+    .filter(b => {
+      const et = etStamp(b.t);
+      return et.date === sessionDate && et.minutes >= OPEN && et.minutes < 16 * 60;
+    })
+    .sort((a, b) => (a.t < b.t ? -1 : 1))
+    .map(b => ({
+      time: Math.floor(new Date(b.t).getTime() / 1000),
+      open: b.o,
+      high: b.h,
+      low: b.l,
+      close: b.c,
+    }));
+}
+
 export function replaySession(sessionDate: string, bars: SpyBar[], prior: PriorSession): DayReplay {
   const rth = bars
     .filter(b => {

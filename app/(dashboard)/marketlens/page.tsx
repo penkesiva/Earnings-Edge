@@ -1,5 +1,6 @@
 import { MarketLensPanel } from '@/components/marketLens/MarketLensPanel';
-import { replaySavedSession, runMarketLensBacktest } from '@/lib/marketLens/backtest';
+import { loadSessionBars, replaySavedSession, runMarketLensBacktest } from '@/lib/marketLens/backtest';
+import { sessionCandles, type CandlePoint } from '@/lib/marketLens/replay';
 import type { BacktestSummary, DayReplay } from '@/lib/marketLens/types';
 import { lastCompletedSessionDate, sessionWindow } from '@/lib/marketLens/sessionTime';
 
@@ -9,7 +10,7 @@ export const maxDuration = 60;
 export default async function MarketLensPage({
   searchParams,
 }: {
-  searchParams: { days?: string };
+  searchParams: { days?: string; chart?: string };
 }) {
   const sessionDate = lastCompletedSessionDate();
   const requested = Number(searchParams.days);
@@ -19,6 +20,8 @@ export default async function MarketLensPage({
   let error: string | null = null;
   let summary: BacktestSummary | null = null;
   let days: DayReplay[] = [];
+  let chartCandles: CandlePoint[] = [];
+  let chartDate: string | null = null;
 
   try {
     if (runDays) {
@@ -27,8 +30,18 @@ export default async function MarketLensPage({
       days = result.days;
       summary = result.summary;
       replay = days[days.length - 1] ?? null;
+      const asked = searchParams.chart;
+      chartDate =
+        asked && days.some(d => d.sessionDate === asked)
+          ? asked
+          : (days.find(d => d.trades.length > 0)?.sessionDate ?? null);
     } else {
       replay = await replaySavedSession(sessionDate);
+      chartDate = replay.trades.length ? sessionDate : null;
+    }
+    if (chartDate) {
+      const loaded = await loadSessionBars(chartDate);
+      chartCandles = sessionCandles(chartDate, loaded.minutes);
     }
   } catch (e) {
     error = e instanceof Error ? e.message : 'Could not load SPY bars.';
@@ -44,7 +57,15 @@ export default async function MarketLensPage({
           SPY intraday structure. Paper research only. PredictMarket can add context later. It does not place the trade.
         </p>
       </div>
-      <MarketLensPanel replay={replay} error={error} summary={summary} days={days} runDays={runDays} />
+      <MarketLensPanel
+        replay={replay}
+        error={error}
+        summary={summary}
+        days={days}
+        runDays={runDays}
+        chartCandles={chartCandles}
+        chartDate={chartDate}
+      />
     </div>
   );
 }

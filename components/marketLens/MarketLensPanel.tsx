@@ -1,5 +1,7 @@
+import { MarketLensDayChart } from '@/components/marketLens/MarketLensDayChart';
 import { macroEventOn } from '@/lib/marketLens/events';
 import { planPaperOrder } from '@/lib/marketLens/paper';
+import type { CandlePoint } from '@/lib/marketLens/replay';
 import type { BacktestSummary, DayReplay } from '@/lib/marketLens/types';
 
 function fmtPt(iso: string): string {
@@ -20,12 +22,16 @@ export function MarketLensPanel({
   summary,
   days,
   runDays,
+  chartCandles,
+  chartDate,
 }: {
   replay: DayReplay | null;
   error: string | null;
   summary: BacktestSummary | null;
   days: DayReplay[];
   runDays: number | null;
+  chartCandles: CandlePoint[];
+  chartDate: string | null;
 }) {
   const event = replay ? macroEventOn(replay.sessionDate) : null;
   const trade = replay?.trades[0] ?? null;
@@ -69,7 +75,7 @@ export function MarketLensPanel({
           </div>
           <div className="px-4 py-4 space-y-2 text-xs text-fg-subtle">
             <p className="text-sm font-bold text-fg">
-              {trade.setup} · {trade.side} · {trade.exitReason} · R {trade.rMultiple.toFixed(2)}
+              {trade.side === 'long' ? 'Bought' : 'Short'} {money(trade.entry)} · {trade.side === 'long' ? 'Sold' : 'Covered'} {money(trade.exit)} · {trade.exitReason} · {trade.rMultiple >= 0 ? '+' : ''}{trade.rMultiple.toFixed(2)} R
             </p>
             <p>
               Signal {fmtPt(trade.signalTime)} PT · fill {fmtPt(trade.entryTime)} PT · out {fmtPt(trade.exitTime)} PT
@@ -83,6 +89,16 @@ export function MarketLensPanel({
               Alpaca paper plan (not sent): {plan.side} 1 SPY, stop {plan.stop_price}, target {plan.target_price}.
             </p>
           </div>
+        </section>
+      ) : null}
+
+      {chartDate && chartCandles.length > 0 && !summary ? (
+        <section className="border border-border px-4 py-4">
+          <MarketLensDayChart
+            sessionDate={chartDate}
+            candles={chartCandles}
+            trade={replay?.trades[0] ?? null}
+          />
         </section>
       ) : null}
 
@@ -117,14 +133,38 @@ export function MarketLensPanel({
                 {summary.sessions} sessions · {summary.trades} trades · {summary.wins} wins · {summary.losses} losses · total R {summary.totalR.toFixed(2)}
               </p>
               <p>Probability is INSUFFICIENT_EVIDENCE. A negative total R means the rules lost on this sample.</p>
+              {chartDate && chartCandles.length > 0 ? (
+                <MarketLensDayChart
+                  sessionDate={chartDate}
+                  candles={chartCandles}
+                  trade={days.find(d => d.sessionDate === chartDate)?.trades[0] ?? null}
+                />
+              ) : null}
               <div className="divide-y divide-border-subtle border border-border">
                 {days.flatMap(day =>
                   day.trades.length
-                    ? day.trades.map(t => (
-                        <div key={`${day.sessionDate}-${t.signalTime}`} className="px-3 py-2">
-                          {day.sessionDate} · {t.setup} · {t.side} · {t.exitReason} · R {t.rMultiple.toFixed(2)}
-                        </div>
-                      ))
+                    ? day.trades.map(t => {
+                        const bought = t.side === 'long';
+                        const href = `/marketlens?days=${runDays ?? 10}&chart=${day.sessionDate}`;
+                        return (
+                          <a
+                            key={`${day.sessionDate}-${t.signalTime}`}
+                            href={href}
+                            className={`block px-3 py-2 hover:bg-accent-muted ${chartDate === day.sessionDate ? 'bg-accent-muted' : ''}`}
+                          >
+                            <span className="text-fg">
+                              {day.sessionDate} · {bought ? 'Bought' : 'Short'} {money(t.entry)} at {fmtPt(t.entryTime)} PT
+                              {' · '}
+                              {bought ? 'Sold' : 'Covered'} {money(t.exit)} at {fmtPt(t.exitTime)} PT
+                            </span>
+                            <span className="text-fg-dim">
+                              {' '}
+                              · {t.exitReason} · {t.rMultiple >= 0 ? '+' : ''}
+                              {t.rMultiple.toFixed(2)} R
+                            </span>
+                          </a>
+                        );
+                      })
                     : [
                         <div key={day.sessionDate} className="px-3 py-2 text-fg-dim">
                           {day.sessionDate} · no trade
