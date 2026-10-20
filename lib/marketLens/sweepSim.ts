@@ -17,7 +17,16 @@ export type SweepDay = {
   prior: { high: number; low: number; close: number };
 };
 
-export type Setup = 'S1' | 'RECLAIM' | 'VWAP' | 'ORB' | 'PULLBACK';
+export type Setup =
+  | 'S1'
+  | 'RECLAIM'
+  | 'VWAP'
+  | 'ORB'
+  | 'PULLBACK'
+  | 'BB_REVERT'
+  | 'BB_REVERT_5M'
+  | 'BB_SQUEEZE'
+  | 'BB_SQUEEZE_5M';
 export type Filter = 'none' | 'ema21up' | 'aboveVwap' | 'abovePrior' | 'gapUp';
 export type Cfg = { setup: Setup; stopAtr: number; targetR: number; filter: Filter; vol: boolean; timeBars: number };
 export type Trade = {
@@ -37,6 +46,19 @@ export const VWAP_SCALP: Cfg = { setup: 'VWAP', stopAtr: 2, targetR: 0.25, filte
 export const SUPPORT_RUNNER: Cfg = { setup: 'S1', stopAtr: 1.5, targetR: 3, filter: 'none', vol: true, timeBars: 120 };
 
 const SLIP = 0.01;
+const BB_SD = 2;
+const SQUEEZE_LOOKBACK = 120;
+const SQUEEZE_RECENT = 10;
+
+type Band = { mid: number; upper: number; lower: number; width: number };
+
+function band(closes: number[], period: number): Band | null {
+  if (closes.length < period) return null;
+  const w = closes.slice(-period);
+  const mid = w.reduce((s, c) => s + c, 0) / period;
+  const sd = Math.sqrt(w.reduce((s, c) => s + (c - mid) ** 2, 0) / period);
+  return { mid, upper: mid + BB_SD * sd, lower: mid - BB_SD * sd, width: (2 * BB_SD * sd) / Math.abs(mid) };
+}
 
 function asBar(raw: Record<string, unknown>): Omit<SweepBar, 'm'> | null {
   const t = raw.t;
@@ -102,6 +124,11 @@ export function runLong(day: SweepDay, cfg: Cfg): Trade | null {
   let pending: { stop: number } | null = null;
   let pos: { entry: number; stop: number; target: number; risk: number; held: number; idx: number } | null = null;
   let done = false;
+  const bbPeriod = cfg.setup === 'BB_REVERT_5M' || cfg.setup === 'BB_SQUEEZE_5M' ? 100 : 20;
+  const isBb = cfg.setup.startsWith('BB_');
+  const closes: number[] = [];
+  const widths: number[] = [];
+  let prevBand: Band | null = null;
 
   const finish = (exit: number, reason: string, i: number): Trade => {
     const p = pos!;
@@ -131,6 +158,12 @@ export function runLong(day: SweepDay, cfg: Cfg): Trade | null {
     const volAvg = vols.reduce((s, v) => s + v, 0) / vols.length;
     recent.push(bar);
     if (recent.length > 10) recent.shift();
+    if (isBb) closes.push(bar.c);
+    const bb = isBb ? band(closes, bbPeriod) : null;
+    if (bb) {
+      widths.push(bb.width);
+      if (widths.length > SQUEEZE_LOOKBACK) widths.shift();
+    }
     if (bar.m < 585) {
       orH = Math.max(orH, bar.h);
       orL = Math.min(orL, bar.l);
@@ -194,6 +227,15 @@ export function runLong(day: SweepDay, cfg: Cfg): Trade | null {
         if (prevC != null && prevC <= orH && bar.c > orH && green) stopBase = Math.min(...recent.slice(-5).map(b => b.l));
       } else if (cfg.setup === 'PULLBACK') {
         if (bar.l <= e21 && bar.c > e21 && green && e21Up) stopBase = bar.l;
+      } else if ((cfg.setup === 'BB_REVERT' || cfg.setup === 'BB_REVERT_5M') && bb && prevBand && prevC != null) {
+        if (prevC < prevBand.lower && bar.c > bb.lower && green) stopBase = Math.min(...recent.slice(-5).map(b => b.l));
+      } else if ((cfg.setup === 'BB_SQUEEZE' || cfg.setup === 'BB_SQUEEZE_5M') && bb && prevBand && prevC != null) {
+        const minWidth = Math.min(...widths);
+        const squeezed =
+          widths.length >= SQUEEZE_LOOKBACK / 2 && widths.slice(-SQUEEZE_RECENT).some(w => w <= minWidth * 1.05);
+        if (squeezed && prevC <= prevBand.upper && bar.c > bb.upper && green) {
+          stopBase = Math.min(...recent.slice(-5).map(b => b.l));
+        }
       }
 
       if (stopBase != null && filterOk && volOk) pending = { stop: stopBase - cfg.stopAtr * atr };
@@ -201,6 +243,7 @@ export function runLong(day: SweepDay, cfg: Cfg): Trade | null {
 
     prevBelowVwap = bar.c < vwap;
     prevC = bar.c;
+    prevBand = bb;
   }
   if (pos) {
     const last = bars.length - 1;

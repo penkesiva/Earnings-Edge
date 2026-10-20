@@ -151,7 +151,10 @@ async function main() {
     `sample ${sample.date} 9:45 ET SPY ${s0.o.toFixed(2)}: ATM 1DTE call ~$${bs('call', s0.o, Math.round(s0.o), yearsLeft(585), iv.get(sample.date)!).toFixed(2)}, put ~$${bs('put', s0.o, Math.round(s0.o), yearsLeft(585), iv.get(sample.date)!).toFixed(2)} per share`,
   );
 
-  const setups: Setup[] = ['S1', 'RECLAIM', 'VWAP', 'ORB', 'PULLBACK'];
+  const setupArg = process.argv.find(a => a.startsWith('--setups='));
+  const setups: Setup[] = setupArg
+    ? (setupArg.slice('--setups='.length).split(',') as Setup[])
+    : ['S1', 'RECLAIM', 'VWAP', 'ORB', 'PULLBACK'];
   const stops = [1, 1.5, 2, 3];
   const targets = [0.25, 0.5, 1, 2, 3];
   const filters: Filter[] = ['none', 'ema21up', 'aboveVwap', 'abovePrior', 'gapUp'];
