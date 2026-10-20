@@ -19,6 +19,7 @@ const FOMC_FLAT = 13 * 60 + 45;
 const SLIP = 0.01;
 const MIN_RR = 2;
 const TIME_STOP_BARS = 60;
+const LONG_ONLY = true;
 
 type Pending = {
   setup: SetupId;
@@ -220,7 +221,9 @@ export function replaySession(sessionDate: string, bars: SpyBar[], prior: PriorS
       const supports = [prior.low, orLow].filter((v): v is number => v != null);
       const resistances = [prior.high, orHigh].filter((v): v is number => v != null);
       const support = supports.find(level => bar.l <= level + zone && bar.c > level && bar.c > bar.o);
-      const resistance = resistances.find(level => bar.h >= level - zone && bar.c < level && bar.c < bar.o);
+      const resistance = LONG_ONLY
+        ? undefined
+        : resistances.find(level => bar.h >= level - zone && bar.c < level && bar.c < bar.o);
       let vwapSide: Pending | null = null;
       if (!support && !resistance && fiveClosed && last5Close != null && ema != null) {
         const fiveLow = Math.min(...bucket.map(b => b.l));
@@ -232,7 +235,7 @@ export function replaySession(sessionDate: string, bars: SpyBar[], prior: PriorS
             stop: fiveLow - atr,
             signalTime: bar.t,
           };
-        } else if (last5Close > vwap && bar.c < vwap && bar.c < ema && fiveHigh >= vwap - zone) {
+        } else if (!LONG_ONLY && last5Close > vwap && bar.c < vwap && bar.c < ema && fiveHigh >= vwap - zone) {
           vwapSide = {
             setup: 'S3_VWAP_REJECT',
             side: 'short',
